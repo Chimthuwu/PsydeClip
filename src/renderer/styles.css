@@ -1,0 +1,1304 @@
+:root {
+  --bg: #070a1c;
+  --bg-2: #0c1133;
+  --fg: #e8edff;
+  --muted: #8e9cc8;
+  --accent: #7df9ff;
+  --accent-2: #b48bff;
+  --accent-3: #ff8df0;
+  --danger: #ff5d6c;
+  --ok: #7fffaf;
+  --line: rgba(120, 150, 255, 0.18);
+  --line-soft: rgba(120, 150, 255, 0.08);
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.app {
+  display: grid;
+  /* minmax(0, 1fr) — without the 0 floor the board row refuses to shrink below
+     its canvas content and pushes the footer off-screen on small windows. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  position: relative;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(125, 249, 255, 0.08), transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(180, 139, 255, 0.08), transparent 60%),
+    var(--bg);
+  overflow: hidden;
+}
+
+.app.theme-classic {
+  background: #000;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, monospace;
+  color: #00ff00;
+}
+.app.theme-classic :root {
+  color-scheme: dark;
+}
+
+.app.theme-cyberpunk {
+  --bg: #0f0518;
+  --bg-2: #1a0524;
+  --fg: #fcee0a;
+  --muted: #887a05;
+  --accent: #fcee0a;
+  --accent-2: #00ffff;
+  --accent-3: #ff003c;
+  --danger: #ff003c;
+  --ok: #00ffff;
+  --line: rgba(252, 238, 10, 0.25);
+  --line-soft: rgba(252, 238, 10, 0.1);
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(0, 255, 255, 0.08), transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(255, 0, 60, 0.08), transparent 60%),
+    var(--bg);
+}
+
+.app.theme-synthwave {
+  --bg: #140c28;
+  --bg-2: #2b1055;
+  --fg: #ff7700;
+  --muted: #b35900;
+  --accent: #ff7700;
+  --accent-2: #ff00a0;
+  --accent-3: #00e5ff;
+  --danger: #ff0055;
+  --ok: #00e5ff;
+  --line: rgba(255, 119, 0, 0.25);
+  --line-soft: rgba(255, 119, 0, 0.1);
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(255, 0, 160, 0.08), transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(0, 229, 255, 0.08), transparent 60%),
+    var(--bg);
+}
+
+.app.theme-monochrome {
+  --bg: #000000;
+  --bg-2: #111111;
+  --fg: #ffffff;
+  --muted: #888888;
+  --accent: #ffffff;
+  --accent-2: #cccccc;
+  --accent-3: #aaaaaa;
+  --danger: #ffffff;
+  --ok: #ffffff;
+  --line: rgba(255, 255, 255, 0.2);
+  --line-soft: rgba(255, 255, 255, 0.08);
+  background: var(--bg);
+  filter: grayscale(100%);
+}
+
+/* HUD -------------------------------------------------------------------- */
+
+.hud {
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  gap: clamp(4px, 1vw, 8px);
+  padding: clamp(8px, 1.8vw, 16px) clamp(10px, 2vw, 20px);
+  border-bottom: 1px solid var(--line);
+  background: rgba(7, 10, 28, 0.65);
+  backdrop-filter: blur(10px);
+  min-width: 0;
+}
+.app.theme-classic .hud {
+  background: #000;
+  border-bottom: 1px solid #003300;
+}
+
+.hud-status {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.2vw, 12px);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pill {
+  font-size: 12px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+.pill.on {
+  background: rgba(127, 255, 175, 0.12);
+  color: var(--ok);
+  border: 1px solid rgba(127, 255, 175, 0.35);
+}
+.pill.off {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.app.theme-classic .pill.on {
+  background: #001a00;
+  color: #00ff00;
+  border: 1px solid #00ff00;
+}
+.app.theme-classic .pill.off {
+  background: transparent;
+  color: #00aa00;
+  border: 1px solid #005500;
+}
+
+.hud-mode {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Grows to eat the leftover row space and shrinks to a 40px stub rather than
+   pushing the elapsed-time readout off the right edge. */
+.hud-buffer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.hud-buffer em {
+  white-space: nowrap;
+}
+.hud-buffer progress {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 40px;
+  max-width: 130px;
+  height: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.hud-buffer progress::-webkit-progress-bar {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.hud-buffer progress::-webkit-progress-value {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 4px;
+}
+.app.theme-classic .hud-buffer progress {
+  background: #001a00;
+}
+.app.theme-classic .hud-buffer progress::-webkit-progress-bar {
+  background: #001a00;
+}
+.app.theme-classic .hud-buffer progress::-webkit-progress-value {
+  background: #00ff00;
+}
+
+.hud-vu {
+  position: relative;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.vu-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+  transition: width 60ms linear;
+}
+.app.theme-classic .vu-bar {
+  background: #00ff00;
+}
+
+.hud-actions {
+  display: flex;
+  gap: clamp(5px, 1vw, 8px);
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+/* The save button carries the longest label, so it's the one that gets to
+   absorb the remaining width (and ellipsise) instead of overflowing. */
+.hud-actions .primary {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud-actions .ghost {
+  flex: 0 0 auto;
+}
+
+/* Long/short label pairs — the short one takes over at narrow widths. */
+.lbl-short { display: none; }
+
+.hud-hint {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud-hint kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  font-family: inherit;
+  color: var(--fg);
+}
+
+.hud-error {
+  font-size: 12px;
+  color: var(--danger);
+  background: rgba(255, 93, 108, 0.08);
+  border: 1px solid rgba(255, 93, 108, 0.25);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+/* Board ------------------------------------------------------------------ */
+
+.board {
+  position: relative;
+  margin: clamp(6px, 1.6vw, 16px);
+  min-width: 0;
+  min-height: 0;
+  border-radius: clamp(8px, 1.4vw, 14px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #050717;
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(120, 150, 255, 0.06);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.board.is-capturing {
+  border-color: #39ff14;
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(120, 150, 255, 0.06),
+    0 0 24px rgba(57, 255, 20, 0.4);
+}
+.app.theme-classic .board {
+  background: #000;
+  border: 1px solid #003300;
+  box-shadow: none;
+}
+.app.theme-classic .board.is-capturing {
+  border-color: #ffff00;
+  box-shadow: 0 0 24px rgba(255, 255, 0, 0.4);
+}
+.app.theme-cyberpunk .board.is-capturing {
+  border-color: #00ffff;
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 255, 255, 0.06),
+    0 0 24px rgba(0, 255, 255, 0.4);
+}
+.app.theme-synthwave .board.is-capturing {
+  border-color: #ff00a0;
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 0, 160, 0.06),
+    0 0 24px rgba(255, 0, 160, 0.4);
+}
+.app.theme-monochrome .board.is-capturing {
+  border-color: #ffffff;
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 24px rgba(255, 255, 255, 0.4);
+}
+.board canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Sidebar ---------------------------------------------------------------- */
+
+.sidebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(8px, 1.4vw, 12px);
+  padding: clamp(8px, 1.4vw, 12px) clamp(10px, 2vw, 20px) clamp(10px, 2vw, 20px);
+  border-top: 1px solid var(--line);
+  background: rgba(7, 10, 28, 0.5);
+  align-items: center;
+  min-width: 0;
+}
+.sidebar > * {
+  min-width: 0;
+}
+.app.theme-classic .sidebar {
+  background: #000;
+  border-top: 1px solid #003300;
+}
+
+.picker-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(6px, 1.2vw, 12px);
+  min-width: 0;
+}
+.picker-row-stack {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+}
+.picker-row label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.15;
+}
+.picker-row small {
+  grid-column: 2 / 3;
+  font-size: 11px;
+  color: var(--muted);
+}
+.picker-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative; /* anchors the dropdown popover */
+  min-width: 0;
+}
+
+select, input[type='text'], input[type='number'] {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+select:focus, input:focus {
+  border-color: var(--accent);
+}
+option {
+  background: var(--bg-2);
+  color: var(--fg);
+}
+
+/* Custom dropdown listbox ----------------------------------------------- */
+/* OS popup menus ignore most CSS, so the source picker uses an in-DOM
+   button + popover instead so we get full colour control. */
+
+.dd-trigger {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  padding: 8px 12px 8px 10px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.dd-trigger:hover {
+  border-color: rgba(125, 249, 255, 0.35);
+}
+.dd-trigger:focus,
+.dd-trigger[aria-expanded='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(125, 249, 255, 0.12);
+}
+.dd-trigger.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.dd-trigger .dd-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dd-trigger .dd-chevron {
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 120ms ease;
+}
+.dd-trigger[aria-expanded='true'] .dd-chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+/* The picker lives in the footer, so the popover opens UPWARD into the board
+   area. Dropping down would run past the bottom of the window and get clipped
+   by `.app { overflow: hidden }`. max-height is viewport-relative so the list
+   still fits when the window is short. */
+.dd-popover {
+  position: absolute;
+  z-index: 50;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 40px; /* leave room for refresh button */
+  background: linear-gradient(180deg, #0c1133 0%, #0a0f29 100%);
+  border: 1px solid rgba(125, 249, 255, 0.28);
+  border-radius: 10px;
+  box-shadow:
+    0 -18px 48px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(125, 249, 255, 0.06),
+    0 0 30px rgba(125, 249, 255, 0.12);
+  padding: 4px;
+  max-height: min(320px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Custom scrollbar inside the popover */
+.dd-popover::-webkit-scrollbar {
+  width: 10px;
+}
+.dd-popover::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dd-popover::-webkit-scrollbar-thumb {
+  background: rgba(125, 249, 255, 0.22);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.dd-popover::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 249, 255, 0.45);
+  background-clip: content-box;
+}
+
+.dd-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dd-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.dd-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+  transition: background 90ms ease, color 90ms ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dd-item:hover {
+  background: rgba(125, 249, 255, 0.12);
+  color: #ffffff;
+}
+.dd-item.is-selected {
+  background: rgba(180, 139, 255, 0.18);
+  color: #ffffff;
+}
+.dd-item.is-selected::before {
+  content: '✓ ';
+  color: var(--accent);
+  margin-right: 4px;
+}
+.dd-item.is-placeholder {
+  color: var(--muted);
+  font-style: italic;
+  cursor: default;
+}
+.dd-item.is-placeholder:hover {
+  background: transparent;
+  color: var(--muted);
+}
+.dd-item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Classic theme live-update */
+.app.theme-classic .dd-trigger {
+  background: #000;
+  border-color: #00ff00;
+  color: #00ff00;
+}
+.app.theme-classic .dd-trigger .dd-chevron {
+  color: #00ff00;
+}
+.app.theme-classic .dd-trigger[aria-expanded='true'] .dd-chevron {
+  color: #00ff00;
+}
+.app.theme-classic .dd-popover {
+  background: #000;
+  border-color: #00ff00;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 255, 0, 0.18);
+}
+.app.theme-classic .dd-item {
+  color: #00ff00;
+}
+.app.theme-classic .dd-item:hover {
+  background: rgba(0, 255, 0, 0.10);
+  color: #ffffff;
+}
+.app.theme-classic .dd-item.is-selected {
+  background: rgba(0, 255, 0, 0.20);
+  color: #ffffff;
+}
+.app.theme-classic .dd-item.is-selected::before {
+  color: #00ff00;
+}
+.app.theme-classic .dd-empty {
+  color: #00aa00;
+}
+
+/* Ensure native <select> inside SettingsPanel/templating fields still get
+   the dark scheme (OS might still render the popup light, but the closed
+   field will be correct). */
+.app.theme-classic select,
+.app.theme-classic input {
+  background: #000;
+  border: 1px solid #00ff00;
+  color: #00ff00;
+}
+.app.theme-classic option {
+  background: #000;
+  color: #00ff00;
+}
+
+.viz-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* Buttons --------------------------------------------------------------- */
+
+button {
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: transform 80ms ease, background 120ms ease, border-color 120ms ease;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+button:active {
+  transform: scale(0.97);
+}
+button.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border: 0;
+  padding: 8px 14px;
+  color: #04122a;
+  font-weight: 600;
+}
+button.primary.big {
+  padding: 10px 18px;
+  font-size: 14px;
+}
+button.ghost {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+}
+button.ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.app.theme-classic button.primary {
+  background: #00ff00;
+  color: #000;
+}
+.app.theme-classic button.ghost {
+  background: transparent;
+  color: #00ff00;
+  border: 1px solid #00ff00;
+}
+.app.theme-classic button.ghost:hover {
+  background: #001a00;
+}
+button.chip {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+button.chip.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(125, 249, 255, 0.08);
+}
+.app.theme-classic button.chip.on {
+  background: #001a00;
+  border-color: #00ff00;
+  color: #00ff00;
+}
+
+.theme-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.theme-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  color: var(--fg);
+}
+.theme-card.on {
+  border-color: var(--accent);
+  background: rgba(125, 249, 255, 0.08);
+}
+.theme-card .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  box-shadow: 0 0 10px currentColor;
+}
+.preset-row,
+.chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.slider-row input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.checkbox-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: flex-start;
+  cursor: pointer;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+}
+.checkbox-row input { margin-top: 3px; }
+.checkbox-row strong { display: block; font-size: 13px; }
+.checkbox-row em {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  font-style: normal;
+  margin-top: 2px;
+}
+.app.theme-classic .checkbox-row {
+  background: #000;
+  border: 1px solid #00ff00;
+}
+
+.template-tokens {
+  margin-top: 8px;
+}
+.template-tokens .chip {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Modal ------------------------------------------------------------------ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal {
+  background: #0c1133;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: clamp(12px, 2.4vw, 18px) clamp(12px, 2.6vw, 20px);
+  width: min(560px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 60px rgba(125, 249, 255, 0.06);
+}
+.app.theme-classic .modal {
+  background: #000;
+  border: 1px solid #00ff00;
+}
+.modal header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal header h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+}
+.modal section {
+  display: grid;
+  gap: 8px;
+}
+
+/* No horizontal scrollbar, ever. Grid and flex children default to
+   `min-width: auto`, so any wide descendant (an <input>'s intrinsic size, the
+   un-wrapped theme-card row, a long <small>) pushed the whole dialog sideways
+   instead of shrinking. Floor every level at 0 and let content wrap. */
+.modal,
+.modal > *,
+.modal section,
+.modal section > *,
+.modal .radio,
+.modal .checkbox-row,
+.modal .theme-card,
+.modal .folder-row,
+.modal .folder-row code,
+.modal .slider-row,
+.modal .slider-row input {
+  min-width: 0;
+}
+.modal input[type='text'],
+.modal input[type='number'],
+.modal select {
+  width: 100%;
+  min-width: 0;
+}
+.modal small,
+.modal .radio em,
+.modal .checkbox-row em {
+  overflow-wrap: anywhere;
+}
+.modal .theme-card {
+  flex: 0 1 auto;
+}
+
+/* Slim, themed vertical scrollbar — the sections list is genuinely taller
+   than the screen, but the default chunky OS bar looks awful over the panel. */
+.modal::-webkit-scrollbar {
+  width: 8px;
+}
+.modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+.modal::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+.modal section > label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.modal footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.radio-group {
+  display: grid;
+  gap: 6px;
+}
+.radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+.radio input { margin-top: 4px; }
+.radio strong { display: block; font-size: 13px; }
+.radio em { display: block; font-size: 11px; color: var(--muted); font-style: normal; margin-top: 2px; }
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.folder-row code {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Toasts ----------------------------------------------------------------- */
+
+.toast-stack {
+  position: fixed;
+  bottom: clamp(58px, 12vh, 80px);
+  right: clamp(8px, 2vw, 24px);
+  left: clamp(8px, 2vw, 24px);
+  justify-items: end;
+  display: grid;
+  gap: 8px;
+  z-index: 40;
+  pointer-events: none;
+}
+.toast {
+  background: #0c1133;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  color: var(--fg);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+  max-width: min(360px, 100%);
+  animation: slide-in 200ms ease-out;
+  pointer-events: auto;
+}
+.toast.ok { border-left-color: var(--ok); }
+.toast.err { border-left-color: var(--danger); }
+.app.theme-classic .toast {
+  background: #000;
+  border: 1px solid #00ff00;
+  color: #00ff00;
+}
+@keyframes slide-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* Loading ---------------------------------------------------------------- */
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Hyper kawaii ✿ ---------------------------------------------------------- */
+/* The one light theme. Everything else keys off the dark `:root` palette, so
+   this block re-points the shared custom properties and then patches the
+   handful of places that hardcode a dark hex. */
+
+.app.theme-kawaii {
+  --bg: #fff0f7;
+  --bg-2: #ffffff;
+  --fg: #6b3f5b;
+  --muted: #b489a5;
+  --accent: #ff8fc7;
+  --accent-2: #b39dff;
+  --accent-3: #7fe7dc;
+  --danger: #ff6b8e;
+  --ok: #59d3b8;
+  --line: rgba(255, 143, 199, 0.35);
+  --line-soft: rgba(255, 143, 199, 0.16);
+
+  color-scheme: light;
+  color: var(--fg);
+  font-family: 'Segoe UI Rounded', 'Varela Round', 'Quicksand', 'Nunito',
+    system-ui, -apple-system, Segoe UI, sans-serif;
+  background:
+    radial-gradient(ellipse at 15% 10%, rgba(255, 143, 199, 0.28), transparent 58%),
+    radial-gradient(ellipse at 85% 85%, rgba(179, 157, 255, 0.26), transparent 58%),
+    radial-gradient(ellipse at 60% 40%, rgba(127, 231, 220, 0.18), transparent 55%),
+    #fff0f7;
+}
+
+.app.theme-kawaii .hud {
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid var(--line);
+}
+.app.theme-kawaii .sidebar {
+  background: rgba(255, 255, 255, 0.6);
+  border-top: 1px solid var(--line);
+}
+
+.app.theme-kawaii .pill {
+  font-weight: 600;
+}
+.app.theme-kawaii .pill.on {
+  background: rgba(89, 211, 184, 0.18);
+  color: #2f9c85;
+  border: 1px solid rgba(89, 211, 184, 0.5);
+}
+.app.theme-kawaii .pill.off {
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.app.theme-kawaii .hud-vu,
+.app.theme-kawaii .hud-buffer progress,
+.app.theme-kawaii .hud-buffer progress::-webkit-progress-bar {
+  background: rgba(255, 143, 199, 0.18);
+}
+
+.app.theme-kawaii .board {
+  background: #fff8fc;
+  border: 2px solid rgba(255, 143, 199, 0.55);
+  border-radius: clamp(12px, 2vw, 22px);
+  box-shadow:
+    inset 0 0 40px rgba(255, 143, 199, 0.12),
+    0 6px 22px rgba(255, 143, 199, 0.22);
+}
+/* Capture cue: a soft pastel-gradient halo that breathes, instead of the
+   dark themes' hard neon ring. */
+.app.theme-kawaii .board.is-capturing {
+  border-color: #ff5fa2;
+  animation: kawaii-pulse 1.8s ease-in-out infinite;
+}
+@keyframes kawaii-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 40px rgba(255, 143, 199, 0.14),
+      0 0 16px rgba(255, 95, 162, 0.45),
+      0 0 34px rgba(179, 157, 255, 0.32);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 40px rgba(255, 143, 199, 0.2),
+      0 0 26px rgba(255, 95, 162, 0.7),
+      0 0 54px rgba(127, 231, 220, 0.45);
+  }
+}
+
+.app.theme-kawaii button.primary {
+  background: linear-gradient(135deg, #ff9ecf, #b39dff 55%, #7fe7dc);
+  color: #ffffff;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(190, 90, 145, 0.35);
+  box-shadow: 0 3px 0 rgba(255, 143, 199, 0.45);
+}
+.app.theme-kawaii button.ghost,
+.app.theme-kawaii .dd-trigger,
+.app.theme-kawaii select,
+.app.theme-kawaii input[type='text'],
+.app.theme-kawaii input[type='number'] {
+  background: #ffffff;
+  color: var(--fg);
+  border: 1px solid var(--line);
+}
+.app.theme-kawaii button.ghost:hover {
+  background: #fff3f9;
+}
+.app.theme-kawaii button.chip {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.app.theme-kawaii button.chip.on {
+  background: linear-gradient(135deg, rgba(255, 143, 199, 0.22), rgba(179, 157, 255, 0.22));
+  border-color: #ff8fc7;
+  color: #d1478a;
+  font-weight: 600;
+}
+
+.app.theme-kawaii .dd-popover {
+  background: linear-gradient(180deg, #ffffff 0%, #fff4fa 100%);
+  border: 1px solid rgba(255, 143, 199, 0.5);
+  box-shadow: 0 -14px 40px rgba(214, 132, 178, 0.28), 0 0 24px rgba(179, 157, 255, 0.18);
+}
+.app.theme-kawaii .dd-item {
+  color: var(--fg);
+}
+.app.theme-kawaii .dd-item:hover {
+  background: rgba(255, 143, 199, 0.18);
+  color: #b93d7d;
+}
+.app.theme-kawaii .dd-item.is-selected {
+  background: rgba(179, 157, 255, 0.22);
+  color: #6a4bb5;
+}
+.app.theme-kawaii .dd-item.is-selected::before {
+  content: '♥ ';
+  color: #ff5fa2;
+}
+.app.theme-kawaii .dd-popover::-webkit-scrollbar-thumb {
+  background: rgba(255, 143, 199, 0.5);
+  background-clip: content-box;
+}
+
+.app.theme-kawaii .modal,
+.app.theme-kawaii .toast {
+  background: #fffafd;
+  border: 1px solid var(--line);
+  color: var(--fg);
+}
+.app.theme-kawaii .modal {
+  box-shadow: 0 24px 60px rgba(190, 120, 165, 0.28), 0 0 40px rgba(179, 157, 255, 0.16);
+}
+.app.theme-kawaii .radio,
+.app.theme-kawaii .checkbox-row,
+.app.theme-kawaii .theme-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+}
+.app.theme-kawaii .theme-card.on {
+  border-color: #ff8fc7;
+  background: linear-gradient(135deg, rgba(255, 143, 199, 0.18), rgba(179, 157, 255, 0.18));
+}
+.app.theme-kawaii .hud-hint kbd {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: #d1478a;
+}
+.app.theme-kawaii .folder-row code {
+  background: rgba(255, 143, 199, 0.12);
+  color: #a2708f;
+}
+.app.theme-kawaii .hud-error {
+  background: rgba(255, 107, 142, 0.12);
+  border: 1px solid rgba(255, 107, 142, 0.4);
+  color: #d63a63;
+}
+
+/* extra UwU ✿ — softer corners, bouncier presses, sparkles */
+.app.theme-kawaii button,
+.app.theme-kawaii .dd-trigger,
+.app.theme-kawaii input[type='text'],
+.app.theme-kawaii input[type='number'],
+.app.theme-kawaii select {
+  border-radius: 999px;
+}
+.app.theme-kawaii .radio,
+.app.theme-kawaii .checkbox-row,
+.app.theme-kawaii .theme-card,
+.app.theme-kawaii .dd-popover,
+.app.theme-kawaii .modal,
+.app.theme-kawaii .toast {
+  border-radius: 18px;
+}
+.app.theme-kawaii .dd-item {
+  border-radius: 999px;
+}
+.app.theme-kawaii button:active {
+  transform: scale(0.93) rotate(-1.5deg);
+}
+.app.theme-kawaii .pill {
+  letter-spacing: 0.06em;
+}
+.app.theme-kawaii .pill.on {
+  animation: kawaii-heartbeat 1.4s ease-in-out infinite;
+}
+@keyframes kawaii-heartbeat {
+  0%, 100% { transform: scale(1); }
+  15%      { transform: scale(1.12); }
+  30%      { transform: scale(1); }
+}
+/* A slow shimmer sweep across the save button. */
+.app.theme-kawaii button.primary {
+  position: relative;
+  overflow: hidden;
+}
+.app.theme-kawaii button.primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  animation: kawaii-shimmer 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes kawaii-shimmer {
+  0%, 65%  { transform: translateX(-120%); }
+  100%     { transform: translateX(120%); }
+}
+.app.theme-kawaii button.primary:disabled::after {
+  animation: none;
+  opacity: 0;
+}
+.app.theme-kawaii .modal header h2::after {
+  content: ' ✿';
+}
+.app.theme-kawaii .hud-mode::after {
+  content: ' ♡';
+}
+.app.theme-kawaii .picker-row label::after {
+  content: ' ♬';
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app.theme-kawaii .pill.on,
+  .app.theme-kawaii button.primary::after,
+  .app.theme-kawaii .board.is-capturing {
+    animation: none;
+  }
+}
+
+/* Compact / responsive --------------------------------------------------- */
+/* The window can be dragged down to 380x300 (see minWidth/minHeight in
+   src/main/index.ts). Every step below sheds chrome so the three things that
+   matter — the transport buttons, the visualizer, and the source picker —
+   stay fully visible instead of being clipped by `.app { overflow: hidden }`. */
+
+/* --- narrow: footer stops being a two-column row --- */
+@media (max-width: 860px) {
+  .sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .viz-buttons {
+    justify-content: flex-start;
+  }
+}
+
+/* --- narrower: shorten labels, drop the helper copy --- */
+@media (max-width: 680px) {
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; }
+
+  button.primary.big {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  button.chip {
+    padding: 5px 9px;
+    font-size: 12px;
+  }
+  .picker-row small {
+    display: none;
+  }
+  .hud-buffer {
+    flex-basis: 100px;
+  }
+}
+
+/* --- very narrow: stack the picker label, hide the hotkey hint --- */
+@media (max-width: 520px) {
+  .hud-hint {
+    display: none;
+  }
+  .picker-row,
+  .picker-row-stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .picker-row small {
+    grid-column: 1 / -1;
+  }
+  .hud-mode {
+    display: none;
+  }
+  button.chip {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .toast {
+    font-size: 12px;
+    padding: 8px 11px;
+  }
+}
+
+/* --- floor: icon-only transport, buffer bar collapses to the readout --- */
+@media (max-width: 420px) {
+  .hud-buffer progress {
+    display: none;
+  }
+  .hud-actions {
+    gap: 4px;
+  }
+  button.primary.big {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  button.ghost {
+    padding: 7px 8px;
+  }
+  .viz-buttons {
+    gap: 4px;
+  }
+}
+
+/* --- short windows: the board must not get squeezed to nothing --- */
+@media (max-height: 520px) {
+  .hud-hint {
+    display: none;
+  }
+  .picker-row small {
+    display: none;
+  }
+  .board {
+    min-height: 90px;
+  }
+}
+@media (max-height: 400px) {
+  .hud-vu {
+    height: 4px;
+  }
+  .hud {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .board {
+    min-height: 64px;
+  }
+}
