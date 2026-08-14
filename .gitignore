@@ -1,0 +1,15 @@
+node_modules/
+dist/
+release/
+*.log
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+
+# .NET SDK (used to build the WASAPI helper on demand)
+.sdk-bootstrap/
+
+# Native build artefacts
+native/RecordrLoopback/bin/
+native/RecordrLoopback/obj/
