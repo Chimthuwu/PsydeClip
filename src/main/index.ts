@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, screen } from 'electron';
 import path from 'node:path';
 import { readSettings, writeSettings } from './settings';
 import { HotkeyManager } from './hotkeys';
@@ -10,7 +10,14 @@ import {
 } from '../shared/types';
 import { registerIpc } from './ipc';
 import { initTray, destroyTray, makeAppIcon } from './tray';
-import { applyMagneticSnap } from './window-controls';
+import { handleWindowMoved, reapplyOnResize } from './window-controls';
+import {
+  appBarOwner,
+  reapplyAppBar,
+  reclaimStaleAppBar,
+  removeAppBar,
+  wireAppBarTeardown,
+} from './appbar';
 import { applyPopoutSettings, createPopout, destroyPopout, getPopout } from './popout';
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -113,27 +120,46 @@ function createWindow(bounds?: Electron.Rectangle) {
   });
 
   mainWindow.on('closed', () => {
+    if (appBarOwner() === mainWindow) removeAppBar();
     mainWindow = null;
   });
 
   // Magnetic edge snap. Windows emits `moved` when the drag ends, so this
   // reads as "let go near the top of the screen and it clicks into place".
-  mainWindow.on('moved', () => {
-    if (readSettings().magneticSnap) applyMagneticSnap(mainWindow);
-  });
+  // It also releases an appbar reservation if the window is dragged out of the
+  // dock — see handleWindowMoved().
+  mainWindow.on('moved', () => handleWindowMoved(mainWindow));
+  mainWindow.on('resized', () => reapplyOnResize(mainWindow));
 
-  // Let the renderer re-render its maximise/restore glyph.
   const pushWindowState = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
+    const b = mainWindow.getBounds();
+    const wa = screen.getDisplayMatching(b).workArea;
+    const dockedTop = b.y === wa.y && b.width === wa.width;
+    
+    if (!dockedTop) {
+      const min = LAYOUT_MIN_SIZE[readSettings().uiLayout];
+      if (min) mainWindow.setMinimumSize(min.width, min.height);
+    }
+
     mainWindow.webContents.send(IpcChannel.windowState, {
       maximized: mainWindow.isMaximized(),
       focused: mainWindow.isFocused(),
+      dockedTop,
     });
   };
   mainWindow.on('maximize', pushWindowState);
   mainWindow.on('unmaximize', pushWindowState);
   mainWindow.on('focus', pushWindowState);
   mainWindow.on('blur', pushWindowState);
+  mainWindow.on('moved', () => {
+    handleWindowMoved(mainWindow);
+    pushWindowState();
+  });
+  mainWindow.on('resized', () => {
+    reapplyOnResize(mainWindow);
+    pushWindowState();
+  });
 
   // Apply initial always-on-top flag.
   try { mainWindow.setAlwaysOnTop(readSettings().alwaysOnTop, 'floating'); }
@@ -244,7 +270,22 @@ function init() {
     w.focus();
   });
 
+  // A reservation that outlives its window leaves the user with a dead strip
+  // of desktop they can't reclaim without logging out, so this is wired before
+  // anything can register one.
+  wireAppBarTeardown(app);
+
   app.whenReady().then(() => {
+    // If the last run died holding a reservation, the desktop is still short of
+    // that space. Reclaim before anything can register a new one.
+    reclaimStaleAppBar();
+
+    // The shell notifies appbars of layout changes through a window message
+    // Electron doesn't dispatch, so these stand in for ABN_POSCHANGED.
+    screen.on('display-metrics-changed', reapplyAppBar);
+    screen.on('display-added', reapplyAppBar);
+    screen.on('display-removed', reapplyAppBar);
+
     registerIpc({
       getWindow: () => mainWindow,
       onSettingsChanged: handleSettingsChanged,
@@ -299,3 +340,4 @@ function init() {
 }
 
 init();
+

@@ -2,7 +2,8 @@ import { BrowserWindow } from 'electron';
 import path from 'node:path';
 import { IpcChannel } from '../shared/types';
 import { readSettings } from './settings';
-import { applyMagneticSnap } from './window-controls';
+import { handleWindowMoved, reapplyOnResize } from './window-controls';
+import { appBarOwner, removeAppBar } from './appbar';
 
 /**
  * The pop-out visualizer: a second, frameless, always-on-top window that shows
@@ -76,6 +77,10 @@ export function createPopout(onClosed?: () => void): BrowserWindow {
 
   popoutWindow.once('ready-to-show', () => popoutWindow?.show());
   popoutWindow.on('closed', () => {
+    // If the pop-out was the docked strip, its reservation dies with it —
+    // otherwise the shell keeps holding space for a window that no longer
+    // exists.
+    if (appBarOwner() === popoutWindow) removeAppBar();
     popoutWindow = null;
     onClosed?.();
   });
@@ -83,9 +88,8 @@ export function createPopout(onClosed?: () => void): BrowserWindow {
   // Same drop-near-an-edge behaviour the main window has. Without this the
   // pop-out was the one window you *couldn't* dock, which is backwards — it's
   // the one most likely to live along the top of a monitor.
-  popoutWindow.on('moved', () => {
-    if (readSettings().magneticSnap) applyMagneticSnap(getPopout());
-  });
+  popoutWindow.on('moved', () => handleWindowMoved(getPopout()));
+  popoutWindow.on('resized', () => reapplyOnResize(getPopout()));
 
   return popoutWindow;
 }

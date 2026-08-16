@@ -117,6 +117,15 @@ export interface AppSettings {
   showHint: boolean;
   /** Snap the window to a screen edge when dragged near one. */
   magneticSnap: boolean;
+  /**
+   * When docked to the top of a screen, register as a Windows appbar so the
+   * desktop work area shrinks and other applications lay out *below* the strip
+   * instead of being covered by it — the same mechanism the taskbar uses.
+   *
+   * Off by default: it changes the desktop layout for every application, which
+   * is not something to opt a user into silently.
+   */
+  dockReservesSpace: boolean;
   /** Re-open the pop-out visualizer window on launch. */
   popoutOpen: boolean;
   /** Keep the pop-out above other windows. */
@@ -162,6 +171,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showVizChips: true,
   showHint: true,
   magneticSnap: true,
+  dockReservesSpace: false,
   popoutOpen: false,
   popoutAlwaysOnTop: true,
   popoutOpacity: 1,

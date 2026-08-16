@@ -163,6 +163,12 @@ export default function App() {
     if (loaded) window.api.setTrayCapturing(capturing);
   }, [capturing, loaded]);
 
+  const [dockedTop, setDockedTop] = useState(false);
+  useEffect(() => {
+    const unsub = window.api.onWindowState((s) => setDockedTop(s.dockedTop));
+    return unsub;
+  }, []);
+
   // A 38px-tall bar has nowhere to draw a modal, so opening settings from
   // that layout grows the window for as long as the panel is up.
   const barLayout = settings.uiLayout === 'bar';
@@ -348,9 +354,24 @@ export default function App() {
     </>
   );
 
+  const vizChips = settings.showVizChips && (
+    <div className="viz-buttons">
+      {(['oscilloscope', 'spectrum', 'spectrogram'] as VisualizerMode[]).map((m) => (
+        <button
+          key={m}
+          type="button"
+          className={`chip ${settings.visualizer === m ? 'on' : ''}`}
+          onClick={() => update({ visualizer: m })}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div
-      className={`app ${themeClass} layout-${layout} ${customChrome ? 'has-custom-titlebar' : ''}`}
+      className={`app ${themeClass} layout-${layout} ${customChrome ? 'has-custom-titlebar' : ''} ${dockedTop ? 'is-docked' : ''}`}
       onContextMenu={handleContextMenu}
     >
       {customChrome && (
@@ -391,30 +412,18 @@ export default function App() {
             mode={settings.visualizer}
             theme={settings.theme}
           />
+          {dockedTop && vizChips}
         </main>
       )}
 
-      {layout === 'compact' && settings.showSourcePicker && (
+      {layout === 'compact' && settings.showSourcePicker && !dockedTop && (
         <footer className="sidebar is-compact">{sourcePicker}</footer>
       )}
 
-      {showFooter && (
+      {showFooter && !dockedTop && (
         <footer className="sidebar">
           {settings.showSourcePicker ? sourcePicker : <span />}
-          {settings.showVizChips && (
-            <div className="viz-buttons">
-              {(['oscilloscope', 'spectrum', 'spectrogram'] as VisualizerMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`chip ${settings.visualizer === m ? 'on' : ''}`}
-                  onClick={() => update({ visualizer: m })}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
+          {vizChips}
         </footer>
       )}
 

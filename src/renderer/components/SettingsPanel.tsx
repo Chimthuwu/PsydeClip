@@ -479,6 +479,22 @@ export function SettingsPanel({
               </button>
             ))}
           </div>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.dockReservesSpace}
+              onChange={(e) => applyNow({ dockReservesSpace: e.target.checked })}
+              disabled={window.api.platform !== 'win32'}
+            />
+            <span>
+              <strong>Docking reserves screen space</strong>
+              <em>
+                While docked to the top, shrink the desktop work area so other applications lay
+                out <em>below</em> the strip instead of being covered by it — the same mechanism
+                the taskbar uses. Affects every application, so it's off by default. Windows only.
+              </em>
+            </span>
+          </label>
           <small>
             Dock top spans the full width of the current monitor at the window's
             present height — pair it with the Bar layout for a strip across the

@@ -6,6 +6,8 @@ import {
   UiLayout,
   WindowAction,
 } from '../shared/types';
+import { appBarOwner, registerAppBar, removeAppBar } from './appbar';
+import { readSettings } from './settings';
 
 /**
  * Window geometry helpers: screen-edge snapping, per-layout minimum sizes and
@@ -64,6 +66,19 @@ export function snapWindow(win: BrowserWindow | null, target: SnapTarget) {
   if (!win || win.isDestroyed()) return;
   if (win.isMaximized()) win.unmaximize();
 
+  // Docking to the top can reserve desktop space so other applications lay out
+  // below the strip rather than behind it. registerAppBar() positions the
+  // window itself (the shell decides the exact rect), so there's nothing more
+  // to do on this path.
+  if (target === 'top' && readSettings().dockReservesSpace) {
+    if (registerAppBar(win)) return;
+    // Fell through: not Windows, or the shell refused. Plain snap below.
+  } else if (appBarOwner() === win) {
+    // Moving somewhere else means we're no longer a top strip — give the
+    // desktop space back before repositioning.
+    removeAppBar();
+  }
+
   const wa = workAreaFor(win);
   const b = win.getBounds();
   const halfW = Math.floor(wa.width / 2);
@@ -71,7 +86,10 @@ export function snapWindow(win: BrowserWindow | null, target: SnapTarget) {
 
   switch (target) {
     case 'top':
-      win.setBounds({ x: wa.x, y: wa.y, width: wa.width, height: b.height });
+      // The user wants a thin strip when docked to the top, so we must drop
+      // the layout's minHeight constraint first.
+      win.setMinimumSize(LAYOUT_MIN_SIZE.bar.width, 100);
+      win.setBounds({ x: wa.x, y: wa.y, width: wa.width, height: 100 });
       break;
     case 'bottom':
       win.setBounds({ x: wa.x, y: wa.y + wa.height - b.height, width: wa.width, height: b.height });
@@ -111,6 +129,39 @@ export function snapWindow(win: BrowserWindow | null, target: SnapTarget) {
  * the top of the screen and the window clicks into place" rather than fighting
  * the cursor mid-drag.
  */
+/**
+ * Everything that should happen when a window finishes being dragged.
+ *
+ * Both windows wire this to `moved`. It exists so that releasing an appbar
+ * reservation isn't conditional on `magneticSnap` being switched on — dragging
+ * a docked strip away from the edge has to give the desktop space back either
+ * way, or the user is left with a reserved gap and no window in it.
+ */
+export function handleWindowMoved(win: BrowserWindow | null) {
+  if (!win || win.isDestroyed()) return;
+  if (appBarOwner() === win) {
+    const wa = workAreaFor(win);
+    const b = win.getBounds();
+    // The reservation *is* the strip's position, so the shell keeps us flush
+    // with the top of the work area. Any real vertical displacement means the
+    // user has pulled us out of the dock.
+    if (Math.abs(b.y - wa.y) > MAGNET_PX) {
+      removeAppBar();
+    }
+  }
+  if (readSettings().magneticSnap) applyMagneticSnap(win);
+}
+
+/**
+ * Resizing a docked strip has to resize the reservation with it, or the gap
+ * the shell is holding stops matching the window sitting in it.
+ */
+export function reapplyOnResize(win: BrowserWindow | null) {
+  if (!win || win.isDestroyed()) return;
+  if (appBarOwner() !== win) return;
+  registerAppBar(win, win.getBounds().height);
+}
+
 export function applyMagneticSnap(win: BrowserWindow | null) {
   if (!win || win.isDestroyed() || win.isMaximized()) return;
   const wa = workAreaFor(win);

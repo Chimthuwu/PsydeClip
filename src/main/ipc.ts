@@ -11,6 +11,7 @@ import {
   WindowAction,
 } from '../shared/types';
 import { applyLayout, performWindowAction, snapWindow, tempExpand } from './window-controls';
+import { removeAppBar } from './appbar';
 import {
   createPopout,
   destroyPopout,
@@ -306,6 +307,20 @@ export function registerIpc(ctx: IpcContext) {
       {
         label: 'Dock to top of screen',
         click: () => snapWindow(win, 'top'),
+      },
+      {
+        label: 'Docking reserves screen space',
+        type: 'checkbox',
+        checked: s.dockReservesSpace,
+        enabled: process.platform === 'win32',
+        click: () => {
+          const next = !s.dockReservesSpace;
+          // Turning it off has to hand the desktop back immediately, not at the
+          // next undock — the user just said they don't want the strip.
+          if (!next) removeAppBar();
+          apply({ dockReservesSpace: next });
+          if (next) snapWindow(win, 'top');
+        },
       },
       {
         label: 'Layout',

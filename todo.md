@@ -61,7 +61,8 @@ recordr/
 │   │   ├── hotkeys.ts                        # globalShortcut registration with accel parsing
 │   │   ├── save.ts                           # saveWebm(): formatFileName() with all token substitutions + sanitisation, then write the buffer via fs.writeFile
 │   │   ├── tray.ts                           # 16x16 procedural icon, dynamic menu/title/tooltip/overlay-badge, recent-saves ring buffer
-│   │   ├── window-controls.ts                # snapWindow() / applyMagneticSnap() / applyLayout() / tempExpand() — everything that moves or resizes the main window
+│   │   ├── window-controls.ts                # snapWindow() / handleWindowMoved() / applyLayout() / tempExpand() — everything that moves or resizes a window
+│   │   ├── appbar.ts                         # Windows appbar registration (shell32!SHAppBarMessage via koffi) so a docked strip reserves desktop space. READ THE WARNING IN §11 FIRST
 │   │   ├── popout.ts                         # second frameless always-on-top window at index.html#popout; createPopout / destroyPopout / applyPopoutSettings
 │   │   └── wasapi.ts                         # resolves helper path (dev + packaged locations), spawns helper for `list` / `capture`, parses Float32LE PCM frames, broadcasts to the renderer over IPC
 │   ├── preload/
@@ -307,7 +308,7 @@ Chips are ordinary `<button>`s, not OS-rendered controls, so they never had the
 
 ### 🟡 Bug #5 — Single-instance lock: error 32 on Lock file
 
-* `process_singleton_win.cc(464)` reports `Lock file can not be created! Error code: 32` on second launch — but the second-instance focus logic still fires correctly. Cosmetic; not breaking. **This is the only bug in this section still open.**
+* `process_singleton_win.cc(464)` reports `Lock file can not be created! Error code: 32` on second launch — but the second-instance focus logic still fires correctly. Cosmetic; not breaking. Open, but the lowest-value thing here — Bug #8 is the one that matters.
 
 ### ✅ Bug #6 — Spectrogram displayed nothing — FIXED
 
@@ -357,6 +358,43 @@ stops dead while the main window is hidden behind the pop-out.
 periodic clicks: the sweep renders as a straight diagonal (correct on a log
 axis), the tone as a sharp flat line, the clicks as clean vertical transients,
 on a black floor.
+
+### ✅ Bug #8 — pop-out's recording border is cut off when docked — FIXED
+
+Fixed as described below: the ring moved from `.popout-board`'s 1px border to a
+`.popout::after` overlay (`inset: 0`, `z-index: 5`, 2px) that the controls
+overlay cannot cover and a short window cannot squeeze. Colour comes from a new
+`--rec` token defined on `.theme-*` — deliberately *not* `.app.theme-*`, because
+that never matched the pop-out root, which is why the pop-out rendered every
+theme in the default palette. **Verified** by screenshot: docked and recording,
+the ring is unbroken on all four sides including beneath the transport.
+
+<details><summary>Original diagnosis</summary>
+
+* **Symptom:** with the pop-out docked to the top of a monitor, the green
+  "currently rolling" highlight reads as a clipped sliver instead of a ring
+  around the visualizer. (User screenshot, v2.0.0.)
+* **Not a clipping bug.** `* { box-sizing: border-box }` is set globally, so the
+  1px border sits *inside* the window and nothing is cut off by the window edge.
+  Two things make it look like it is:
+  1. `.popout-controls` is `position: absolute; bottom: 0` at `opacity: 0.25`
+     even when not hovered, and it carries a black gradient. Docked, the pop-out
+     is ~100px tall, `.popout-board` gets ~60px of that, and the overlay covers
+     most of it — including the bottom border.
+  2. The top border sits immediately under the 20px `.popout-drag` strip, so a
+     single green pixel there reads as part of the chrome rather than as a state
+     indicator.
+* **Fix direction:** stop hanging the recording state off `.popout-board`'s 1px
+  border. Put it on `.popout` itself as a dedicated pseudo-element ring —
+  `position: absolute; inset: 0; pointer-events: none;` with a higher
+  `z-index` than `.popout-controls`, ~2px, glow drawn inward — so it is
+  independent of the board's height and can't be occluded by the controls
+  overlay. The same treatment should be considered for `.board.is-capturing` in
+  the main window for consistency.
+* **Where to look:** `.popout`, `.popout-board`, `.popout-controls` in
+  `src/renderer/styles.css` (~line 1700), `src/renderer/PopoutApp.tsx`.
+
+</details>
 
 ---
 
@@ -483,6 +521,7 @@ keys.
   "showVizChips": true,
   "showHint": true,
   "magneticSnap": true,
+  "dockReservesSpace": false,
   "popoutOpen": false,
   "popoutAlwaysOnTop": true,
   "popoutOpacity": 1,
@@ -518,36 +557,30 @@ Bug #4 (chips), Bug #6 (spectrogram), item 4 (always-live visualizer), item 5
 polish: pop-out toggle, layout radio group and dock-to-top are all in the menu
 now).
 
-Still open, in rough priority order:
+**v3 is planned and ordered — see §11.** That section is the working list; the
+order in it was set by the user and should be followed:
 
-1. **Premium visual redesign.** (user-requested, specced, not started — this is
-   the next major piece of work.) Full brief in **§10**. Headline: the themes
-   currently read as *the same UI with different colours*, the layout wastes
-   vertical space, and the design leans on neon borders instead of hierarchy.
-   The test to design against: **it should still look good with the accent
-   colour turned off.** Do NOT start by changing colours.
+1. ✅ **Bug #8** — the docked pop-out's clipped recording border. Done.
+2. ✅ **Docking reserves screen space** — `SHAppBarMessage` via koffi. Done.
+   ⚠️ Read the warning box in §11 before touching `appbar.ts`.
+3. **Premium visual redesign** — brief in §10. ← **next**
+4. **Historical waveform: scrub, select, drag out** — phased, §11. The user
+   asked specifically that this not be attempted in one turn.
 
-2. **The scrubbable waveform + drag-to-export.** (user-requested, not started —
-   the largest remaining piece; the user has explicitly deferred it to a
-   version after v2.0.0.) Full sketch in §9. Shape: a decoded peak track in a
-   parallel ring buffer, drawn as an overview of the last N minutes, with drag
-   range-selection and `webContents.startDrag()` so a selection can be dropped
-   straight onto the desktop or into a DAW.
+Not scheduled, in rough priority order:
 
-3. **A browser version.** (user-requested, not started.) See §9 — feasible for
-   the desktopCapturer path only.
-
-4. **Harden `readSettings()`** against a BOM / malformed file: strip a leading
-   `﻿`, and log rather than silently reverting to defaults (see §6).
-
-5. **Bug #5** — the cosmetic single-instance lock-file warning. Low value.
-
-6. **Mic capture via WASAPI?** Optional; user asked for output-side only so
-   don't introduce unless they ask.
-
-7. **Optional: nice-to-have quality-of-life.** A "preview" capture-before-record,
-   a button to rename template tokens on the fly, an in-app audio meter that
-   expands the HUD on click. **Not yet asked.**
+* **A browser version.** (user-requested, not started.) See §9 — feasible for
+  the desktopCapturer path only. Prerequisite for the Android idea.
+* **Harden `readSettings()`** against a BOM / malformed file: strip a leading
+  `﻿`, and log rather than silently reverting to defaults (see §6).
+* **Bug #5** — the cosmetic single-instance lock-file warning. Low value.
+* **Mic capture via WASAPI?** Optional; user asked for output-side only so
+  don't introduce unless they ask.
+* **An Android version.** Parked; see §9 for why the recording core doesn't
+  survive the move.
+* **Optional: nice-to-have quality-of-life.** A "preview" capture-before-record,
+  a button to rename template tokens on the fly, an in-app audio meter that
+  expands the HUD on click. **Not yet asked.**
 
 <details><summary>Original wording of the completed items 4 &amp; 5 (kept for context)</summary>
 
@@ -596,6 +629,26 @@ Still open, in rough priority order:
     the global hotkey are desktop-only, and File System Access API replaces the
     save-folder picker. The renderer is already isolated behind `window.api`, so
     the port is mostly writing a browser-backed implementation of that object.
+  * Prerequisite for the Android bullet below, if that route is taken.
+- android version of this app, later.
+  * Not started, not scheduled — parked alongside the webapp port.
+  * The recording core does not survive the move. Android has no WASAPI, no
+    `desktopCapturer`, and no global hotkey. System-audio capture on Android is
+    `AudioPlaybackCapture` (API 29+), which is a *foreground-service* API and is
+    opt-out per app: any app that sets `allowAudioPlaybackCapture="false"` or
+    marks its session as media-protected simply won't be captured. So "record
+    whatever is playing" is best-effort on Android in a way it isn't on Windows.
+  * What does port cleanly: the rolling-buffer model, the filename template, the
+    settings shape, and the visualizer maths in `lib/visualizer.ts` (it only
+    needs a canvas and an FFT).
+  * Likely shapes, cheapest first: (1) Capacitor/Tauri wrapper over the webapp
+    port once that exists, with a native plugin for `AudioPlaybackCapture` and a
+    foreground service for the rolling buffer; (2) a real Kotlin app reusing only
+    the visualizer/design language. Option 1 only makes sense if the webapp port
+    happens first — treat that as the prerequisite.
+  * The pop-out visualizer, the tray, the layout system and the window-snapping
+    work are all desktop-only and have no Android analogue; the equivalent there
+    is a notification-shade control and a floating bubble/overlay.
 - ~~spectrogram doesnt work, nothing displays~~ — **fixed**, see Bug #6 above.
 - i want like a live waveform display aswell that shows the current like audio thats in the span of time "save last xxx"
   Users can then select parts of this waveform and then drag aand drop it (same as Rolling Sampler by Bird things does)
@@ -719,3 +772,190 @@ that table must be kept in agreement, since the board sits inside the panel.
 Audit → design system → layout → polish → cleanup. Don't start rewriting
 immediately, and don't stop at "technically improved" — check the result at
 1280×720, 1440×900, 1920×1080 and a small window, then iterate.
+
+---
+
+## 11. v3 — planned work
+
+**Do these in this order.** The user set the sequence deliberately: two small,
+well-understood items first, then the redesign, then the big one.
+
+### 1. ✅ Fix Bug #8 — the docked pop-out's recording border — DONE
+
+See §4. Ring moved to a `.popout::after` overlay; new `--rec` token per theme.
+
+### 2. ✅ Docking reserves screen space — DONE (`settings.dockReservesSpace`, default off)
+
+Implemented in `src/main/appbar.ts` via `koffi` → `shell32!SHAppBarMessage`,
+wired through `snapWindow()`. Verified by an isolated Electron harness (10/10
+checks): maximised window refused, oversized reservation refused, a 120px strip
+shrinking the work area `0,0 1685x913` → `0,120 1685x793`, window width matching
+display width exactly, marker written/cleared, and removal restoring the work
+area. The crash path was tested by deliberately leaking a reservation and
+hard-exiting.
+
+> ### ⚠️ Read this before touching `appbar.ts`
+>
+> **This feature broke the developer's desktop once.** A *maximised* window was
+> docked; `unmaximize()` is not synchronous on Windows, so `getBounds()` still
+> returned `1936x1096`, and we asked the shell to reserve a 1096px "strip" on a
+> 1080px display. The result was a 172px usable desktop — icons flung to the
+> bottom, nothing able to maximise — and it did **not** clear when the process
+> was killed. Recovery took an explicit `SPI_SETWORKAREA` reset.
+>
+> Three guards now exist and must not be removed:
+> 1. `registerAppBar()` refuses a maximised or fullscreen window outright.
+> 2. The reservation is clamped to `min(300px, 20% of display height)` with a
+>    20px floor; anything outside is refused and logged, never honoured.
+> 3. A marker file is written when the shell accepts a reservation and deleted
+>    on clean removal. `reclaimStaleAppBar()` runs at startup before any window
+>    can register, and forces the work area back if the marker survived.
+>
+> **Windows does not reliably reclaim appbar space when the owning process
+> dies** — measured, not assumed. An earlier reading suggesting otherwise was a
+> stale per-process cache in `System.Windows.Forms.Screen`; that class caches
+> display metrics, so always re-measure in a *fresh* process.
+
+Still worth doing later: the shell posts `ABN_POSCHANGED` to the callback
+message we register, which Electron's window proc doesn't dispatch. We stand in
+for it with `display-metrics-changed` / `display-added` / `display-removed` and
+the window's own `resized`. That covers resolution and monitor changes but not
+another appbar appearing alongside ours.
+
+<details><summary>Original brief</summary>
+
+**What the user asked for**, in their words: *"when it snaps to the top… I want
+it to move any other applications, [so they] need to be kind of snapped so that
+the top of that window is underneath it. So it doesn't block the top toolbars of
+other applications."*
+
+Today, docking to the top just parks a floating always-on-top window over
+whatever is behind it — a maximised browser keeps its tab strip and address bar
+underneath Recordr, hidden. The desired behaviour (user screenshots) is what the
+**taskbar** does: the desktop work area shrinks, and every other window lays
+itself out below.
+
+* **The mechanism is `SHAppBarMessage`** (shell32) — the Windows *application
+  desktop toolbar* ("appbar") API, which is exactly what the taskbar itself
+  uses. Sequence: `ABM_NEW` to register the HWND, `ABM_QUERYPOS` +
+  `ABM_SETPOS` with `uEdge = ABE_TOP` and the desired rect (Windows adjusts the
+  rect for other appbars and hands it back), then move the window to the
+  returned rect. `ABM_REMOVE` to give the space back.
+* Electron exposes no wrapper for this. The HWND comes from
+  `win.getNativeWindowHandle()`. Two routes:
+  1. **`koffi`** (or another prebuilt FFI) to call `shell32.dll` from the main
+     process. **Preferred** — this box has no VS Build Tools (see the Phase 3
+     history), so anything needing `node-gyp` is a non-starter, and koffi ships
+     prebuilt binaries.
+  2. Extend the existing .NET 8 helper in `native/RecordrLoopback` with a second
+     command that takes an HWND. We already build and ship that helper, so no
+     new dependency — but it puts the appbar's lifetime in a separate process
+     from the window that owns it, which is worse.
+* **This must be a setting**, default off, and must apply only while actually
+  docked. Undock → `ABM_REMOVE`.
+
+⚠️ **Three traps, all of which will bite:**
+
+1. **A stale registration shrinks the user's desktop until they log out.** If we
+   register and the process dies without `ABM_REMOVE`, the reserved strip can
+   persist with nothing in it. Needs `ABM_REMOVE` on `before-quit`, on window
+   close, on undock, *and* a defensive sweep on startup. Treat this as the
+   headline risk — it breaks the whole machine, not just our app.
+2. **It will fight our own snapping code.** `workAreaFor()` in
+   `src/main/window-controls.ts` reads
+   `screen.getDisplayNearestPoint(...).workArea`, and once we register an appbar
+   that work area *excludes our own strip*. Re-snapping would then walk the
+   window progressively down the screen. Snap geometry has to be computed from
+   `display.bounds` (minus other appbars) rather than the post-registration work
+   area.
+3. **`ABN_POSCHANGED` needs handling.** When the taskbar moves, another appbar
+   registers, or the resolution changes, Windows notifies via the
+   `uCallbackMessage` we registered — which an Electron window proc won't
+   process. At minimum, re-apply position on
+   `screen.on('display-metrics-changed')` and `display-added`/`display-removed`.
+
+Also: appbars are per-display and the rect is in **physical** pixels, so DPI
+scaling has to be applied. Fullscreen exclusive apps (games, full-screen video)
+ignore the work area — that's expected and fine.
+
+</details>
+
+### 3. Premium visual redesign — IN PROGRESS (Phases 1–2 done)
+
+Brief in **§10**. Working through its own phase list.
+
+**✅ Phase 1 — audit.** Measured, not guessed. `styles.css` held **271
+hard-coded colour values** (149 hex + 122 rgba) against only **106 token uses**,
+with just 11 tokens, all presentational (`--accent-2`, `--bg-2`) rather than
+semantic. The per-theme override counts named the problem exactly: `classic` 34
+rules, `kawaii` 67, but `cyberpunk` / `synthwave` / `monochrome` **three each** —
+they were literally palette swaps of `modern`, which is the "same UI, different
+colours" complaint in numbers. 94 distinct class names across the renderer.
+
+**✅ Phase 2 — design system.** Semantic token layer at the top of
+`styles.css`: **42 tokens**, all six themes plus `:root` carrying a full block.
+Two decisions worth keeping:
+
+* Tokens are scoped to `.theme-*`, **not** `.app.theme-*`. The pop-out root is
+  `.popout.theme-*`, so the old blocks never matched it and every theme
+  rendered there in the default palette. One selector now feeds both windows —
+  verified by screenshot (cyberpunk pop-out chrome, previously always navy).
+* Each theme sets *personality* knobs, not just hue: `--glow` (0.15 monochrome
+  → 0.7 cyber), `--radius` (0 classic → 18px kawaii), `--panel-blur`, surface
+  separation, border weight, and a mono type stack for classic. This is what
+  stops the themes collapsing back into palette swaps.
+* Legacy aliases (`--bg`, `--fg`, `--line`, …) map the old names onto the new
+  semantic ones, so the layer landed with **zero visual change** to
+  already-styled components. The old `.app.theme-*` blocks still win on
+  specificity where they exist — deliberately — and get deleted per component
+  as it migrates.
+
+**Next — Phase 3 (layout), Phase 4 (polish), Phase 5 (cleanup).** The real work
+left is migrating components onto the tokens and deleting the per-theme override
+blocks that a proper token layer makes redundant. Expect `styles.css` to get
+*shorter*. Remember the acceptance test: it must still look good with `--accent`
+forced to grey.
+
+### 4. Historical waveform — scrub, select, drag out
+
+**The big one.** The user's words: *"a new visualizer that lets us see
+historical audio… a waveform… this will allow users to scrub through, highlight,
+select, and then drag and drop the bits of that audio they want to clip."*
+Same model as Rolling Sampler by Bird Things.
+
+> **The user explicitly asked that this be phased and not attempted in one
+> turn.** Land it in stages, each shippable on its own.
+
+It becomes a **fourth visualizer mode** alongside oscilloscope / spectrum /
+spectrogram, so `VisualizerMode` in `src/shared/types.ts` gains a member, and the
+chip row, the quick menu and `SettingsPanel` all pick it up automatically-ish.
+
+**Phase A — the peak track.** A ring buffer of min/max pairs per ~20ms bucket,
+accumulated off the existing AnalyserNode's time-domain data, sized to
+`settings.bufferSeconds`. Cheap (10 min at 20ms ≈ 30k pairs) and completely
+independent of the encoder. Nothing user-visible yet.
+
+**Phase B — draw it.** Render the peak track as an overview of the last N
+minutes: envelope, time axis, "now" edge on the right. Read-only.
+
+**Phase C — selection.** Click-drag to select a range, with a duration readout,
+keyboard nudge, and edge handles.
+
+**Phase D — export the selection.** ⚠️ **This is the hard part, and it is not
+the peak track.** `ring-buffer.ts` holds *encoded* WebM/Opus chunks from
+MediaRecorder, and only the first chunk carries the header — individual chunks
+are not independently decodable, so you cannot simply concatenate an arbitrary
+sub-range. The workable path: take header + the chunks spanning the selection,
+`decodeAudioData` that, slice precisely in PCM, re-encode the slice, write it.
+Do **not** try to cut the encoded stream at sample granularity.
+
+**Phase E — drag it out.** `webContents.startDrag({ file, icon })` in main, over
+a new IPC channel, so a selection can be dropped straight onto the desktop or
+into a DAW. Needs a temp-file strategy (write to `app.getPath('temp')`, and a
+cleanup policy for clips the user drags but never keeps).
+
+**Phase F — polish.** Zoom/scroll on the overview, a Save-selection button as a
+non-drag path, keyboard shortcuts, and a decision on what history mode should do
+in the **pop-out** — it receives only analyser frames over `viz:frame` and has no
+ring buffer of its own, so either the peak track gets streamed to it too, or the
+mode is disabled there. Decide this early; it affects the Phase A data flow.
