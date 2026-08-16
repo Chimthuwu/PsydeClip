@@ -10,6 +10,14 @@ interface Props {
   onRefresh: () => Promise<unknown>;
   /** Whether loopback is supported on this platform. */
   loopbackSupported: boolean;
+  /**
+   * Drop the label column and the helper line, leaving just the trigger.
+   * Used by the compact layouts, where the two of them cost more vertical
+   * room than the control itself.
+   */
+  compact?: boolean;
+  /** Notified when the listbox opens/closes (the bar layout grows the window). */
+  onOpenChange?: (open: boolean) => void;
 }
 
 type Item =
@@ -24,6 +32,8 @@ export function SourcePicker({
   onChange,
   onRefresh,
   loopbackSupported,
+  compact,
+  onOpenChange,
 }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -71,6 +81,7 @@ export function SourcePicker({
   // shows an up-to-date enumeration.
   useEffect(() => {
     if (open) onRefresh().catch(() => {});
+    onOpenChange?.(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -92,11 +103,14 @@ export function SourcePicker({
 
   const disabled = backend === 'loopback' && !loopbackSupported;
 
+  const labelText = backend === 'loopback' ? 'Output device' : 'Source';
+
   return (
-    <div className="picker-row picker-row-stack" ref={wrapRef}>
-      <label htmlFor="source-trigger">
-        {backend === 'loopback' ? 'Output device' : 'Source'}
-      </label>
+    <div
+      className={`picker-row picker-row-stack${compact ? ' is-compact' : ''}`}
+      ref={wrapRef}
+    >
+      {!compact && <label htmlFor="source-trigger">{labelText}</label>}
 
       <div className="picker-select-wrap">
         <button
@@ -106,8 +120,14 @@ export function SourcePicker({
           onClick={() => !disabled && setOpen((o) => !o)}
           disabled={disabled}
           aria-haspopup="listbox"
+          aria-label={labelText}
           aria-expanded={open}
         >
+          {compact && (
+            <span className="dd-icon" aria-hidden="true">
+              {backend === 'loopback' ? '🔊' : '🖵'}
+            </span>
+          )}
           <span className="dd-label">{selectedLabel}</span>
           <span className="dd-chevron" aria-hidden="true">
             ▾
@@ -151,7 +171,7 @@ export function SourcePicker({
         )}
       </div>
 
-      <small>{headerHint}</small>
+      {!compact && <small>{headerHint}</small>}
     </div>
   );
 }

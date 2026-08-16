@@ -7,6 +7,12 @@ import {
   LoopbackEvent,
   RecorderEvent,
   SaveResult,
+  SnapTarget,
+  UiLayout,
+  VizCommand,
+  VizFrame,
+  VizState,
+  WindowAction,
 } from '../shared/types';
 
 const api = {
@@ -40,6 +46,77 @@ const api = {
     const listener = () => handler();
     ipcRenderer.on(IpcChannel.openSettings, listener);
     return () => ipcRenderer.removeListener(IpcChannel.openSettings, listener);
+  },
+  /** Settings saved anywhere (any window, or the tray menu). */
+  onSettingsChanged(handler: (s: AppSettings) => void): () => void {
+    const listener = (_e: unknown, s: AppSettings) => handler(s);
+    ipcRenderer.on(IpcChannel.settingsChanged, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.settingsChanged, listener);
+  },
+
+  // ------- Window chrome / geometry -------------------------------------------
+
+  /** Minimise / maximise / hide / close the window that called this. */
+  windowControl(action: WindowAction): void {
+    void ipcRenderer.invoke(IpcChannel.windowControl, { action });
+  },
+  /** Park the window against an edge of its current display. */
+  snapWindow(target: SnapTarget): void {
+    void ipcRenderer.invoke(IpcChannel.windowSnap, { target });
+  },
+  /** Tell main the UI layout changed so it can re-clamp the minimum size. */
+  applyLayout(layout: UiLayout): void {
+    void ipcRenderer.invoke(IpcChannel.windowApplyLayout, { layout });
+  },
+  /**
+   * Grow the window to `height` px so a popover taller than it stays visible;
+   * pass null to snap back. Used by the bar layout's device dropdown.
+   */
+  tempExpandWindow(height: number | null): void {
+    void ipcRenderer.invoke(IpcChannel.windowTempExpand, { height });
+  },
+  onWindowState(handler: (s: { maximized: boolean; focused: boolean }) => void): () => void {
+    const listener = (_e: unknown, s: { maximized: boolean; focused: boolean }) => handler(s);
+    ipcRenderer.on(IpcChannel.windowState, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.windowState, listener);
+  },
+
+  // ------- Pop-out visualizer --------------------------------------------------
+
+  togglePopout(open?: boolean): Promise<{ open: boolean }> {
+    return ipcRenderer.invoke(IpcChannel.popoutToggle, { open });
+  },
+  onPopoutState(handler: (s: { open: boolean }) => void): () => void {
+    const listener = (_e: unknown, s: { open: boolean }) => handler(s);
+    ipcRenderer.on(IpcChannel.popoutState, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.popoutState, listener);
+  },
+  /** Main window → pop-out: one analyser frame. Fire-and-forget, ~30/s. */
+  sendVizFrame(frame: VizFrame): void {
+    ipcRenderer.send(IpcChannel.vizFrame, frame);
+  },
+  /** Main window → pop-out: capture/buffer/theme state, on change only. */
+  sendVizState(state: VizState): void {
+    ipcRenderer.send(IpcChannel.vizState, state);
+  },
+  onVizFrame(handler: (f: VizFrame) => void): () => void {
+    const listener = (_e: unknown, f: VizFrame) => handler(f);
+    ipcRenderer.on(IpcChannel.vizFrame, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.vizFrame, listener);
+  },
+  onVizState(handler: (s: VizState) => void): () => void {
+    const listener = (_e: unknown, s: VizState) => handler(s);
+    ipcRenderer.on(IpcChannel.vizState, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.vizState, listener);
+  },
+  /** Pop-out → main window: a transport command. */
+  sendVizCommand(cmd: VizCommand): void {
+    ipcRenderer.send(IpcChannel.vizCommand, cmd);
+  },
+  onVizCommand(handler: (c: VizCommand) => void): () => void {
+    const listener = (_e: unknown, c: VizCommand) => handler(c);
+    ipcRenderer.on(IpcChannel.vizCommand, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.vizCommand, listener);
   },
 
   // ------- WASAPI loopback ----------------------------------------------------

@@ -17,6 +17,31 @@ export type RecordMode = 'rolling' | 'traditional';
  */
 export type CaptureBackend = 'desktop' | 'loopback';
 
+/**
+ * How much chrome the main window shows.
+ *   - 'full'    = title bar + HUD + visualizer + footer (the original layout)
+ *   - 'compact' = title bar + a single control row + visualizer
+ *   - 'bar'     = one thin strip: transport + meter only, no visualizer.
+ *                 Meant to be docked to the top edge of a monitor.
+ */
+export type UiLayout = 'full' | 'compact' | 'bar';
+
+/** 'system' = the OS title bar; 'custom' = our own 26px frameless strip. */
+export type TitleBarMode = 'system' | 'custom';
+
+/** How button labels are rendered as the window narrows. */
+export type LabelMode = 'auto' | 'icon' | 'text';
+
+/** Where a snap request should put the window on its current display. */
+export type SnapTarget =
+  | 'top'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'center';
+
 /** A source the user can pick for system audio capture (desktopCapturer). */
 export interface CaptureSource {
   /** Stable id from Electron's desktopCapturer. */
@@ -68,6 +93,40 @@ export interface AppSettings {
   alwaysOnTop: boolean;
   /** Template used to name saved recordings. */
   fileNameTemplate: string;
+
+  // ----- Interface ---------------------------------------------------------
+  // Everything below is presentation-only: it changes how much room the app
+  // takes up, never what it records. Each knob is user-facing so nobody is
+  // stuck with a layout that doesn't suit their screen.
+
+  /** How much chrome the main window shows. */
+  uiLayout: UiLayout;
+  /** OS title bar vs our own minimal strip (applies on window re-create). */
+  titleBarMode: TitleBarMode;
+  /** Button label strategy as the window narrows. */
+  labelMode: LabelMode;
+  /** Show the VU meter row in the HUD. */
+  showVu: boolean;
+  /** Show the rolling-buffer fill bar in the HUD. */
+  showBuffer: boolean;
+  /** Show the source / output-device picker in the footer. */
+  showSourcePicker: boolean;
+  /** Show the oscilloscope / spectrum / spectrogram chip row. */
+  showVizChips: boolean;
+  /** Show the "Hotkey: …" hint line. */
+  showHint: boolean;
+  /** Snap the window to a screen edge when dragged near one. */
+  magneticSnap: boolean;
+  /** Re-open the pop-out visualizer window on launch. */
+  popoutOpen: boolean;
+  /** Keep the pop-out above other windows. */
+  popoutAlwaysOnTop: boolean;
+  /** Pop-out window opacity, 0.2–1. */
+  popoutOpacity: number;
+  /** Render transport buttons inside the pop-out. */
+  popoutControls: boolean;
+  /** Hide the main window's visualizer while the pop-out is open. */
+  hideBoardWhenPopped: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -83,7 +142,36 @@ export const DEFAULT_SETTINGS: AppSettings = {
   bitrateKbps: 96,
   alwaysOnTop: false,
   fileNameTemplate: 'recordr_{date}_{time}',
+
+  uiLayout: 'full',
+  titleBarMode: 'custom',
+  labelMode: 'auto',
+  showVu: true,
+  showBuffer: true,
+  showSourcePicker: true,
+  showVizChips: true,
+  showHint: true,
+  magneticSnap: true,
+  popoutOpen: false,
+  popoutAlwaysOnTop: true,
+  popoutOpacity: 1,
+  popoutControls: true,
+  hideBoardWhenPopped: false,
 };
+
+/**
+ * Minimum window size per layout, in CSS px. `bar` is deliberately tiny — it
+ * only has to fit one row of icon buttons — and main clamps the window to
+ * these numbers whenever the layout changes.
+ */
+export const LAYOUT_MIN_SIZE: Record<UiLayout, { width: number; height: number }> = {
+  full: { width: 240, height: 190 },
+  compact: { width: 200, height: 120 },
+  bar: { width: 180, height: 34 },
+};
+
+/** Height the window is snapped to when entering `bar` layout. */
+export const BAR_LAYOUT_HEIGHT = 38;
 
 /**
  * Tokens supported in `fileNameTemplate`. The renderer surfaces these as
@@ -131,7 +219,50 @@ export const IpcChannel = {
   windowSetAlwaysOnTop: 'window:set-always-on-top',
   openSettings: 'window:open-settings',
   traySetCapturing: 'tray:set-capturing',
+  settingsChanged: 'settings:changed',
+  windowControl: 'window:control',
+  windowSnap: 'window:snap',
+  windowApplyLayout: 'window:apply-layout',
+  windowTempExpand: 'window:temp-expand',
+  windowState: 'window:state',
+  popoutToggle: 'popout:toggle',
+  popoutState: 'popout:state',
+  vizFrame: 'viz:frame',
+  vizState: 'viz:state',
+  vizCommand: 'viz:command',
 } as const;
+
+/** Simple window verbs the custom title bar can ask main to perform. */
+export type WindowAction = 'minimize' | 'maximize' | 'restore-or-max' | 'hide' | 'close';
+
+/** What the main renderer streams to the pop-out visualizer, ~30×/s. */
+export interface VizFrame {
+  /** Time-domain samples, one AnalyserNode fftSize window. */
+  time: Float32Array;
+  /** Frequency bins in dB. */
+  freq: Float32Array;
+  minDecibels: number;
+  maxDecibels: number;
+}
+
+/** Slower-moving state the pop-out mirrors (sent only when it changes). */
+export interface VizState {
+  capturing: boolean;
+  hasSource: boolean;
+  canSave: boolean;
+  bufferedSeconds: number;
+  bufferSeconds: number;
+  recordMode: RecordMode;
+  theme: Theme;
+  visualizer: VisualizerMode;
+  rms: number;
+}
+
+/** Commands the pop-out sends back to the main renderer. */
+export type VizCommand =
+  | { type: 'toggle-capture' }
+  | { type: 'save' }
+  | { type: 'set-visualizer'; mode: VisualizerMode };
 
 export type RecorderEvent =
   | { type: 'saved'; path: string; bytes: number; durationSec: number }

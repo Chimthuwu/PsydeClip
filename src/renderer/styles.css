@@ -27,10 +27,12 @@ html, body, #root {
 }
 
 .app {
-  display: grid;
-  /* minmax(0, 1fr) — without the 0 floor the board row refuses to shrink below
-     its canvas content and pushes the footer off-screen on small windows. */
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Flex, not grid: which rows exist now depends on the layout and on the
+     visibility toggles (title bar? HUD? board? footer?), and a column flexbox
+     doesn't care how many there are. The board is the only flexible child;
+     everything else is its natural height. */
+  display: flex;
+  flex-direction: column;
   height: 100%;
   position: relative;
   background:
@@ -228,21 +230,53 @@ html, body, #root {
   flex-wrap: wrap;
   min-width: 0;
 }
-/* The save button carries the longest label, so it's the one that gets to
-   absorb the remaining width (and ellipsise) instead of overflowing. */
+/* The save button carries the longest label, so it's the one that shrinks and
+   ellipsises when the row runs out of room — but it does NOT grow to fill it.
+   `flex-grow: 1` here is what made "Save last 10 min" a banner across the
+   whole HUD at every window size. */
 .hud-actions .primary {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Push the transport to the right so the row reads status → actions. */
+.hud-actions {
+  justify-content: flex-end;
+}
 .hud-actions .ghost {
   flex: 0 0 auto;
 }
 
-/* Long/short label pairs — the short one takes over at narrow widths. */
+/* Label triples ------------------------------------------------------------
+   Every transport button ships three labels — full text, short text, glyph —
+   and exactly one is visible. `labels-auto` lets the breakpoints choose;
+   `labels-text` and `labels-icon` pin it regardless of window size. */
+.lbl-icon { display: none; }
 .lbl-short { display: none; }
+.labels-text .lbl-full { display: inline; }
+.labels-text .lbl-short,
+.labels-text .lbl-icon { display: none; }
+.labels-icon .lbl-full,
+.labels-icon .lbl-short { display: none; }
+.labels-icon .lbl-icon { display: inline; }
+
+/* Tight variant: bar strip + pop-out overlay. */
+button.is-tight {
+  padding: 3px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+button.primary.big.is-tight {
+  padding: 3px 9px;
+  font-size: 12px;
+}
+button.is-tight.labels-icon {
+  padding: 3px 6px;
+  min-width: 24px;
+}
+.transport-toggle.is-live .lbl-icon { color: var(--danger); }
 
 .hud-hint {
   font-size: 11px;
@@ -260,6 +294,23 @@ html, body, #root {
   color: var(--fg);
 }
 
+/* "The device is quiet" is a state, not an error — it's what an idle WASAPI
+   endpoint looks like — so it gets a warning tint rather than the red bar. */
+.hud-quiet {
+  font-size: 11px;
+  white-space: nowrap;
+  color: #ffcc66;
+  background: rgba(255, 204, 102, 0.1);
+  border: 1px solid rgba(255, 204, 102, 0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: help;
+}
+.hud-quiet.mini {
+  padding: 1px 5px;
+  flex: 0 0 auto;
+}
+
 .hud-error {
   font-size: 12px;
   color: var(--danger);
@@ -273,6 +324,7 @@ html, body, #root {
 
 .board {
   position: relative;
+  flex: 1 1 auto;
   margin: clamp(6px, 1.6vw, 16px);
   min-width: 0;
   min-height: 0;
@@ -377,6 +429,9 @@ html, body, #root {
   gap: 8px;
   position: relative; /* anchors the dropdown popover */
   min-width: 0;
+  /* Device names are short; letting the trigger run the full width of the
+     window made the picker look like the most important control in the app. */
+  max-width: 460px;
 }
 
 select, input[type='text'], input[type='number'] {
@@ -1214,8 +1269,8 @@ small {
 
 /* --- narrower: shorten labels, drop the helper copy --- */
 @media (max-width: 680px) {
-  .lbl-full { display: none; }
-  .lbl-short { display: inline; }
+  .labels-auto .lbl-full { display: none; }
+  .labels-auto .lbl-short { display: inline; }
 
   button.primary.big {
     padding: 8px 12px;
@@ -1278,6 +1333,42 @@ small {
   }
 }
 
+/* --- sub-360: the transport goes icon-only --- */
+@media (max-width: 360px) {
+  .labels-auto .lbl-short { display: none; }
+  .labels-auto .lbl-icon { display: inline; }
+  .hud-actions .primary {
+    flex: 0 0 auto;
+  }
+  .hud {
+    padding: 5px 7px;
+    gap: 4px;
+  }
+  .sidebar {
+    padding: 5px 7px 7px;
+  }
+  .picker-row small,
+  .picker-row label {
+    display: none;
+  }
+  .board {
+    margin: 4px;
+  }
+}
+
+/* --- sub-260: only the things you press survive --- */
+@media (max-width: 260px) {
+  .hud-buffer,
+  .hud-mode,
+  .viz-buttons {
+    display: none;
+  }
+  .pill {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+}
+
 /* --- short windows: the board must not get squeezed to nothing --- */
 @media (max-height: 520px) {
   .hud-hint {
@@ -1287,7 +1378,7 @@ small {
     display: none;
   }
   .board {
-    min-height: 90px;
+    min-height: 60px;
   }
 }
 @media (max-height: 400px) {
@@ -1295,10 +1386,322 @@ small {
     height: 4px;
   }
   .hud {
-    padding-top: 6px;
-    padding-bottom: 6px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    gap: 4px;
   }
   .board {
-    min-height: 64px;
+    min-height: 40px;
+    margin: 4px;
   }
+}
+/* Below this the board is a sliver; give the controls the room instead. */
+@media (max-height: 240px) {
+  .hud-vu,
+  .hud-buffer {
+    display: none;
+  }
+  .board {
+    min-height: 24px;
+  }
+}
+
+/* Custom title bar --------------------------------------------------------
+   26px against the OS bar's ~32, and it carries the controls that matter for
+   a window docked to an edge. The strip itself is the drag region; every
+   interactive child opts back out. */
+
+.titlebar {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 2px 0 8px;
+  background: rgba(5, 8, 22, 0.9);
+  border-bottom: 1px solid var(--line-soft);
+  user-select: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+.titlebar.has-inline {
+  /* Bar layout: the strip is the whole app, so it needs room to breathe. */
+  height: auto;
+  min-height: 32px;
+  padding: 3px 2px 3px 8px;
+}
+.app.theme-kawaii .titlebar {
+  background: rgba(255, 255, 255, 0.82);
+  border-bottom: 1px solid var(--line);
+}
+.app.theme-classic .titlebar {
+  background: #000;
+  border-bottom: 1px solid #003300;
+  color: #00aa00;
+}
+
+.tb-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 6px transparent;
+}
+.tb-dot.on {
+  background: var(--danger);
+  box-shadow: 0 0 8px var(--danger);
+  animation: tb-breathe 1.6s ease-in-out infinite;
+}
+@keyframes tb-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+.tb-name {
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.tb-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+.tb-inline {
+  -webkit-app-region: no-drag;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.tb-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+.tb-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 3px;
+  background: var(--line);
+}
+
+.tb-btn {
+  -webkit-app-region: no-drag;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+  width: 26px;
+  height: 22px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tb-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fg);
+}
+.tb-btn:active {
+  transform: none;
+}
+.tb-btn.is-on {
+  color: var(--accent);
+  background: rgba(125, 249, 255, 0.12);
+}
+.tb-btn.tb-close:hover {
+  background: var(--danger);
+  color: #fff;
+}
+.app.theme-kawaii .tb-btn:hover {
+  background: rgba(255, 143, 199, 0.18);
+}
+
+/* Bar layout --------------------------------------------------------------
+   One row, nothing else. Intended to live docked across the top of a monitor
+   with the visualizer popped out into its own window. */
+
+.app.layout-bar {
+  overflow: visible; /* the device popover has to escape a 38px window */
+}
+.barstrip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(7, 10, 28, 0.85);
+  min-width: 0;
+}
+.pill.mini {
+  padding: 2px 6px;
+  font-size: 10px;
+  flex: 0 0 auto;
+}
+.hud-vu.mini {
+  flex: 1 1 40px;
+  min-width: 24px;
+  max-width: 120px;
+  height: 5px;
+}
+.bar-picker {
+  flex: 1 1 60px;
+  min-width: 0;
+}
+.bar-picker .picker-row {
+  gap: 4px;
+}
+/* In a 38px-tall window the popover has nowhere to go inside the client
+   area, so it drops below the strip instead of above it. */
+.app.layout-bar .dd-popover {
+  bottom: auto;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6), 0 0 30px rgba(125, 249, 255, 0.12);
+}
+
+/* Compact layout ----------------------------------------------------------- */
+
+.hud.is-compact {
+  grid-template-rows: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px 8px;
+}
+.hud.is-compact .hud-status {
+  flex: 0 1 auto;
+}
+.hud.is-compact .hud-vu {
+  flex: 1 1 50px;
+  min-width: 30px;
+  height: 5px;
+}
+.hud.is-compact .hud-actions {
+  flex: 0 0 auto;
+}
+.sidebar.is-compact {
+  display: block;
+  padding: 4px 8px 6px;
+}
+
+/* Icon-only device picker: label and helper line are gone, the trigger keeps
+   a speaker glyph so it's still identifiable at ~90px wide. */
+.picker-row.is-compact {
+  display: block;
+}
+.picker-row.is-compact .picker-select-wrap {
+  gap: 4px;
+}
+.picker-row.is-compact .dd-trigger {
+  padding: 4px 8px 4px 6px;
+  font-size: 12px;
+  gap: 4px;
+}
+.picker-row.is-compact .ghost {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.dd-icon {
+  flex: 0 0 auto;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+/* Pop-out visualizer window ------------------------------------------------ */
+
+.popout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #05070f;
+  color: var(--fg);
+  overflow: hidden;
+}
+.popout.theme-kawaii { background: #fff0f7; }
+.popout.theme-classic { background: #000; }
+
+.popout-drag {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 2px 0 8px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.35);
+  flex: 0 0 auto;
+}
+.popout-title {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.popout-drag .tb-btn {
+  height: 18px;
+  width: 22px;
+}
+
+.popout-board {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.popout.is-capturing .popout-board {
+  border-color: #39ff14;
+  box-shadow: inset 0 0 22px rgba(57, 255, 20, 0.22);
+}
+.popout-board canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Controls sit over the waveform and fade up on hover so a parked pop-out is
+   just the visualizer. */
+.popout-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+  opacity: 0.25;
+  transition: opacity 140ms ease;
+  flex-wrap: wrap;
+}
+.popout-controls.is-shown {
+  opacity: 1;
+}
+.popout-chips {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+.popout-chips .chip {
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.popout.theme-kawaii .popout-controls {
+  background: linear-gradient(0deg, rgba(255, 240, 247, 0.9), rgba(255, 240, 247, 0));
 }
