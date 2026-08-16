@@ -11,10 +11,16 @@ function settingsPath(): string {
 
 export function readSettings(): AppSettings {
   try {
-    const raw = fs.readFileSync(settingsPath(), 'utf8');
+    let raw = fs.readFileSync(settingsPath(), 'utf8');
+    if (raw.charCodeAt(0) === 0xFEFF) {
+      raw = raw.slice(1);
+    }
     const parsed = JSON.parse(raw);
     return { ...DEFAULT_SETTINGS, ...parsed };
-  } catch {
+  } catch (err: any) {
+    if (err.code !== 'ENOENT') {
+      console.error(`Failed to read/parse settings file at ${settingsPath()}:`, err);
+    }
     return { ...DEFAULT_SETTINGS };
   }
 }
