@@ -1,6 +1,6 @@
 # Recordr — Project Handoff
 
-> **Last updated:** 2026-08-16 (Phase 8 + Bug #1 verification)
+> **Last updated:** 2026-08-16 (Phase 9 — v2.0.0)
 > **Repo root:** `C:\Users\Serge\Documents\GitHub\recordr`
 > **Stack:** Electron 30 (Chromium 126) + React 18 + TypeScript + Vite, native WASAPI helper in C# / .NET 8 (NAudio)
 
@@ -225,6 +225,16 @@ User asked: **"Make the floor/minimum UI size even smaller and thinner. Let me s
 * Settings written anywhere now broadcast to every window (`settings:changed`), so the tray, the pop-out and the main window can't drift apart.
 * A 38px window can't host a popover or a modal, so the device dropdown and the settings panel temporarily grow the window (`tempExpand`) and snap it back on close.
 
+### Phase 9 — pop-out as a real mode, reclaimed vertical space, spectrogram rebuild
+
+User report: *"when we pop out the visualizer the previous one kinda remains… we shouldn't have two windows open"*, *"we can't actually snap the monitor window to the top"*, *"when we snap [the main window] to the top and make it the smallest possible size we can't even really see the visualizer… the only thing we can really see is output device"*, *"perhaps instead of having the output device selection on the front-facing UI we could have it behind a right-click dropdown"*, and **"CRITICAL: I think the spectrogram is broken, it looks funny."**
+
+* **Popping out now swaps windows instead of adding one.** New `settings.hideMainWhenPopped` (default **on**): the main window hides while the pop-out is up and returns when it closes. It's *hidden*, never closed — it still owns the capture, the rolling buffer and the 30fps frame pump the pop-out draws from. The policy lives in `applyPopoutWindowSwap()` (`src/main/index.ts`) and fires on **transitions** of `popoutOpen` only, so changing a setting while popped out can't yank back a window the user deliberately restored from the tray. `popoutToggle` in `ipc.ts` now routes through `onSettingsChanged` instead of writing quietly, which is what makes every entry point (title bar, tray, the pop-out's own ✕) agree.
+* **The pop-out can be docked.** It gained a `⤒` button and magnetic edge snap on `moved`. `windowSnap` already routed to `BrowserWindow.fromWebContents(e.sender)`, so the plumbing existed — the monitor window simply had no UI to reach it. Verified: dock click took it from `600,300 525x240` to `0,0 1921x241`.
+* **Short windows give their height to the waveform.** A window docked across the top of a monitor is the worst case, because it is *wide* — none of the width breakpoints fire, so the HUD kept its full stacked-row height and the board collapsed to a sliver. Below 460px tall the HUD is now a single flex row (a full-width row holding two right-aligned buttons was almost entirely empty space); below 340px the buffer bar, mode label and picker label go and the transport tightens; below 260px the footer strip goes entirely and the right-click menu carries the device and mode. At 1900×215 the board went from a ~10px line to ~130px.
+* **Right-click quick menu** (`IpcChannel.contextMenu`, built in `ipc.ts`): capture source / output device, capture backend, visualizer mode, rolling buffer, always-on-top, pop-out, dock-to-top, layout, and Settings. Built as a **native** Electron menu on purpose — `bar` layout is a 38px window and anything the renderer draws is clipped at the window edge, so an in-DOM menu could not work there. With this in place `showSourcePicker` now defaults to **off**.
+* **Spectrogram rebuilt.** See Bug #7 below — it had four compounding defects, not one.
+
 ---
 
 ## 4. Known bugs / open issues
@@ -310,6 +320,43 @@ pop-out each get their own), scrolls it with a self `drawImage` under
 `globalCompositeOperation = 'copy'`, and blits the result. Frequency is mapped
 logarithmically now too — the linear map buried everything musical in the
 bottom eighth of the image.
+
+### ✅ Bug #7 — Spectrogram rendered as smeared blocks — FIXED
+
+Bug #6 got it *drawing*; it was still drawing wrong. Four separate defects,
+each of which alone would have looked "funny":
+
+1. **Thick horizontal banding across the bottom.** The row→bin lookup was a
+   bare `round(exp(...))`. With a 1024-bin FFT the bottom ~30% of the image
+   spans bins 1–8, so dozens of consecutive rows resolved to the *same* bin and
+   painted the same flat colour.
+2. **Flickering vertical streaks at the top.** At the high end each row
+   advanced 40+ bins, and one sampled bin stood in for all of them — any peak
+   between two sampled bins vanished, and which bins got sampled shifted frame
+   to frame.
+3. **Everything out of focus.** The scroll step draws the history canvas onto
+   itself. `imageSmoothingEnabled` defaults to *true*, so every frame resampled
+   the entire image; after a few seconds it was mush.
+4. **A flat cyan wash.** The ramp's floor was `rgb(20,40,80)` — silence was
+   already a visible blue — and typical music sits at −60…−30 dB, dead centre
+   of the −90…−10 window, so a linear map put nearly the whole picture in one
+   mid-tone.
+
+Fixes, all in `src/renderer/lib/visualizer.ts`: a precomputed per-row bin map
+(`buildRowMap()`) that **interpolates** where a row is narrower than one bin
+and **max-pools** where it is wider, so neither end loses data;
+`imageSmoothingEnabled = false` on the history buffer; a `norm²` contrast curve;
+and `RAMPS`, a stop-table per theme that starts at that theme's own canvas
+background so silence disappears into the panel. Scroll step went from `w/480`
+to `w/900` (finer time axis, ~16s of history instead of ~8). Temporal smoothing
+is now per mode — `SMOOTHING_FOR_MODE`, applied to the live `AnalyserNode` from
+`App.tsx` rather than in the draw loop, because the draw loop is rAF-driven and
+stops dead while the main window is hidden behind the pop-out.
+
+**Verified** against a synthetic 80 Hz→12 kHz log sweep + steady 440 Hz tone +
+periodic clicks: the sweep renders as a straight diagonal (correct on a log
+axis), the tone as a sharp flat line, the clicks as clean vertical transients,
+on a black floor.
 
 ---
 
@@ -432,7 +479,7 @@ keys.
   "labelMode": "auto",
   "showVu": true,
   "showBuffer": true,
-  "showSourcePicker": true,
+  "showSourcePicker": false,
   "showVizChips": true,
   "showHint": true,
   "magneticSnap": true,
@@ -440,7 +487,8 @@ keys.
   "popoutAlwaysOnTop": true,
   "popoutOpacity": 1,
   "popoutControls": true,
-  "hideBoardWhenPopped": false
+  "hideBoardWhenPopped": false,
+  "hideMainWhenPopped": true
 }
 ```
 
@@ -472,18 +520,32 @@ now).
 
 Still open, in rough priority order:
 
-1. **The scrubbable waveform + drag-to-export.** (user-requested, not started —
-   the largest remaining piece.) See §9 for the sketch: a decoded peak track in
-   a parallel ring buffer, drawn as an overview of the last N minutes, with
-   range selection and `webContents.startDrag()` export.
-2. **A browser version.** (user-requested, not started.) See §9 — feasible for
+1. **Premium visual redesign.** (user-requested, specced, not started — this is
+   the next major piece of work.) Full brief in **§10**. Headline: the themes
+   currently read as *the same UI with different colours*, the layout wastes
+   vertical space, and the design leans on neon borders instead of hierarchy.
+   The test to design against: **it should still look good with the accent
+   colour turned off.** Do NOT start by changing colours.
+
+2. **The scrubbable waveform + drag-to-export.** (user-requested, not started —
+   the largest remaining piece; the user has explicitly deferred it to a
+   version after v2.0.0.) Full sketch in §9. Shape: a decoded peak track in a
+   parallel ring buffer, drawn as an overview of the last N minutes, with drag
+   range-selection and `webContents.startDrag()` so a selection can be dropped
+   straight onto the desktop or into a DAW.
+
+3. **A browser version.** (user-requested, not started.) See §9 — feasible for
    the desktopCapturer path only.
-3. **Bug #5** — the cosmetic single-instance lock-file warning. Low value.
+
 4. **Harden `readSettings()`** against a BOM / malformed file: strip a leading
    `﻿`, and log rather than silently reverting to defaults (see §6).
-5. **Mic capture via WASAPI?** Optional; user asked for output-side only so
+
+5. **Bug #5** — the cosmetic single-instance lock-file warning. Low value.
+
+6. **Mic capture via WASAPI?** Optional; user asked for output-side only so
    don't introduce unless they ask.
-6. **Optional: nice-to-have quality-of-life.** A "preview" capture-before-record,
+
+7. **Optional: nice-to-have quality-of-life.** A "preview" capture-before-record,
    a button to rename template tokens on the fly, an in-app audio meter that
    expands the HUD on click. **Not yet asked.**
 
@@ -510,8 +572,8 @@ Still open, in rough priority order:
 
 ## 8. Reference files (important landmarks)
 
-* **Visualizer source of truth:** `src/renderer/lib/visualizer.ts` — adapted from `C:\Users\Serge\Desktop\Audio Oscilloscope & Spectrum Analyzer.html`. Don't lose the magColor() palette switcher; both themes need it.
-* **Renderer's "what's currently being recorded" model:** `src/renderer/hooks/useCapture.ts` — branches on `settings.captureBackend`. The render-loop bug is somewhere in the `useEffect` cascade here.
+* **Visualizer source of truth:** `src/renderer/lib/visualizer.ts` — adapted from `C:\Users\Serge\Desktop\Audio Oscilloscope & Spectrum Analyzer.html`. Three palette layers, all per theme, all needed: `palette()` (line/bar/grid colours), `drawBackground()` (canvas gradient) and `RAMPS` (the spectrogram's dB→colour table). A spectrogram ramp must start at that theme's own canvas background or silence tints the whole board.
+* **Renderer's "what's currently being recorded" model:** `src/renderer/hooks/useCapture.ts` — branches on `settings.captureBackend`. `bindDesktop()`'s pre-flight guard is load-bearing: see Bug #1.
 * **Filename substitution:** `src/main/save.ts` → `formatFileName()`. Tokens defined as `FILENAME_TOKENS` in `src/shared/types.ts`.
 * **Tray state machine:** `src/main/tray.ts`. ~370 lines. Has `isCapturing`, `captureStartedAt`, `recentSaves[]`, `lastSaveFlashUntil` — be careful when extending.
 * **Single-instance, hotkey, IPC registration sequence:** `src/main/index.ts`.
@@ -523,7 +585,7 @@ Still open, in rough priority order:
 
 ## 9. Free-form notes
 
-* This is an 8-phase build and the app now ships. Phase 7's two bugs (Start → blank, dropdown white-on-white) turned out **not** to share a root cause: the first was Chromium killing the renderer over a `getUserMedia` source that can't carry audio, the second was `<option>` being OS-rendered. Both are fixed; see §4.
+* This is a 9-phase build and the app now ships. Phase 7's two bugs (Start → blank, dropdown white-on-white) turned out **not** to share a root cause: the first was Chromium killing the renderer over a `getUserMedia` source that can't carry audio, the second was `<option>` being OS-rendered. Both are fixed; see §4.
 * The user has a real DAW setup (Bitwig, SphereEx Hydra, FL Studio, VCV Rack are listed in package.json's allow-list of windows). Don't change capture-backend semantics without letting them verify their actual recording pipeline.
 * Disk on C: is currently sitting at ~94% used. Don't run `npm install` again without first deleting `.sdk-bootstrap/` (~430 MB) and any leftover `node_modules` from sibling projects if you're switching contexts. Run `df -h /c` periodically.
 * If you (the next agent) need to verify exact internal behavior: `set RECORDR_DEBUG=1` was added in this session, stays in the source. Just set it before launching the packaged exe.
@@ -544,3 +606,116 @@ Still open, in rough priority order:
     and let a drag select a time range. Export = re-encode just that range, then
     `webContents.startDrag({ file, icon })` in main to hand the file to Explorer /
     a DAW. Needs a new IPC channel and a temp-file strategy for the dragged clip.
+  * **Deferred by the user to a release after v2.0.0.** Don't start it as a
+    side-quest — it wants its own version.
+
+---
+
+## 10. Premium visual redesign — brief
+
+Verbatim intent from the user, condensed into something actionable. **This is a
+UI/UX redesign, not permission to rewrite the architecture.** Preserve every
+existing behaviour: capture backends, the rolling buffer, device selection, the
+pop-out bridge, the layout system, the hotkey.
+
+### The direction
+
+> "Premium futuristic audio workstation meets experimental desktop recording tool."
+
+Professional audio software, oscilloscope/lab instrumentation, modern DAWs,
+futuristic monitoring gear, a subtle cyberpunk influence. **Elegant rather than
+gamer-y; technical rather than corporate; minimal but atmospheric.** Something
+an audio engineer or electronic artist would enjoy looking at for hours.
+
+Explicitly **not**: a generic SaaS dashboard, a gaming HUD, a Discord clone, a
+Tailwind component demo, "black background + neon green border everywhere",
+random cyberpunk decoration, excessive gradients/glow/rounded cards.
+
+### The single most important problem
+
+The themes currently read as **the same UI with different colours**. That is the
+thing to fix. Each theme should change the *atmosphere* — surface treatment,
+lighting, accent behaviour, texture — while the interface stays structurally
+coherent and every component stays recognisable. Sketches the user gave:
+
+| theme | atmosphere |
+|---|---|
+| Studio / Dark | quiet professional monitoring gear; very dark charcoal, restrained accent, subtle separators, extremely readable type |
+| Cyber / Neon | dark technical instrument panel; more luminous accents, subtle glow, still restrained |
+| Moonlight / Midnight | cool nocturnal studio; deep blue-black, soft cyan/lavender, low-contrast ambience |
+| Psychedelic / Psyforest | organic and atmospheric; subtle colour transitions, unusual accent treatment, still usable as a tool |
+| Retro | old-school digital instrumentation |
+
+### The acceptance test
+
+> **The design must still look good with the accent colour turned off.**
+
+If it only works because of bright colours, the system isn't strong enough. Get
+hierarchy → spacing → typography → surfaces → controls right *first*, then add
+atmosphere. **Make it feel designed, not decorated.**
+
+### Specific asks
+
+* **Layout.** Wastes vertical space today. Read as: chrome → status/transport →
+  *visualization (dominant)* → output+modes strip. Don't blindly copy that; use
+  design judgement, but the waveform gets the majority of the real estate.
+* **The waveform is the hero.** It's the most interesting thing in the app and
+  currently reads as a big empty rectangle containing a thin line. Wants: better
+  amplitude scaling, more interesting signal rendering, subtle glow, a real
+  oscilloscope grid (major/minor lines at *different* opacities, clear centre
+  axis, restrained measurement marks), readable at low signal, no distracting
+  animation when there's no signal. **Not** just a thicker line.
+* **Status area.** `LIVE` primary, `ROLLING` visibly subordinate, progress as a
+  proper recording timeline rather than a stray horizontal bar, elapsed/total
+  time in strong numerals aligned to it. A recording console, not a web header.
+* **Actions.** `Save last N min` is the *primary* action; `Stop` is the
+  end/destructive one. Clear hierarchy — but compact buttons, not huge ones.
+* **Output + modes.** Make the device control feel part of the instrument, and
+  make `OSCILLOSCOPE / SPECTRUM / SPECTROGRAM` read as *view modes*, with the
+  active one obvious without a fat border. (Note: as of Phase 9 the device
+  picker is off by default and lives in the right-click quick menu.)
+* **Typography.** One UI sans + one technical mono, no more. Small uppercase
+  labels for instrument categories, strong numerals for time, coherent
+  hierarchy without huge font sizes.
+* **Spacing.** A real scale (4/8/12/16/24/32/48) used to create hierarchy — not
+  padding sprayed everywhere.
+* **Borders & glow.** Dramatically less. Subtle 1px separators, low-opacity
+  borders, accent borders only for active/important elements, background
+  contrast to define surfaces. Glow is an *accent* — LIVE indicator, waveform,
+  active mode, primary action — not a property of every element.
+* **Surfaces.** A real depth hierarchy: app bg → header → control →
+  visualization → interactive controls. The steps can be extremely subtle.
+* **Motion.** 150–250ms. Subtle LIVE pulse, smooth mode transitions, small
+  hover/press feedback, a refresh spin, a clear save confirmation. Never
+  arcade-y. Honour `prefers-reduced-motion` (there's already a block for it).
+* **States.** Every control needs default / hover / active / focus / disabled.
+  Keyboard focus must be visible. Never communicate state by colour alone.
+* **Accessibility.** Readable contrast, adequate hit targets, meaningful labels,
+  screen-reader-friendly controls. The neon sits *on top of* an accessible UI.
+* **Unicode.** Device names are real-world strings like
+  `スピーカー (3- Corsair HS55 SURROUND)`. Don't assume Latin; truncate long
+  names gracefully. (`overflow-wrap`/`text-overflow` are already in place —
+  don't regress them.)
+* **Chrome.** Bring the 26px title bar into the visual system; `recordr` should
+  feel intentional. Don't make it taller.
+
+### Theme architecture
+
+Improve the token layer rather than hard-coding per-theme rules. Semantic
+tokens wanted: `--bg-app`, `--bg-surface`, `--bg-surface-elevated`,
+`--text-primary/secondary/muted`, `--accent`, `--accent-bright`, `--accent-soft`,
+`--border`, `--border-active`, `--waveform`, `--grid-major`, `--grid-minor`,
+`--success`, `--warning`, `--danger`, `--glow`. Themes redefine tokens; they do
+not get their own parallel stylesheets.
+
+⚠️ `styles.css` is ~1700 lines with six per-theme override blocks that grew
+organically — a large part of this job is *deleting* rules that a proper token
+layer makes redundant. Note that the canvas has its own palette in
+`visualizer.ts` (`palette()`, `RAMPS`, `drawBackground()`); the CSS tokens and
+that table must be kept in agreement, since the board sits inside the panel.
+
+### Process the user asked for
+
+Audit → design system → layout → polish → cleanup. Don't start rewriting
+immediately, and don't stop at "technically improved" — check the result at
+1280×720, 1440×900, 1920×1080 and a small window, then iterate.

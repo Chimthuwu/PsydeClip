@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow, desktopCapturer } from 'electron';
+import { ipcMain, dialog, BrowserWindow, desktopCapturer, Menu, MenuItemConstructorOptions } from 'electron';
 import {
   AppSettings,
   CaptureSource,
@@ -7,6 +7,7 @@ import {
   SaveResult,
   SnapTarget,
   UiLayout,
+  VisualizerMode,
   WindowAction,
 } from '../shared/types';
 import { applyLayout, performWindowAction, snapWindow, tempExpand } from './window-controls';
@@ -185,6 +186,162 @@ export function registerIpc(ctx: IpcContext) {
     },
   );
 
+  /**
+   * The right-click quick menu.
+   *
+   * Built natively rather than in the renderer for one hard reason: `bar`
+   * layout is a 38px-tall window, and anything the renderer draws is clipped at
+   * the window edge. A native menu floats free of the window, so the same menu
+   * works whether the app is full-size or a strip docked to the top of a
+   * monitor. It's also why the output-device picker no longer has to occupy a
+   * permanent row in the UI.
+   */
+  ipcMain.handle(IpcChannel.contextMenu, async (e): Promise<void> => {
+    const win = BrowserWindow.fromWebContents(e.sender) ?? ctx.getWindow();
+    if (!win || win.isDestroyed()) return;
+    const s = readSettings();
+
+    const apply = (patch: Partial<AppSettings>) => {
+      ctx.onSettingsChanged(writeSettings({ ...readSettings(), ...patch }));
+    };
+
+    // Only enumerate the backend actually in use — desktopCapturer and the
+    // WASAPI helper both cost real time and only one of them can be current.
+    let deviceItems: MenuItemConstructorOptions[];
+    if (s.captureBackend === 'loopback') {
+      let devices: LoopbackDevice[] = [];
+      try { devices = await listLoopbackDevices(); } catch { /* helper missing */ }
+      deviceItems = devices.length
+        ? devices.map((d) => ({
+            label: d.isDefault ? `★ ${d.name}` : d.name,
+            type: 'radio' as const,
+            checked: s.loopbackDeviceId === d.id,
+            click: () => apply({ loopbackDeviceId: d.id }),
+          }))
+        : [{ label: 'No output devices found', enabled: false }];
+    } else {
+      let sources: CaptureSource[] = [];
+      try {
+        sources = (
+          await desktopCapturer.getSources({
+            types: process.platform === 'win32' ? ['screen'] : ['screen', 'window'],
+            fetchWindowIcons: false,
+            thumbnailSize: { width: 0, height: 0 },
+          })
+        ).map((x) => ({ id: x.id, name: x.name, kind: 'screen' as const }));
+      } catch { /* ignore */ }
+      deviceItems = sources.length
+        ? sources.map((src) => ({
+            label: src.name,
+            type: 'radio' as const,
+            checked: s.sourceId === src.id,
+            click: () => apply({ sourceId: src.id }),
+          }))
+        : [{ label: 'No sources found', enabled: false }];
+    }
+
+    const vizItem = (mode: VisualizerMode, label: string): MenuItemConstructorOptions => ({
+      label,
+      type: 'radio',
+      checked: s.visualizer === mode,
+      click: () => apply({ visualizer: mode }),
+    });
+
+    const template: MenuItemConstructorOptions[] = [
+      { label: s.captureBackend === 'loopback' ? 'Output device' : 'Capture source', enabled: false },
+      ...deviceItems,
+      { type: 'separator' },
+      {
+        label: 'Capture backend',
+        submenu: [
+          {
+            label: 'WASAPI loopback (per device)',
+            type: 'radio',
+            checked: s.captureBackend === 'loopback',
+            enabled: process.platform === 'win32',
+            click: () => apply({ captureBackend: 'loopback' }),
+          },
+          {
+            label: 'Desktop capture (whole screen)',
+            type: 'radio',
+            checked: s.captureBackend === 'desktop',
+            click: () => apply({ captureBackend: 'desktop' }),
+          },
+        ],
+      },
+      { type: 'separator' },
+      vizItem('oscilloscope', 'Oscilloscope'),
+      vizItem('spectrum', 'Spectrum'),
+      vizItem('spectrogram', 'Spectrogram'),
+      { type: 'separator' },
+      {
+        label: 'Rolling buffer',
+        type: 'checkbox',
+        checked: s.recordMode === 'rolling',
+        click: () => apply({ recordMode: s.recordMode === 'rolling' ? 'traditional' : 'rolling' }),
+      },
+      {
+        label: 'Always on top',
+        type: 'checkbox',
+        checked: s.alwaysOnTop,
+        click: () => apply({ alwaysOnTop: !s.alwaysOnTop }),
+      },
+      {
+        label: 'Pop out visualizer',
+        type: 'checkbox',
+        checked: isPopoutOpen(),
+        click: () => {
+          const want = !isPopoutOpen();
+          if (want) {
+            createPopout(() => {
+              ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
+            });
+          } else {
+            destroyPopout();
+          }
+          apply({ popoutOpen: want });
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Dock to top of screen',
+        click: () => snapWindow(win, 'top'),
+      },
+      {
+        label: 'Layout',
+        submenu: (['full', 'compact', 'bar'] as UiLayout[]).map((l) => ({
+          label: l === 'bar' ? 'Bar (thin strip)' : l[0].toUpperCase() + l.slice(1),
+          type: 'radio' as const,
+          checked: s.uiLayout === l,
+          click: () => {
+            applyLayout(ctx.getWindow(), l);
+            apply({ uiLayout: l });
+          },
+        })),
+      },
+      {
+        label: 'Show device picker in window',
+        type: 'checkbox',
+        checked: s.showSourcePicker,
+        click: () => apply({ showSourcePicker: !s.showSourcePicker }),
+      },
+      { type: 'separator' },
+      {
+        label: 'Settings…',
+        click: () => {
+          const w = ctx.getWindow();
+          if (w && !w.isDestroyed()) {
+            if (!w.isVisible()) w.show();
+            w.focus();
+            w.webContents.send(IpcChannel.openSettings);
+          }
+        },
+      },
+    ];
+
+    Menu.buildFromTemplate(template).popup({ window: win });
+  });
+
   // ------- Pop-out visualizer ------------------------------------------------
 
   ipcMain.handle(
@@ -193,14 +350,19 @@ export function registerIpc(ctx: IpcContext) {
       const want = args.open ?? !isPopoutOpen();
       if (want) {
         createPopout(() => {
-          writeSettings({ ...readSettings(), popoutOpen: false });
+          // Closed by its own ✕. Same path as an explicit toggle-off so the
+          // main window comes back and every window sees the new state.
+          ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
           const w = ctx.getWindow();
           if (w && !w.isDestroyed()) w.webContents.send(IpcChannel.popoutState, { open: false });
         });
       } else {
         destroyPopout();
       }
-      writeSettings({ ...readSettings(), popoutOpen: want });
+      // Route through onSettingsChanged rather than writing quietly: main hides
+      // or restores the main window off this transition, and the pop-out's own
+      // useSettings only learns about it from the settings:changed broadcast.
+      ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: want }));
       const w = ctx.getWindow();
       if (w && !w.isDestroyed()) w.webContents.send(IpcChannel.popoutState, { open: want });
       return { open: want };

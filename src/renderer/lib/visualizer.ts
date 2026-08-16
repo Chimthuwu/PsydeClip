@@ -27,9 +27,28 @@ export interface VisualizerState {
 export interface AnalyserLike {
   readonly timeData: Float32Array;
   readonly freqData: Float32Array;
-  readonly analyser: { minDecibels: number; maxDecibels: number };
+  readonly analyser: {
+    minDecibels: number;
+    maxDecibels: number;
+    /** Present on a real AnalyserNode; absent on the pop-out's RemoteAnalyser. */
+    smoothingTimeConstant?: number;
+  };
   sample(): { rms: number };
 }
+
+/**
+ * Temporal smoothing per mode.
+ *
+ * The spectrum bars want a lot of it or they strobe. The spectrogram is a
+ * *time-history* view, so the same smoothing paints every transient across
+ * dozens of columns — which is what made it look like a smeared watercolour.
+ * `App.tsx` applies this to the live AnalyserNode whenever the mode changes.
+ */
+export const SMOOTHING_FOR_MODE: Record<VisualizerMode, number> = {
+  oscilloscope: 0.82,
+  spectrum: 0.82,
+  spectrogram: 0.2,
+};
 
 export class AudioAnalyser implements AnalyserLike {
   readonly analyser: AnalyserNode;
@@ -303,26 +322,88 @@ interface SpectroBuffer {
   w: number;
   h: number;
   theme: Theme;
+  bins: number;
+  /** Per-row bin mapping — see buildRowMap(). */
+  lo: Int32Array;
+  hi: Int32Array;
+  frac: Float32Array;
 }
 const spectroBuffers = new WeakMap<CanvasRenderingContext2D, SpectroBuffer>();
+
+/**
+ * Precompute, for every output row, which FFT bins it represents.
+ *
+ * A naive `round(exp(...))` lookup per row is wrong at *both* ends of a log
+ * axis and that is what made the old spectrogram look broken:
+ *
+ *   - **Low end.** With a 1024-bin FFT the bottom ~30% of the image spans bins
+ *     1–8. Dozens of consecutive rows resolved to the same bin and painted the
+ *     same flat colour, producing the thick horizontal banding across the
+ *     bottom of the picture.
+ *   - **High end.** Near the top each row advances by 40+ bins, so a single
+ *     sampled bin stood in for all of them. Any peak that fell between two
+ *     sampled bins vanished, and which bins got sampled shifted frame to frame
+ *     — the source of the flickering vertical streaks.
+ *
+ * So: rows narrower than one bin interpolate between neighbours (`hi === lo`,
+ * blend by `frac`), and rows wider than one bin take the max over their range
+ * (`hi > lo`) so nothing is dropped.
+ */
+function buildRowMap(h: number, bins: number) {
+  const lo = new Int32Array(h);
+  const hi = new Int32Array(h);
+  const frac = new Float32Array(h);
+  const maxBin = bins - 1;
+  const logMin = Math.log(1);
+  const logMax = Math.log(maxBin);
+  // Bin position for a row centre expressed as a fraction up the canvas.
+  const posAt = (t: number) => Math.exp(logMin + Math.min(1, Math.max(0, t)) * (logMax - logMin));
+
+  for (let y = 0; y < h; y++) {
+    // y = 0 is the top of the canvas, i.e. the highest frequency.
+    const tMid = 1 - y / Math.max(1, h - 1);
+    const half = 0.5 / Math.max(1, h - 1);
+    const pLow = posAt(tMid - half);
+    const pHigh = posAt(tMid + half);
+    const a = Math.floor(pLow);
+    const b = Math.ceil(pHigh) - 1;
+    if (b > a) {
+      lo[y] = Math.max(1, Math.min(maxBin, a));
+      hi[y] = Math.max(1, Math.min(maxBin, b));
+      frac[y] = 0;
+    } else {
+      const p = Math.min(maxBin - 1, Math.max(1, posAt(tMid)));
+      lo[y] = Math.floor(p);
+      hi[y] = Math.floor(p);
+      frac[y] = p - Math.floor(p);
+    }
+  }
+  return { lo, hi, frac };
+}
 
 function getSpectroBuffer(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
   theme: Theme,
+  bins: number,
 ): SpectroBuffer | null {
   let buf = spectroBuffers.get(ctx);
   // Any size or theme change invalidates the history — the old pixels were
   // painted with a different palette at a different scale.
-  if (!buf || buf.w !== w || buf.h !== h || buf.theme !== theme) {
+  if (!buf || buf.w !== w || buf.h !== h || buf.theme !== theme || buf.bins !== bins) {
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
     const bctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!bctx) return null;
+    // The scroll step below draws this canvas onto itself. With smoothing left
+    // on, every frame resamples the whole history and it turns to mush after a
+    // few seconds — the soft, out-of-focus look the old version had.
+    bctx.imageSmoothingEnabled = false;
     drawBackground(bctx, w, h, theme);
-    buf = { canvas, bctx, w, h, theme };
+    const map = buildRowMap(h, bins);
+    buf = { canvas, bctx, w, h, theme, bins, ...map };
     spectroBuffers.set(ctx, buf);
   }
   return buf;
@@ -337,14 +418,18 @@ function drawSpectrogram(
   theme: Theme,
 ) {
   if (w < 2 || h < 2) return;
-  const buf = getSpectroBuffer(ctx, w, h, theme);
+  const bins = data.length;
+  if (bins < 4) return;
+  const buf = getSpectroBuffer(ctx, w, h, theme, bins);
   if (!buf) return;
 
-  const { bctx } = buf;
-  const range = analyser.maxDecibels - analyser.minDecibels || 1;
-  // Scroll speed scales with width so a 200px strip and a 1600px window move
-  // at roughly the same apparent rate.
-  const col = Math.max(1, Math.round(w / 480));
+  const { bctx, lo, hi, frac } = buf;
+  const min = analyser.minDecibels;
+  const range = analyser.maxDecibels - min || 1;
+  // One or two device pixels per frame. The old `w / 480` gave 4px columns on a
+  // wide window, which both coarsened the time axis and scrolled the whole
+  // history off screen in about eight seconds.
+  const col = Math.max(1, Math.round(w / 900));
 
   // Shift left. 'copy' means the vacated column comes back transparent instead
   // of ghosting the previous frame under the new one.
@@ -352,29 +437,45 @@ function drawSpectrogram(
   bctx.drawImage(buf.canvas, -col, 0);
   bctx.globalCompositeOperation = 'source-over';
 
-  // Paint the newest slice into the freed column. Frequency is mapped
-  // logarithmically — a linear map buries everything musical in the bottom
-  // eighth of the image.
+  // Paint the newest slice into the freed column.
   const slice = bctx.createImageData(col, h);
-  const bins = data.length;
-  const minBin = 1;
-  const logMin = Math.log(minBin);
-  const logMax = Math.log(bins - 1);
+  const px = slice.data;
   for (let y = 0; y < h; y++) {
-    // y = 0 is the top of the canvas, i.e. the highest frequency.
-    const t = 1 - y / (h - 1);
-    const idx = Math.min(bins - 1, Math.round(Math.exp(logMin + t * (logMax - logMin))));
-    const db = data[idx];
-    const norm = Number.isFinite(db)
-      ? Math.max(0, Math.min(1, (db - analyser.minDecibels) / range))
-      : 0;
-    const [r, g, b] = magColor(norm, theme);
+    const a = lo[y];
+    const b = hi[y];
+    let db: number;
+    if (b > a) {
+      // Wide row: max over the bins it covers, so nothing is skipped.
+      let m = -Infinity;
+      for (let i = a; i <= b; i++) {
+        const v = data[i];
+        if (v > m) m = v;
+      }
+      db = m;
+    } else {
+      // Narrow row: interpolate, so the low end is a gradient not a stack of
+      // flat bands.
+      const f = frac[y];
+      const v0 = data[a];
+      const v1 = data[a + 1] ?? v0;
+      db = v0 + (v1 - v0) * f;
+    }
+
+    let norm = Number.isFinite(db) ? (db - min) / range : 0;
+    norm = norm < 0 ? 0 : norm > 1 ? 1 : norm;
+    // Contrast curve. Typical music sits at -60…-30 dB, i.e. right in the
+    // middle of the -90…-10 window, so a linear map rendered almost the entire
+    // picture in one mid-tone — the flat cyan wash. This pushes the noise floor
+    // down to the background and keeps the headroom for actual peaks.
+    norm = norm * norm;
+
+    const [r, g, bb] = magColor(norm, theme);
     for (let x = 0; x < col; x++) {
       const off = (y * col + x) * 4;
-      slice.data[off] = r;
-      slice.data[off + 1] = g;
-      slice.data[off + 2] = b;
-      slice.data[off + 3] = 255;
+      px[off] = r;
+      px[off + 1] = g;
+      px[off + 2] = bb;
+      px[off + 3] = 255;
     }
   }
   bctx.putImageData(slice, w - col, 0);
@@ -382,65 +483,83 @@ function drawSpectrogram(
   ctx.drawImage(buf.canvas, 0, 0);
 }
 
+/**
+ * Spectrogram colour ramps, as `[stop, r, g, b]` rows in ascending stop order.
+ *
+ * Every ramp starts *at that theme's canvas background* so silence disappears
+ * into the panel instead of tinting the whole picture, then climbs through two
+ * or three hues to a near-white peak. The old ramps began at a mid-brightness
+ * colour (modern's floor was rgb(20,40,80)), which is why a quiet track still
+ * filled the board edge to edge.
+ */
+type Ramp = readonly (readonly [number, number, number, number])[];
+
+const RAMPS: Record<Theme, Ramp> = {
+  modern: [
+    [0.0, 7, 10, 28],
+    [0.22, 14, 46, 96],
+    [0.45, 32, 150, 200],
+    [0.66, 125, 249, 255],
+    [0.82, 180, 139, 255],
+    [0.93, 255, 141, 240],
+    [1.0, 255, 250, 255],
+  ],
+  classic: [
+    [0.0, 0, 0, 0],
+    [0.35, 0, 60, 12],
+    [0.7, 0, 190, 45],
+    [0.9, 90, 255, 130],
+    [1.0, 220, 255, 220],
+  ],
+  monochrome: [
+    [0.0, 0, 0, 0],
+    [0.5, 105, 105, 105],
+    [0.85, 215, 215, 215],
+    [1.0, 255, 255, 255],
+  ],
+  cyberpunk: [
+    [0.0, 15, 5, 24],
+    [0.25, 60, 10, 60],
+    [0.5, 255, 0, 60],
+    [0.72, 252, 238, 10],
+    [0.88, 0, 255, 255],
+    [1.0, 235, 255, 255],
+  ],
+  synthwave: [
+    [0.0, 20, 12, 40],
+    [0.26, 60, 24, 96],
+    [0.5, 160, 40, 190],
+    [0.72, 255, 0, 160],
+    [0.88, 255, 119, 0],
+    [1.0, 255, 240, 200],
+  ],
+  // The one light theme: the ramp runs *down* in luminance so loud bins are
+  // dark against the pale canvas, otherwise nothing is visible at all.
+  kawaii: [
+    [0.0, 255, 240, 247],
+    [0.28, 175, 231, 224],
+    [0.52, 127, 231, 220],
+    [0.72, 179, 157, 255],
+    [0.88, 255, 95, 162],
+    [1.0, 120, 40, 90],
+  ],
+};
+
 function magColor(norm: number, theme: Theme): [number, number, number] {
-  if (theme === 'classic') {
-    const v = Math.floor(255 * Math.pow(norm, 1.5));
-    return [0, v, Math.floor(v * 0.3)];
-  }
-  if (theme === 'monochrome') {
-    const v = Math.floor(255 * norm);
-    return [v, v, v];
-  }
-  if (theme === 'cyberpunk') {
-    // dark purple -> neon pink -> cyan -> yellow
-    if (norm < 0.4) {
-      const t = norm / 0.4;
-      return [Math.floor(15 + 240 * t), Math.floor(5 + 0 * t), Math.floor(24 + 36 * t)];
+  const ramp = RAMPS[theme] ?? RAMPS.modern;
+  if (norm <= ramp[0][0]) return [ramp[0][1], ramp[0][2], ramp[0][3]];
+  for (let i = 1; i < ramp.length; i++) {
+    const [stop, r, g, b] = ramp[i];
+    if (norm <= stop) {
+      const [prevStop, pr, pg, pb] = ramp[i - 1];
+      const t = (norm - prevStop) / (stop - prevStop || 1);
+      return [
+        (pr + (r - pr) * t) | 0,
+        (pg + (g - pg) * t) | 0,
+        (pb + (b - pb) * t) | 0,
+      ];
     }
-    if (norm < 0.75) {
-      const t = (norm - 0.4) / 0.35;
-      return [Math.floor(255 - 255 * t), Math.floor(0 + 255 * t), Math.floor(60 + 195 * t)];
-    }
-    const t = (norm - 0.75) / 0.25;
-    return [Math.floor(0 + 252 * t), Math.floor(255 - 17 * t), Math.floor(255 - 245 * t)];
   }
-  if (theme === 'kawaii') {
-    // Light theme, so quiet bins stay near the pale background:
-    // cream -> mint -> lavender -> bubblegum.
-    if (norm < 0.35) {
-      const t = norm / 0.35;
-      return [Math.floor(255 - 128 * t), Math.floor(246 - 15 * t), Math.floor(251 - 31 * t)];
-    }
-    if (norm < 0.7) {
-      const t = (norm - 0.35) / 0.35;
-      return [Math.floor(127 + 52 * t), Math.floor(231 - 74 * t), Math.floor(220 + 35 * t)];
-    }
-    const t = (norm - 0.7) / 0.3;
-    return [Math.floor(179 + 76 * t), Math.floor(157 - 62 * t), Math.floor(255 - 93 * t)];
-  }
-  if (theme === 'synthwave') {
-    // dark blue -> purple -> pink -> orange
-    if (norm < 0.4) {
-      const t = norm / 0.4;
-      return [Math.floor(20 + 235 * t), Math.floor(12 + 0 * t), Math.floor(40 + 120 * t)];
-    }
-    if (norm < 0.75) {
-      const t = (norm - 0.4) / 0.35;
-      return [Math.floor(255 + 0 * t), Math.floor(0 + 0 * t), Math.floor(160 - 160 * t)];
-    }
-    const t = (norm - 0.75) / 0.25;
-    return [Math.floor(255 + 0 * t), Math.floor(0 + 119 * t), Math.floor(0 + 0 * t)];
-  }
-  
-  // modern: black -> cyan -> magenta -> white
-  if (norm < 0.4) {
-    const t = norm / 0.4;
-    return [Math.floor(20 + 100 * t), Math.floor(40 + 180 * t), Math.floor(80 + 160 * t)];
-  }
-  if (norm < 0.75) {
-    const t = (norm - 0.4) / 0.35;
-    return [Math.floor(120 + 110 * t), Math.floor(220 - 60 * t), Math.floor(240 - 40 * t)];
-  }
-  const t = (norm - 0.75) / 0.25;
-  return [Math.floor(230 + 25 * t), Math.floor(160 + 95 * t), Math.floor(200 + 55 * t)];
+  const last = ramp[ramp.length - 1];
+  return [last[1], last[2], last[3]];
 }

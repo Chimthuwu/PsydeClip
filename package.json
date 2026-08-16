@@ -1,6 +1,6 @@
 {
   "name": "recordr",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Rolling Sampler-style audio recorder with oscilloscope/spectrogram visualizers",
   "main": "dist/main/index.js",
   "author": "Serge",

@@ -518,12 +518,31 @@ export function SettingsPanel({
           <label className="checkbox-row">
             <input
               type="checkbox"
-              checked={draft.hideBoardWhenPopped}
-              onChange={(e) => applyNow({ hideBoardWhenPopped: e.target.checked })}
+              checked={draft.hideMainWhenPopped}
+              onChange={(e) => applyNow({ hideMainWhenPopped: e.target.checked })}
             />
             <span>
-              <strong>Hide the main visualizer while popped out</strong>
-              <em>Leaves the main window as controls only, so it can shrink much further.</em>
+              <strong>Hide the main window while popped out</strong>
+              <em>
+                Popping out moves the app into the monitor window instead of leaving two on
+                screen. Recording keeps running; the tray icon and the hotkey still work, and
+                closing the pop-out brings the main window back.
+              </em>
+            </span>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.hideBoardWhenPopped}
+              onChange={(e) => applyNow({ hideBoardWhenPopped: e.target.checked })}
+              disabled={draft.hideMainWhenPopped}
+            />
+            <span>
+              <strong>Hide only the main visualizer while popped out</strong>
+              <em>
+                Leaves the main window as controls only, so it can shrink much further. Has no
+                effect while the whole window is hidden.
+              </em>
             </span>
           </label>
           <div className="slider-row">
