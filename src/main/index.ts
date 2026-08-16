@@ -19,6 +19,11 @@ const isDev = process.env.NODE_ENV === 'development';
 let mainWindow: BrowserWindow | null = null;
 /** Title-bar mode the live window was built with — a change needs a rebuild. */
 let builtTitleBarMode: AppSettings['titleBarMode'] = 'custom';
+/** Last seen `popoutOpen`, so the hide/show policy fires on transitions only. */
+let lastPopoutOpen = false;
+/** Set when the app starts straight into pop-out mode — don't flash the main
+ *  window on screen just to hide it again a frame later. */
+let suppressInitialShow = false;
 /** Set while we tear the window down on purpose (frame change), so the
  *  hide-on-close handler doesn't intercept and the app doesn't quit. */
 let recreating = false;
@@ -71,6 +76,10 @@ function createWindow(bounds?: Electron.Rectangle) {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
   mainWindow.once('ready-to-show', () => {
+    if (suppressInitialShow) {
+      suppressInitialShow = false;
+      return;
+    }
     mainWindow?.show();
   });
 
@@ -155,6 +164,7 @@ function recreateWindow() {
  */
 function handleSettingsChanged(s: AppSettings) {
   applyHotkey(s.hotkey);
+  applyPopoutWindowSwap(s);
   // Apply always-on-top; the tray module has direct refs to the current
   // window/settings so it can rebuild itself when notified.
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -170,6 +180,33 @@ function handleSettingsChanged(s: AppSettings) {
   // Deferred: this runs inside the settings:set IPC handler, and tearing the
   // sender's window down mid-call is a good way to lose the reply channel.
   if (s.titleBarMode !== builtTitleBarMode) setImmediate(recreateWindow);
+}
+
+/**
+ * Popping the visualizer out should *move* the app into that window, not add a
+ * second one — so the main window hides while the pop-out is up and comes back
+ * when it closes.
+ *
+ * Only transitions of `popoutOpen` act, because this runs on every settings
+ * write: without the guard, changing the theme while popped out would yank a
+ * main window the user had deliberately brought back via the tray.
+ *
+ * The main window is only hidden, never closed. It keeps running the capture,
+ * the rolling buffer and the frame pump that feeds the pop-out (which is why
+ * `backgroundThrottling` is off), and Show in the tray menu always gets it back.
+ */
+function applyPopoutWindowSwap(s: AppSettings) {
+  if (s.popoutOpen === lastPopoutOpen) return;
+  lastPopoutOpen = s.popoutOpen;
+  if (!s.hideMainWhenPopped) return;
+  const w = mainWindow;
+  if (!w || w.isDestroyed()) return;
+  if (s.popoutOpen) {
+    w.hide();
+  } else {
+    w.show();
+    w.focus();
+  }
 }
 
 /** The pop-out was closed by its own ✕ (or by us) — persist and tell the UI. */
@@ -217,6 +254,10 @@ function init() {
 
     const initial = readSettings();
     applyHotkey(initial.hotkey);
+    lastPopoutOpen = initial.popoutOpen;
+    // Relaunching straight into pop-out mode: skip the main window's first
+    // show entirely rather than showing then hiding it.
+    suppressInitialShow = initial.popoutOpen && initial.hideMainWhenPopped;
 
     createWindow();
 

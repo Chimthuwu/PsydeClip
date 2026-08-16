@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import path from 'node:path';
 import { IpcChannel } from '../shared/types';
 import { readSettings } from './settings';
+import { applyMagneticSnap } from './window-controls';
 
 /**
  * The pop-out visualizer: a second, frameless, always-on-top window that shows
@@ -77,6 +78,13 @@ export function createPopout(onClosed?: () => void): BrowserWindow {
   popoutWindow.on('closed', () => {
     popoutWindow = null;
     onClosed?.();
+  });
+
+  // Same drop-near-an-edge behaviour the main window has. Without this the
+  // pop-out was the one window you *couldn't* dock, which is backwards — it's
+  // the one most likely to live along the top of a monitor.
+  popoutWindow.on('moved', () => {
+    if (readSettings().magneticSnap) applyMagneticSnap(getPopout());
   });
 
   return popoutWindow;

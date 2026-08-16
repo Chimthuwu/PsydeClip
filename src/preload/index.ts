@@ -75,6 +75,14 @@ const api = {
   tempExpandWindow(height: number | null): void {
     void ipcRenderer.invoke(IpcChannel.windowTempExpand, { height });
   },
+  /**
+   * Pop the native right-click quick menu (device, visualizer, layout…) at the
+   * cursor. Native rather than in-DOM so it isn't clipped by a `bar`-layout
+   * window that's only 38px tall.
+   */
+  showContextMenu(): void {
+    void ipcRenderer.invoke(IpcChannel.contextMenu);
+  },
   onWindowState(handler: (s: { maximized: boolean; focused: boolean }) => void): () => void {
     const listener = (_e: unknown, s: { maximized: boolean; focused: boolean }) => handler(s);
     ipcRenderer.on(IpcChannel.windowState, listener);

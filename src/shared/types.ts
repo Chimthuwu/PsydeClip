@@ -127,6 +127,13 @@ export interface AppSettings {
   popoutControls: boolean;
   /** Hide the main window's visualizer while the pop-out is open. */
   hideBoardWhenPopped: boolean;
+  /**
+   * Hide the *whole* main window while the pop-out is open, so popping out
+   * swaps windows instead of leaving two on screen. The tray icon and the
+   * global hotkey still work, and closing the pop-out brings the main window
+   * back — as does Show from the tray menu.
+   */
+  hideMainWhenPopped: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -148,7 +155,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   labelMode: 'auto',
   showVu: true,
   showBuffer: true,
-  showSourcePicker: true,
+  // Off by default: the device lives in the right-click quick menu and in
+  // Settings, and on a short window the footer strip was costing the
+  // visualizer more height than the picker was worth.
+  showSourcePicker: false,
   showVizChips: true,
   showHint: true,
   magneticSnap: true,
@@ -157,6 +167,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   popoutOpacity: 1,
   popoutControls: true,
   hideBoardWhenPopped: false,
+  hideMainWhenPopped: true,
 };
 
 /**
@@ -225,6 +236,7 @@ export const IpcChannel = {
   windowApplyLayout: 'window:apply-layout',
   windowTempExpand: 'window:temp-expand',
   windowState: 'window:state',
+  contextMenu: 'window:context-menu',
   popoutToggle: 'popout:toggle',
   popoutState: 'popout:state',
   vizFrame: 'viz:frame',

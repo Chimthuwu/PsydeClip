@@ -73,10 +73,33 @@ export default function PopoutApp() {
       className={`popout theme-${theme} ${state.capturing ? 'is-capturing' : ''}`}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        window.api.showContextMenu();
+      }}
     >
       <div className="popout-drag">
         <span className={`tb-dot ${state.capturing ? 'on' : ''}`} aria-hidden="true" />
         <span className="popout-title">{state.capturing ? 'recording' : 'monitor'}</span>
+        {/* Docking is the whole point of a monitor window — it wants to live
+            along the top edge of a display. `windowSnap` routes to whichever
+            window sent it, so this parks the pop-out, not the main window. */}
+        <button
+          type="button"
+          className="tb-btn"
+          title="Dock to top of screen"
+          onClick={() => window.api.snapWindow('top')}
+        >
+          ⤒
+        </button>
+        <button
+          type="button"
+          className="tb-btn"
+          title="Quick settings"
+          onClick={() => window.api.showContextMenu()}
+        >
+          ⋯
+        </button>
         <button
           type="button"
           className="tb-btn tb-close"

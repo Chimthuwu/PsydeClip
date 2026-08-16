@@ -1369,7 +1369,16 @@ small {
   }
 }
 
-/* --- short windows: the board must not get squeezed to nothing --- */
+/* --- short windows: the board must not get squeezed to nothing -------------
+   The window can be dragged to any height, and the failure mode is always the
+   same: the HUD and footer keep their full natural height while the board —
+   the only flexible child — collapses to a sliver. A window docked across the
+   top of a monitor is the worst case, because it's *wide*, so none of the
+   width breakpoints fire to help.
+
+   The single biggest win is dropping the HUD's stacked rows. A full-width row
+   holding two right-aligned buttons is mostly empty space, and every pixel of
+   it comes straight out of the visualizer. */
 @media (max-height: 520px) {
   .hud-hint {
     display: none;
@@ -1381,28 +1390,95 @@ small {
     min-height: 60px;
   }
 }
-@media (max-height: 400px) {
-  .hud-vu {
-    height: 4px;
-  }
+
+@media (max-height: 460px) {
   .hud {
-    padding-top: 5px;
-    padding-bottom: 5px;
-    gap: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: clamp(6px, 1.2vw, 12px);
+    padding: 5px clamp(8px, 1.6vw, 14px);
+  }
+  /* Shrinks rather than wraps, so the transport stays on the same line. */
+  .hud-status {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .hud-vu {
+    flex: 1 1 40px;
+    min-width: 24px;
+    height: 5px;
+  }
+  .hud-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    margin-left: auto;
+  }
+  /* The one thing allowed a second row — it's the only feedback for an
+     unusable source, so it must never be silently dropped. */
+  .hud-error {
+    flex: 1 1 100%;
+    order: 9;
+    padding: 3px 8px;
+    font-size: 11px;
   }
   .board {
-    min-height: 40px;
-    margin: 4px;
+    min-height: 56px;
+    margin: clamp(4px, 0.8vw, 8px);
+    border-radius: 8px;
+  }
+  .sidebar {
+    padding: 6px clamp(8px, 1.6vw, 14px);
   }
 }
-/* Below this the board is a sliver; give the controls the room instead. */
-@media (max-height: 240px) {
-  .hud-vu,
+
+@media (max-height: 340px) {
+  .hud-mode,
   .hud-buffer {
     display: none;
   }
+  .picker-row label {
+    display: none;
+  }
+  /* The transport is the tallest thing left in the row, so its padding is the
+     last real claim on the visualizer's height. */
+  .hud-actions button,
+  .hud-actions button.primary.big {
+    padding: 4px 11px;
+    font-size: 12px;
+  }
+  .pill {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
   .board {
-    min-height: 24px;
+    min-height: 44px;
+    margin: 3px;
+  }
+  .sidebar {
+    padding: 4px 10px;
+  }
+}
+
+/* Bottom of the range — a strip docked to a screen edge. Everything that isn't
+   the waveform or the transport goes; the right-click quick menu carries the
+   device picker and the visualizer modes at this size. */
+@media (max-height: 260px) {
+  .hud-vu {
+    display: none;
+  }
+  .sidebar {
+    display: none;
+  }
+  .hud {
+    padding: 3px 8px;
+    gap: 6px;
+  }
+  .board {
+    min-height: 32px;
+    margin: 2px;
   }
 }
 

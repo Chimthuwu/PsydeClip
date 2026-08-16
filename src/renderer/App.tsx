@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { HUD } from './components/HUD';
 import { TitleBar } from './components/TitleBar';
 import { Transport } from './components/Transport';
@@ -9,6 +9,7 @@ import { ToastStack } from './components/ToastStack';
 import { useSettings } from './hooks/useSettings';
 import { useCapture } from './hooks/useCapture';
 import { useRecorderEvents } from './hooks/useRecorderEvents';
+import { SMOOTHING_FOR_MODE } from './lib/visualizer';
 import { AppSettings, VisualizerMode } from '../shared/types';
 
 const LOOPBACK_SUPPORTED_PLATFORMS = new Set(['win32']);
@@ -134,6 +135,27 @@ export default function App() {
   useEffect(() => {
     if (loaded) window.api.applyLayout(settings.uiLayout);
   }, [settings.uiLayout, loaded]);
+
+  // Temporal smoothing is per visualizer mode (see SMOOTHING_FOR_MODE). It's
+  // set on the live AnalyserNode here rather than inside the draw loop because
+  // the draw loop is requestAnimationFrame-driven and stops dead while this
+  // window is hidden — which is exactly the case when the pop-out is the only
+  // thing on screen and still needs correctly-smoothed frames.
+  useEffect(() => {
+    const node = cs.analyser?.analyser;
+    if (node && typeof node.smoothingTimeConstant === 'number') {
+      node.smoothingTimeConstant = SMOOTHING_FOR_MODE[settings.visualizer];
+    }
+  }, [cs.analyser, settings.visualizer]);
+
+  // Right-click anywhere → the native quick menu (device, visualizer, layout).
+  // Form fields keep the OS text menu.
+  const handleContextMenu = useCallback((e: MouseEvent) => {
+    const el = e.target as HTMLElement;
+    if (el.closest('input, textarea, select, [contenteditable="true"]')) return;
+    e.preventDefault();
+    window.api.showContextMenu();
+  }, []);
 
   // Mirror our local capturing state into the tray so its title, overlay
   // badge, tooltip and elapsed-time ticker stay in sync.
@@ -327,7 +349,10 @@ export default function App() {
   );
 
   return (
-    <div className={`app ${themeClass} layout-${layout} ${customChrome ? 'has-custom-titlebar' : ''}`}>
+    <div
+      className={`app ${themeClass} layout-${layout} ${customChrome ? 'has-custom-titlebar' : ''}`}
+      onContextMenu={handleContextMenu}
+    >
       {customChrome && (
         <TitleBar
           settings={settings}
