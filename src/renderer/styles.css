@@ -1,21 +1,286 @@
+/* ==========================================================================
+   DESIGN TOKENS
+   ==========================================================================
+   Phase 2 of the redesign brief (§10 of todo.md). Two rules govern this block:
+
+   1. **Themes redefine tokens; they do not get parallel stylesheets.** Before
+      this existed the stylesheet held 271 hard-coded colour values against 106
+      token uses, and the theme blocks told the story the user complained
+      about: `classic` had 34 override rules and `kawaii` 67, while
+      `cyberpunk`, `synthwave` and `monochrome` had *three each* — literally a
+      palette swap of `modern`. Personality has to live in the tokens
+      (surface separation, border weight, glow strength, radius, type), not
+      only in hue.
+
+   2. **Scoped to `.theme-*`, never `.app.theme-*`.** The pop-out root is
+      `.popout.theme-*`, so the old `.app`-scoped blocks never matched it and
+      every theme rendered there in the default palette. One selector now feeds
+      both windows.
+
+   The legacy aliases at the end map the original names onto the semantic ones,
+   so every un-migrated rule keeps working while components move across. The
+   old `.app.theme-*` blocks still win on specificity where they exist, which
+   is deliberate: this layer can land with zero visual change, and those blocks
+   get deleted as each component is migrated. */
+
 :root {
-  --bg: #070a1c;
-  --bg-2: #0c1133;
-  --fg: #e8edff;
-  --muted: #8e9cc8;
-  --accent: #7df9ff;
-  --accent-2: #b48bff;
-  --accent-3: #ff8df0;
-  --danger: #ff5d6c;
-  --ok: #7fffaf;
-  --line: rgba(120, 150, 255, 0.18);
-  --line-soft: rgba(120, 150, 255, 0.08);
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  /* Spacing scale — the brief asks for one, used to create hierarchy. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* Type: one UI face, one technical face. No more. */
+  --font-ui: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  font-family: var(--font-ui);
   color-scheme: dark;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* --- Studio (default / `modern`) ----------------------------------------
+   Quiet professional monitoring equipment: near-black surfaces separated by
+   luminance rather than by borders, one restrained accent, glow used sparingly.
+   This is the palette the acceptance test is written against — it should still
+   read correctly with --accent forced to grey. */
+.theme-modern,
+:root {
+  --bg-app: #070a1c;
+  --bg-surface: #0a0f26;
+  --bg-surface-elevated: #0c1133;
+
+  --text-primary: #e8edff;
+  --text-secondary: #b6c2e8;
+  --text-muted: #8e9cc8;
+
+  --accent: #7df9ff;
+  --accent-bright: #b48bff;
+  --accent-soft: #ff8df0;
+
+  --border: rgba(120, 150, 255, 0.18);
+  --border-soft: rgba(120, 150, 255, 0.08);
+  --border-active: rgba(125, 249, 255, 0.55);
+
+  --waveform: #7df9ff;
+  --grid-major: rgba(120, 150, 255, 0.18);
+  --grid-minor: rgba(120, 150, 255, 0.08);
+
+  --success: #7fffaf;
+  --warning: #ffcc66;
+  --danger: #ff5d6c;
+  --rec: #39ff14;
+
+  /* Personality knobs — this is what stops themes being pure palette swaps. */
+  --glow: 0.45;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --panel-blur: 10px;
+}
+
+/* --- Classic: green CRT terminal. Hard edges, no blur, no elevation. ----- */
+.theme-classic {
+  --bg-app: #000000;
+  --bg-surface: #000000;
+  --bg-surface-elevated: #001100;
+
+  --text-primary: #00ff00;
+  --text-secondary: #00cc00;
+  --text-muted: #00aa00;
+
+  --accent: #00ff00;
+  --accent-bright: #88ff88;
+  --accent-soft: #00ffaa;
+
+  --border: #005500;
+  --border-soft: #003300;
+  --border-active: #00ff00;
+
+  --waveform: #00ff00;
+  --grid-major: #004400;
+  --grid-minor: #003300;
+
+  --success: #00ff00;
+  --warning: #ffff00;
+  --danger: #ff4444;
+  --rec: #ffff00;
+
+  --glow: 0.25;
+  --radius: 0px;
+  --radius-lg: 0px;
+  --radius-pill: 0px;
+  --panel-blur: 0px;
+
+  font-family: var(--font-mono);
+}
+
+/* --- Cyber: dark technical instrument panel. Luminous, still restrained. -- */
+.theme-cyberpunk {
+  --bg-app: #0f0518;
+  --bg-surface: #150725;
+  --bg-surface-elevated: #1a0524;
+
+  --text-primary: #f6e9ff;
+  --text-secondary: #cbb2e0;
+  --text-muted: #9d84b5;
+
+  --accent: #fcee0a;
+  --accent-bright: #00ffff;
+  --accent-soft: #ff003c;
+
+  --border: rgba(252, 238, 10, 0.22);
+  --border-soft: rgba(252, 238, 10, 0.08);
+  --border-active: rgba(0, 255, 255, 0.65);
+
+  --waveform: #fcee0a;
+  --grid-major: rgba(252, 238, 10, 0.25);
+  --grid-minor: rgba(252, 238, 10, 0.1);
+
+  --success: #00ffae;
+  --warning: #fcee0a;
+  --danger: #ff003c;
+  --rec: #00ffff;
+
+  --glow: 0.7;
+  --radius: 2px;
+  --radius-lg: 3px;
+  --radius-pill: 3px;
+  --panel-blur: 6px;
+}
+
+/* --- Synthwave: nocturnal, deeper surfaces, softer light. ----------------- */
+.theme-synthwave {
+  --bg-app: #140c28;
+  --bg-surface: #1c1038;
+  --bg-surface-elevated: #2b1055;
+
+  --text-primary: #ffe9f7;
+  --text-secondary: #d7b8e8;
+  --text-muted: #a98cc4;
+
+  --accent: #ff7700;
+  --accent-bright: #ff00a0;
+  --accent-soft: #00e5ff;
+
+  --border: rgba(255, 119, 0, 0.22);
+  --border-soft: rgba(255, 119, 0, 0.08);
+  --border-active: rgba(255, 0, 160, 0.6);
+
+  --waveform: #ff7700;
+  --grid-major: rgba(255, 119, 0, 0.25);
+  --grid-minor: rgba(255, 119, 0, 0.1);
+
+  --success: #4ade9b;
+  --warning: #ffb347;
+  --danger: #ff3d6e;
+  --rec: #ff00a0;
+
+  --glow: 0.6;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --panel-blur: 14px;
+}
+
+/* --- Monochrome: the acceptance test made literal. No hue at all. -------- */
+.theme-monochrome {
+  --bg-app: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-surface-elevated: #141414;
+
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-muted: #999999;
+
+  --accent: #ffffff;
+  --accent-bright: #ffffff;
+  --accent-soft: #cccccc;
+
+  --border: rgba(255, 255, 255, 0.22);
+  --border-soft: rgba(255, 255, 255, 0.09);
+  --border-active: rgba(255, 255, 255, 0.75);
+
+  --waveform: #ffffff;
+  --grid-major: #555555;
+  --grid-minor: #333333;
+
+  --success: #ffffff;
+  --warning: #cccccc;
+  --danger: #ffffff;
+  --rec: #ffffff;
+
+  --glow: 0.15;
+  --radius: 4px;
+  --radius-lg: 6px;
+  --radius-pill: 999px;
+  --panel-blur: 0px;
+}
+
+/* --- Kawaii: the one light theme. Soft, high-radius, gentle separation. --- */
+.theme-kawaii {
+  --bg-app: #fff0f7;
+  --bg-surface: #fffafd;
+  --bg-surface-elevated: #ffffff;
+
+  --text-primary: #6b3f5b;
+  --text-secondary: #9b6d88;
+  --text-muted: #b489a5;
+
+  --accent: #ff8fc7;
+  --accent-bright: #b39dff;
+  --accent-soft: #7fe7dc;
+
+  --border: rgba(255, 143, 199, 0.35);
+  --border-soft: rgba(255, 143, 199, 0.16);
+  --border-active: rgba(255, 95, 162, 0.75);
+
+  --waveform: #ff5fa2;
+  --grid-major: rgba(179, 157, 255, 0.45);
+  --grid-minor: rgba(255, 143, 199, 0.2);
+
+  --success: #59d3b8;
+  --warning: #ffb86b;
+  --danger: #ff6b8e;
+  --rec: #ff5fa2;
+
+  --glow: 0.5;
+  --radius: 18px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --panel-blur: 8px;
+
+  color-scheme: light;
+}
+
+/* --- Legacy aliases ------------------------------------------------------
+   The original token names, expressed in terms of the semantic ones. This is
+   what lets the token layer land without touching 1800 lines of rules in the
+   same change: everything un-migrated keeps resolving, and the pop-out — which
+   never matched the old `.app.theme-*` blocks — starts themeing correctly
+   immediately. Delete an alias once nothing references it. */
+.theme-modern,
+.theme-classic,
+.theme-cyberpunk,
+.theme-synthwave,
+.theme-monochrome,
+.theme-kawaii,
+:root {
+  --bg: var(--bg-app);
+  --bg-2: var(--bg-surface-elevated);
+  --fg: var(--text-primary);
+  --muted: var(--text-muted);
+  --accent-2: var(--accent-bright);
+  --accent-3: var(--accent-soft);
+  --line: var(--border);
+  --line-soft: var(--border-soft);
+  --ok: var(--success);
 }
 
 html, body, #root {
@@ -1736,12 +2001,45 @@ small {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  border: 1px solid transparent;
+}
+
+/* Recording ring.
+   This used to be a 1px border on `.popout-board`, which failed exactly where
+   it mattered most: docked to the top of a monitor the pop-out is ~100px tall,
+   the board gets ~60px of that, and `.popout-controls` — absolutely positioned
+   at bottom:0 and never fully transparent — covered the bottom edge. One green
+   pixel tucked under the 20px drag strip read as chrome, not as state.
+
+   So the ring now belongs to the window, not to the canvas: an overlay pinned
+   to `.popout` itself, above the controls in paint order, at a thickness that
+   survives a 100px-tall window. It can't be occluded and it can't be squeezed. */
+.popout::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  border: 2px solid transparent;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.popout.is-capturing .popout-board {
-  border-color: #39ff14;
-  box-shadow: inset 0 0 22px rgba(57, 255, 20, 0.22);
+.popout.is-capturing::after {
+  border-color: var(--rec, #39ff14);
+  box-shadow:
+    inset 0 0 22px -6px var(--rec, #39ff14),
+    inset 0 0 3px var(--rec, #39ff14);
+}
+/* Kawaii breathes rather than sitting hard on, matching `.board.is-capturing`. */
+.popout.theme-kawaii.is-capturing::after {
+  animation: popout-rec-pulse 1.8s ease-in-out infinite;
+}
+@keyframes popout-rec-pulse {
+  0%, 100% { box-shadow: inset 0 0 20px -8px var(--rec), inset 0 0 3px var(--rec); }
+  50% { box-shadow: inset 0 0 34px -6px var(--rec), inset 0 0 6px var(--rec); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .popout.theme-kawaii.is-capturing::after {
+    animation: none;
+  }
 }
 .popout-board canvas {
   width: 100%;
@@ -1780,4 +2078,32 @@ small {
 }
 .popout.theme-kawaii .popout-controls {
   background: linear-gradient(0deg, rgba(255, 240, 247, 0.9), rgba(255, 240, 247, 0));
+}
+/* ==========================================================================
+   Docked Mode Adjustments
+   ========================================================================== */
+
+.app.is-docked .hud-hint {
+  display: none;
+}
+
+.app.is-docked .board {
+  position: relative; /* ensure it's positioned for absolute children */
+}
+
+.app.is-docked .board .viz-buttons {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+.app.is-docked .board:hover .viz-buttons {
+  opacity: 1;
 }

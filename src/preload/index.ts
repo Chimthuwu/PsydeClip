@@ -83,8 +83,8 @@ const api = {
   showContextMenu(): void {
     void ipcRenderer.invoke(IpcChannel.contextMenu);
   },
-  onWindowState(handler: (s: { maximized: boolean; focused: boolean }) => void): () => void {
-    const listener = (_e: unknown, s: { maximized: boolean; focused: boolean }) => handler(s);
+  onWindowState(handler: (s: { maximized: boolean; focused: boolean; dockedTop: boolean }) => void): () => void {
+    const listener = (_e: unknown, s: { maximized: boolean; focused: boolean; dockedTop: boolean }) => handler(s);
     ipcRenderer.on(IpcChannel.windowState, listener);
     return () => ipcRenderer.removeListener(IpcChannel.windowState, listener);
   },
