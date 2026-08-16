@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'react';
-import { AudioAnalyser, drawVisualizer } from '../lib/visualizer';
+import { AnalyserLike, drawVisualizer } from '../lib/visualizer';
 import { Theme, VisualizerMode } from '../../shared/types';
 
 interface Props {
-  analyser: AudioAnalyser | null;
+  analyser: AnalyserLike | null;
   mode: VisualizerMode;
   theme: Theme;
   className?: string;
+  /** Placeholder text shown when nothing is bound. */
+  idleText?: string;
 }
 
-export function VisualizerBoard({ analyser, mode, theme, className }: Props) {
+export function VisualizerBoard({ analyser, mode, theme, className, idleText }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -67,7 +69,8 @@ export function VisualizerBoard({ analyser, mode, theme, className }: Props) {
         ctx.textBaseline = 'middle';
         // Drop to the terse message once the long one can't fit, and cap the
         // font size off the width too so it never runs past the canvas edges.
-        const msg = canvas.width < 260 ? 'no source' : 'Pick a source and press Start';
+        const long = idleText ?? 'Pick a source and press Start';
+        const msg = canvas.width < 260 ? 'no source' : long;
         const size = Math.max(
           8,
           Math.floor(Math.min(canvas.height / 14, (canvas.width * 0.82) / (msg.length * 0.6))),
@@ -84,7 +87,7 @@ export function VisualizerBoard({ analyser, mode, theme, className }: Props) {
       ro.disconnect();
       window.removeEventListener('resize', fit);
     };
-  }, [analyser, mode, theme]);
+  }, [analyser, mode, theme, idleText]);
 
   return <canvas ref={canvasRef} className={className} />;
 }

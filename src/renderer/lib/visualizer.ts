@@ -17,7 +17,21 @@ export interface VisualizerState {
   rms: number;
 }
 
-export class AudioAnalyser {
+/**
+ * Everything the draw routines actually need from an analyser.
+ *
+ * The main window supplies a real `AudioAnalyser` wrapping an AnalyserNode;
+ * the pop-out window has no audio graph of its own and supplies a
+ * `RemoteAnalyser` fed by IPC frames instead. Both satisfy this.
+ */
+export interface AnalyserLike {
+  readonly timeData: Float32Array;
+  readonly freqData: Float32Array;
+  readonly analyser: { minDecibels: number; maxDecibels: number };
+  sample(): { rms: number };
+}
+
+export class AudioAnalyser implements AnalyserLike {
   readonly analyser: AnalyserNode;
   readonly timeData: Float32Array<ArrayBuffer>;
   readonly freqData: Float32Array<ArrayBuffer>;
@@ -42,17 +56,43 @@ export class AudioAnalyser {
   }
 }
 
-export function drawVisualizer(state: VisualizerState, analyser: AudioAnalyser) {
-  const { ctx, width, height, theme, mode } = state;
-  const anyCtx = ctx as any;
-  if (mode !== 'spectrogram' || anyCtx._lastMode !== mode || anyCtx._lastTheme !== theme || anyCtx._lastW !== width || anyCtx._lastH !== height) {
-    ctx.clearRect(0, 0, width, height);
-    drawBackground(ctx, width, height, theme);
-    anyCtx._lastMode = mode;
-    anyCtx._lastTheme = theme;
-    anyCtx._lastW = width;
-    anyCtx._lastH = height;
+/**
+ * An `AnalyserLike` with no audio graph behind it — the pop-out window fills
+ * it from `viz:frame` IPC messages produced by the main window's real
+ * analyser. `sample()` is a no-op because the data is already current.
+ */
+export class RemoteAnalyser implements AnalyserLike {
+  timeData: Float32Array = new Float32Array(2048);
+  freqData: Float32Array = new Float32Array(1024);
+  analyser = { minDecibels: -90, maxDecibels: -10 };
+  private lastRms = 0;
+
+  update(frame: {
+    time: Float32Array;
+    freq: Float32Array;
+    minDecibels: number;
+    maxDecibels: number;
+  }) {
+    this.timeData = frame.time;
+    this.freqData = frame.freq;
+    this.analyser.minDecibels = frame.minDecibels;
+    this.analyser.maxDecibels = frame.maxDecibels;
+    let sum = 0;
+    for (let i = 0; i < frame.time.length; i++) sum += frame.time[i] ** 2;
+    this.lastRms = Math.sqrt(sum / Math.max(1, frame.time.length));
   }
+
+  sample(): { rms: number } {
+    return { rms: this.lastRms };
+  }
+}
+
+export function drawVisualizer(state: VisualizerState, analyser: AnalyserLike) {
+  const { ctx, width, height, theme, mode } = state;
+  // The spectrogram keeps its own scroll buffer, so it repaints in full every
+  // frame like the other two modes — no "don't clear" special case.
+  ctx.clearRect(0, 0, width, height);
+  drawBackground(ctx, width, height, theme);
   analyser.sample();
 
   if (mode === 'oscilloscope') drawOscilloscope(ctx, analyser.timeData, width, height, theme);
@@ -213,7 +253,7 @@ function drawOscilloscope(
 function drawSpectrum(
   ctx: CanvasRenderingContext2D,
   data: Float32Array,
-  analyser: AnalyserNode,
+  analyser: { minDecibels: number; maxDecibels: number },
   w: number,
   h: number,
   theme: Theme,
@@ -246,41 +286,100 @@ function drawSpectrum(
 }
 
 /**
- * Scrolling spectrogram. Each animation frame we shift the canvas left by one
- * pixel-column and paint the latest frequency slice onto the right edge.
+ * Scrolling spectrogram.
+ *
+ * History lives in an offscreen buffer rather than on the visible canvas. The
+ * old implementation scrolled the live canvas with getImageData/putImageData
+ * every frame — a GPU→CPU readback per frame that stalled the render loop, and
+ * it was wiped by anything that repainted the canvas (a resize, a theme swap,
+ * a mode round-trip), which is why the spectrogram usually showed nothing.
+ *
+ * The buffer is keyed off the destination context, so each canvas (main window
+ * and pop-out) keeps its own independent history.
  */
-const spectrogramHistory: ImageData[] = [];
-const SPECTRO_HISTORY_MAX = 256;
+interface SpectroBuffer {
+  canvas: HTMLCanvasElement;
+  bctx: CanvasRenderingContext2D;
+  w: number;
+  h: number;
+  theme: Theme;
+}
+const spectroBuffers = new WeakMap<CanvasRenderingContext2D, SpectroBuffer>();
+
+function getSpectroBuffer(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  theme: Theme,
+): SpectroBuffer | null {
+  let buf = spectroBuffers.get(ctx);
+  // Any size or theme change invalidates the history — the old pixels were
+  // painted with a different palette at a different scale.
+  if (!buf || buf.w !== w || buf.h !== h || buf.theme !== theme) {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const bctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!bctx) return null;
+    drawBackground(bctx, w, h, theme);
+    buf = { canvas, bctx, w, h, theme };
+    spectroBuffers.set(ctx, buf);
+  }
+  return buf;
+}
 
 function drawSpectrogram(
   ctx: CanvasRenderingContext2D,
   data: Float32Array,
-  analyser: AnalyserNode,
+  analyser: { minDecibels: number; maxDecibels: number },
   w: number,
   h: number,
   theme: Theme,
 ) {
-  const range = analyser.maxDecibels - analyser.minDecibels;
-  // Shift the existing canvas left by 1 px.
-  const img = ctx.getImageData(1, 0, w - 1, h);
-  ctx.putImageData(img, 0, 0);
+  if (w < 2 || h < 2) return;
+  const buf = getSpectroBuffer(ctx, w, h, theme);
+  if (!buf) return;
 
-  // Draw a vertical slice.
-  const slice = ctx.createImageData(1, h);
-  const usable = Math.min(data.length, Math.floor(h));
+  const { bctx } = buf;
+  const range = analyser.maxDecibels - analyser.minDecibels || 1;
+  // Scroll speed scales with width so a 200px strip and a 1600px window move
+  // at roughly the same apparent rate.
+  const col = Math.max(1, Math.round(w / 480));
+
+  // Shift left. 'copy' means the vacated column comes back transparent instead
+  // of ghosting the previous frame under the new one.
+  bctx.globalCompositeOperation = 'copy';
+  bctx.drawImage(buf.canvas, -col, 0);
+  bctx.globalCompositeOperation = 'source-over';
+
+  // Paint the newest slice into the freed column. Frequency is mapped
+  // logarithmically — a linear map buries everything musical in the bottom
+  // eighth of the image.
+  const slice = bctx.createImageData(col, h);
+  const bins = data.length;
+  const minBin = 1;
+  const logMin = Math.log(minBin);
+  const logMax = Math.log(bins - 1);
   for (let y = 0; y < h; y++) {
-    // map y=0 (top) to highest frequency
-    const idx = Math.floor((1 - y / h) * (usable - 1));
+    // y = 0 is the top of the canvas, i.e. the highest frequency.
+    const t = 1 - y / (h - 1);
+    const idx = Math.min(bins - 1, Math.round(Math.exp(logMin + t * (logMax - logMin))));
     const db = data[idx];
-    const norm = Math.max(0, Math.min(1, (db - analyser.minDecibels) / range));
+    const norm = Number.isFinite(db)
+      ? Math.max(0, Math.min(1, (db - analyser.minDecibels) / range))
+      : 0;
     const [r, g, b] = magColor(norm, theme);
-    const off = y * 4;
-    slice.data[off] = r;
-    slice.data[off + 1] = g;
-    slice.data[off + 2] = b;
-    slice.data[off + 3] = 255;
+    for (let x = 0; x < col; x++) {
+      const off = (y * col + x) * 4;
+      slice.data[off] = r;
+      slice.data[off + 1] = g;
+      slice.data[off + 2] = b;
+      slice.data[off + 3] = 255;
+    }
   }
-  ctx.putImageData(slice, w - 1, 0);
+  bctx.putImageData(slice, w - col, 0);
+
+  ctx.drawImage(buf.canvas, 0, 0);
 }
 
 function magColor(norm: number, theme: Theme): [number, number, number] {

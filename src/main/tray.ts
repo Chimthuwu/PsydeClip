@@ -1,5 +1,7 @@
 import { Tray, Menu, nativeImage, BrowserWindow, app, shell } from 'electron';
-import { AppSettings } from '../shared/types';
+import { AppSettings, UiLayout } from '../shared/types';
+import { applyLayout, snapWindow } from './window-controls';
+import { createPopout, destroyPopout, isPopoutOpen } from './popout';
 
 let trayInstance: Tray | null = null;
 let isAlwaysOnTop = false;
@@ -20,6 +22,7 @@ let lastSaveFlashUntil = 0;
 let setSettingsRef: ((patch: Partial<AppSettings>) => AppSettings) | null = null;
 let getSettingsRef: (() => AppSettings) | null = null;
 let getWindowRef: (() => BrowserWindow | null) | null = null;
+let onPopoutClosedRef: (() => void) | null = null;
 
 const ACCENT_CYAN = { r: 125, g: 249, b: 255 };
 const REC_RED    = { r: 255, g:  93, b: 108 };
@@ -129,10 +132,12 @@ export function initTray(
   getWindow: () => BrowserWindow | null,
   getSettings: () => AppSettings,
   setSettings: (patch: Partial<AppSettings>) => AppSettings,
+  onPopoutClosed?: () => void,
 ): Tray {
   getWindowRef = getWindow;
   setSettingsRef = setSettings;
   getSettingsRef = getSettings;
+  onPopoutClosedRef = onPopoutClosed ?? null;
 
   if (!trayInstance) {
     trayInstance = new Tray(makeTrayIcon(false));
@@ -305,6 +310,25 @@ function buildMenu(): Electron.Menu {
       checked: isAlwaysOnTop,
       click: () => setAlwaysOnTop(!isAlwaysOnTop),
     },
+    {
+      label: 'Pop-out visualizer',
+      type: 'checkbox',
+      checked: isPopoutOpen(),
+      click: () => togglePopoutFromTray(),
+    },
+    {
+      label: 'Layout',
+      submenu: (['full', 'compact', 'bar'] as UiLayout[]).map((l) => ({
+        label: l === 'bar' ? 'Bar (thin strip)' : l[0].toUpperCase() + l.slice(1),
+        type: 'radio' as const,
+        checked: (getSettingsRef?.()?.uiLayout ?? 'full') === l,
+        click: () => setLayoutFromTray(l),
+      })),
+    },
+    {
+      label: 'Dock to top of screen',
+      click: () => snapWindow(getWindowRef?.() ?? null, 'top'),
+    },
     { type: 'separator' },
     {
       label: 'Open save folder',
@@ -343,6 +367,23 @@ function setAlwaysOnTop(value: boolean) {
   if (setSettingsRef) {
     try { setSettingsRef({ alwaysOnTop: value }); } catch { /* ignore */ }
   }
+  refreshTray();
+}
+
+function togglePopoutFromTray() {
+  if (isPopoutOpen()) {
+    destroyPopout();
+    setSettingsRef?.({ popoutOpen: false });
+  } else {
+    createPopout(() => onPopoutClosedRef?.());
+    setSettingsRef?.({ popoutOpen: true });
+  }
+  refreshTray();
+}
+
+function setLayoutFromTray(layout: UiLayout) {
+  setSettingsRef?.({ uiLayout: layout });
+  applyLayout(getWindowRef?.() ?? null, layout);
   refreshTray();
 }
 

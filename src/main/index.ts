@@ -1,25 +1,47 @@
-import { app, BrowserWindow, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import { readSettings, writeSettings } from './settings';
 import { HotkeyManager } from './hotkeys';
-import { IpcChannel, RecorderEvent } from '../shared/types';
+import {
+  AppSettings,
+  IpcChannel,
+  LAYOUT_MIN_SIZE,
+  RecorderEvent,
+} from '../shared/types';
 import { registerIpc } from './ipc';
 import { initTray, destroyTray, makeAppIcon } from './tray';
+import { applyMagneticSnap } from './window-controls';
+import { applyPopoutSettings, createPopout, destroyPopout, getPopout } from './popout';
 
 const isDev = process.env.NODE_ENV === 'development';
 
+
 let mainWindow: BrowserWindow | null = null;
+/** Title-bar mode the live window was built with — a change needs a rebuild. */
+let builtTitleBarMode: AppSettings['titleBarMode'] = 'custom';
+/** Set while we tear the window down on purpose (frame change), so the
+ *  hide-on-close handler doesn't intercept and the app doesn't quit. */
+let recreating = false;
 const hotkeyMgr = new HotkeyManager();
 
-function createWindow() {
+function createWindow(bounds?: Electron.Rectangle) {
+  const settings = readSettings();
+  builtTitleBarMode = settings.titleBarMode;
+  const min = LAYOUT_MIN_SIZE[settings.uiLayout] ?? LAYOUT_MIN_SIZE.full;
+
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 760,
-    // The renderer layout has compact breakpoints down to this floor (see the
-    // "Compact / responsive" block in src/renderer/styles.css), so the window
-    // can be dragged this small and still show every control.
-    minWidth: 380,
-    minHeight: 300,
+    width: bounds?.width ?? 1100,
+    height: bounds?.height ?? 760,
+    x: bounds?.x,
+    y: bounds?.y,
+    // The floor tracks the active layout (see LAYOUT_MIN_SIZE): `bar` is a
+    // 34px strip, `full` still has to fit the visualizer. main re-clamps this
+    // whenever the renderer switches layout.
+    minWidth: min.width,
+    minHeight: min.height,
+    // 'custom' drops the OS title bar entirely; the renderer draws a 26px
+    // strip instead (src/renderer/components/TitleBar.tsx).
+    frame: settings.titleBarMode !== 'custom',
     title: 'Recordr',
     backgroundColor: '#070a1c',
     autoHideMenuBar: true,
@@ -30,6 +52,13 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // This window is the audio engine, not just a view: it owns the
+      // AnalyserNode, the rolling-buffer bookkeeping and the frame pump that
+      // feeds the pop-out. Chromium throttles timers and animation frames to a
+      // crawl for backgrounded windows — and Recordr spends most of its life
+      // minimised or hidden to the tray, which is exactly when it must keep
+      // running.
+      backgroundThrottling: false,
     },
   });
 
@@ -40,7 +69,8 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
-  }  mainWindow.once('ready-to-show', () => {
+  }
+  mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
   });
 
@@ -66,6 +96,7 @@ function createWindow() {
   // triggered from the tray menu's Quit item, before which isQuitting flips
   // to true so this close handler doesn't intercept.
   mainWindow.on('close', (e) => {
+    if (recreating) return;
     if (!(app as unknown as { isQuitting?: boolean }).isQuitting) {
       e.preventDefault();
       mainWindow?.hide();
@@ -76,9 +107,76 @@ function createWindow() {
     mainWindow = null;
   });
 
+  // Magnetic edge snap. Windows emits `moved` when the drag ends, so this
+  // reads as "let go near the top of the screen and it clicks into place".
+  mainWindow.on('moved', () => {
+    if (readSettings().magneticSnap) applyMagneticSnap(mainWindow);
+  });
+
+  // Let the renderer re-render its maximise/restore glyph.
+  const pushWindowState = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send(IpcChannel.windowState, {
+      maximized: mainWindow.isMaximized(),
+      focused: mainWindow.isFocused(),
+    });
+  };
+  mainWindow.on('maximize', pushWindowState);
+  mainWindow.on('unmaximize', pushWindowState);
+  mainWindow.on('focus', pushWindowState);
+  mainWindow.on('blur', pushWindowState);
+
   // Apply initial always-on-top flag.
   try { mainWindow.setAlwaysOnTop(readSettings().alwaysOnTop, 'floating'); }
   catch { /* ignore on platforms that don't support the floating level */ }
+}
+
+/**
+ * Electron can't toggle a window's frame after creation, so switching between
+ * the OS title bar and our own means building a fresh window at the same
+ * bounds. The renderer reloads; an in-progress capture does not survive, which
+ * is why the settings UI says so.
+ */
+function recreateWindow() {
+  const old = mainWindow;
+  const bounds = old && !old.isDestroyed() ? old.getBounds() : undefined;
+  recreating = true;
+  try {
+    if (old && !old.isDestroyed()) old.destroy();
+  } finally {
+    recreating = false;
+  }
+  createWindow(bounds);
+}
+
+/**
+ * Everything that has to happen after settings are written, from wherever:
+ * the settings modal, the tray menu, or the title bar's pin button.
+ */
+function handleSettingsChanged(s: AppSettings) {
+  applyHotkey(s.hotkey);
+  // Apply always-on-top; the tray module has direct refs to the current
+  // window/settings so it can rebuild itself when notified.
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try { mainWindow.setAlwaysOnTop(s.alwaysOnTop, 'floating'); }
+    catch { /* ignore */ }
+  }
+  applyPopoutSettings();
+  // Mirror the new settings into every window so the pop-out picks up
+  // theme/visualizer changes made in the main window and vice-versa.
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(IpcChannel.settingsChanged, s);
+  }
+  // Deferred: this runs inside the settings:set IPC handler, and tearing the
+  // sender's window down mid-call is a good way to lose the reply channel.
+  if (s.titleBarMode !== builtTitleBarMode) setImmediate(recreateWindow);
+}
+
+/** The pop-out was closed by its own ✕ (or by us) — persist and tell the UI. */
+function onPopoutClosed() {
+  handleSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
+  const w = mainWindow;
+  if (w && !w.isDestroyed()) w.webContents.send(IpcChannel.popoutState, { open: false });
 }
 
 function broadcast(event: RecorderEvent) {
@@ -112,16 +210,9 @@ function init() {
   app.whenReady().then(() => {
     registerIpc({
       getWindow: () => mainWindow,
-      onSettingsChanged: (s) => {
-        applyHotkey(s.hotkey);
-        // Apply always-on-top; the tray module has direct refs to the
-        // current window/settings so it can rebuild itself when notified.
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          try { mainWindow.setAlwaysOnTop(s.alwaysOnTop, 'floating'); }
-          catch { /* ignore */ }
-        }
-      },
+      onSettingsChanged: handleSettingsChanged,
       getCurrentHotkey: () => hotkeyMgr.accel(),
+      recreateWindow,
     });
 
     const initial = readSettings();
@@ -134,8 +225,17 @@ function init() {
     initTray(
       () => mainWindow,
       () => readSettings(),
-      (patch) => writeSettings({ ...readSettings(), ...patch }),
+      (patch) => {
+        // Route tray writes through the same path as the settings modal so
+        // the renderer sees them (layout, pop-out, always-on-top…).
+        const merged = writeSettings({ ...readSettings(), ...patch });
+        handleSettingsChanged(merged);
+        return merged;
+      },
+      onPopoutClosed,
     );
+
+    if (initial.popoutOpen) createPopout(onPopoutClosed);
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -147,6 +247,7 @@ function init() {
     (app as unknown as { isQuitting?: boolean }).isQuitting = true;
     hotkeyMgr.unregister();
     destroyTray();
+    if (getPopout()) destroyPopout();
   });
 
   app.on('window-all-closed', () => {

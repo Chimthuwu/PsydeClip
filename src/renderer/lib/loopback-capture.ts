@@ -67,15 +67,62 @@ class PCMProcessor extends AudioWorkletProcessor {
 registerProcessor('pcm-processor', PCMProcessor);
 `;
 
+/**
+ * Make sure an AudioContext is actually running.
+ *
+ * Electron hands back a running context today, but Chromium's autoplay policy
+ * is free to hand back a suspended one — and a suspended context renders
+ * nothing, which looks exactly like a broken capture: flat visualizer, and on
+ * the loopback backend (whose MediaRecorder is fed by a MediaStreamDestination)
+ * silent recordings. Cheap to guarantee, expensive to debug.
+ */
+export async function resumeContext(ctx: AudioContext): Promise<void> {
+  // Read through a function: `ctx.state` changes underneath us, and reading it
+  // directly lets TS narrow the type permanently after the first check.
+  const running = () => (ctx.state as AudioContextState) === 'running';
+  if (running()) return;
+  try {
+    await ctx.resume();
+  } catch {
+    /* blocked — fall through to the gesture listener */
+  }
+  if (running()) return;
+  const retry = () => {
+    void ctx.resume().catch(() => undefined);
+    if (running()) {
+      window.removeEventListener('pointerdown', retry);
+      window.removeEventListener('keydown', retry);
+    }
+  };
+  window.addEventListener('pointerdown', retry);
+  window.addEventListener('keydown', retry);
+}
+
 export interface LoopbackStream {
   ctx: AudioContext;
   node: AudioWorkletNode;
   stream: MediaStream;
+  /**
+   * `performance.now()` of the last PCM frame, or 0 if none has arrived.
+   *
+   * WASAPI loopback delivers **no packets at all** while the endpoint is idle
+   * — measured on this machine: 1 callback over 4 seconds of silence versus
+   * 111 over 5 seconds with a tone playing. So "no frames" means "nothing is
+   * playing on this device", which is indistinguishable from a broken capture
+   * unless the UI says so.
+   */
+  lastFrameAt(): number;
   dispose(): Promise<void>;
 }
 
 export async function startLoopbackStream(sampleRate = 48000): Promise<LoopbackStream> {
   const ctx = new AudioContext({ sampleRate, latencyHint: 'interactive' });
+  // Chromium hands back a *suspended* context when there's been no user
+  // gesture yet — and we bind as soon as a device is remembered from settings,
+  // long before anyone clicks anything. A suspended context renders nothing:
+  // the visualizer sits flat AND the MediaStreamDestination feeding
+  // MediaRecorder emits silence, so recordings come out empty.
+  await resumeContext(ctx);
 
   const blob = new Blob([WORKLET_SRC], { type: 'application/javascript' });
   const url = URL.createObjectURL(blob);
@@ -97,17 +144,24 @@ export async function startLoopbackStream(sampleRate = 48000): Promise<LoopbackS
   // Subscribe to main-process PCM frames and post them into the worklet.
   // We transfer the ArrayBuffer so the worklet owns it; the next frame will
   // be a brand-new buffer from main.
+  let frames = 0;
+  let lastFrame = 0;
   const unsub = window.api.onLoopbackSamples((u8) => {
-    // view the same bytes as little-endian Float32
-    const f32 = new Float32Array(u8.buffer, u8.byteOffset, u8.byteLength / 4);
-    // Worklet consumes Float32 directly — post a copy (transferring the
-    // underlying buffer keeps allocations down on the main side).
-    try {
-      node.port.postMessage(f32, [f32.buffer]);
-    } catch {
-      // If the buffer was neutered (e.g. duplicate postMessage), copy.
-      node.port.postMessage(new Float32Array(f32));
+    // Copy into a fresh, 4-byte-aligned buffer rather than viewing the bytes
+    // in place: a Float32Array view demands a byteOffset that's a multiple of
+    // 4, and nothing guarantees the offset IPC deserialisation hands us. When
+    // that constructor throws it does so inside a listener, once per frame,
+    // and the only visible symptom is a stream that never produces audio.
+    const usable = u8.byteLength - (u8.byteLength % 4);
+    if (usable === 0) return;
+    const f32 = new Float32Array(usable / 4);
+    new Uint8Array(f32.buffer).set(u8.subarray(0, usable));
+    if (frames === 0) {
+      console.info(`[loopback] first PCM frame: ${usable} bytes, ctx=${ctx.state}`);
     }
+    frames++;
+    lastFrame = performance.now();
+    node.port.postMessage(f32, [f32.buffer]);
   });
 
   const dispose = async () => {
@@ -117,5 +171,5 @@ export async function startLoopbackStream(sampleRate = 48000): Promise<LoopbackS
     try { URL.revokeObjectURL(url); } catch { /* noop */ }
   };
 
-  return { ctx, node, stream: dest.stream, dispose };
+  return { ctx, node, stream: dest.stream, lastFrameAt: () => lastFrame, dispose };
 }

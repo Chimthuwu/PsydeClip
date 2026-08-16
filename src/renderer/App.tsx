@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HUD } from './components/HUD';
+import { TitleBar } from './components/TitleBar';
+import { Transport } from './components/Transport';
 import { VisualizerBoard } from './components/VisualizerBoard';
 import { SourcePicker } from './components/SourcePicker';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -7,9 +9,13 @@ import { ToastStack } from './components/ToastStack';
 import { useSettings } from './hooks/useSettings';
 import { useCapture } from './hooks/useCapture';
 import { useRecorderEvents } from './hooks/useRecorderEvents';
-import { AppSettings } from '../shared/types';
+import { AppSettings, VisualizerMode } from '../shared/types';
 
 const LOOPBACK_SUPPORTED_PLATFORMS = new Set(['win32']);
+
+/** Pop-out frame rate. 30fps is plenty for a visualizer and a third of the
+ *  IPC traffic of streaming every animation frame. */
+const VIZ_FRAME_MS = 33;
 
 export default function App() {
   const { settings, loaded, update } = useSettings();
@@ -123,18 +129,43 @@ export default function App() {
     if (loaded) window.api.setAlwaysOnTop(settings.alwaysOnTop);
   }, [settings.alwaysOnTop, loaded]);
 
+  // Layout drives the window's minimum size (and shrinks it to a strip for
+  // `bar`), which only main can set.
+  useEffect(() => {
+    if (loaded) window.api.applyLayout(settings.uiLayout);
+  }, [settings.uiLayout, loaded]);
+
   // Mirror our local capturing state into the tray so its title, overlay
   // badge, tooltip and elapsed-time ticker stay in sync.
   useEffect(() => {
     if (loaded) window.api.setTrayCapturing(capturing);
   }, [capturing, loaded]);
 
+  // A 38px-tall bar has nowhere to draw a modal, so opening settings from
+  // that layout grows the window for as long as the panel is up.
+  const barLayout = settings.uiLayout === 'bar';
+  const openSettingsPanel = useCallback(() => {
+    if (barLayout) window.api.tempExpandWindow(640);
+    setSettingsOpen(true);
+  }, [barLayout]);
+  const closeSettingsPanel = useCallback(() => {
+    setSettingsOpen(false);
+    if (barLayout) window.api.tempExpandWindow(null);
+  }, [barLayout]);
+
   // Listen for "open settings" requests from the tray menu.
   useEffect(() => {
-    const unsub = window.api.onOpenSettingsRequest(() => {
-      setSettingsOpen(true);
-    });
+    const unsub = window.api.onOpenSettingsRequest(() => openSettingsPanel());
     return unsub;
+  }, [openSettingsPanel]);
+
+  // Pop-out lifecycle: main owns the window and persists whether it's up, so
+  // settings.popoutOpen is the single source of truth — no matter whether the
+  // toggle came from here, the tray menu, or the pop-out's own ✕.
+  const popoutOpen = loaded && settings.popoutOpen;
+
+  const togglePopout = useCallback(() => {
+    void window.api.togglePopout();
   }, []);
 
   const events = useRecorderEvents({
@@ -151,16 +182,73 @@ export default function App() {
   }, [cs.recorder, settings.recordMode, settings.saveFolder, cs.stream]);
 
   const toggleCapture = useCallback(() => {
-    if (!settings.sourceId) {
+    if (!settings.sourceId && !settings.loopbackDeviceId) {
       alert('Pick an audio source first.');
       return;
     }
     setCapturing((c) => !c);
-  }, [settings.sourceId]);
+  }, [settings.sourceId, settings.loopbackDeviceId]);
 
-  const onPickFolder = useCallback(async () => {
-    return window.api.pickFolder();
-  }, []);
+  // ----- Pop-out bridge ----------------------------------------------------
+  // Stream analyser frames to the pop-out while it's open. Refs keep the
+  // effect from restarting whenever a callback identity changes.
+  const analyserRef = useRef(cs.analyser);
+  analyserRef.current = cs.analyser;
+
+  // A timer, not requestAnimationFrame: rAF is tied to compositing, so it
+  // stops the moment this window is minimised or hidden to the tray — which is
+  // precisely when the pop-out is the only thing the user can see. (main also
+  // sets backgroundThrottling: false so the timer keeps its interval.)
+  useEffect(() => {
+    if (!popoutOpen) return;
+    const id = setInterval(() => {
+      const a = analyserRef.current;
+      if (!a) return;
+      a.sample();
+      window.api.sendVizFrame({
+        time: a.timeData,
+        freq: a.freqData,
+        minDecibels: a.analyser.minDecibels,
+        maxDecibels: a.analyser.maxDecibels,
+      });
+    }, VIZ_FRAME_MS);
+    return () => clearInterval(id);
+  }, [popoutOpen]);
+
+  // Slower-moving state. bufferedSeconds is floored so this fires about once a
+  // second instead of on every animation frame.
+  const bufferedWhole = Math.floor(cs.bufferedSeconds);
+  useEffect(() => {
+    if (!popoutOpen) return;
+    window.api.sendVizState({
+      capturing,
+      hasSource: !!cs.analyser,
+      canSave: canSaveNow,
+      bufferedSeconds: bufferedWhole,
+      bufferSeconds: settings.bufferSeconds,
+      recordMode: settings.recordMode,
+      theme: settings.theme,
+      visualizer: settings.visualizer,
+      rms: cs.rms,
+    });
+  }, [
+    popoutOpen, capturing, canSaveNow, bufferedWhole, cs.analyser,
+    settings.bufferSeconds, settings.recordMode, settings.theme, settings.visualizer,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Commands coming back from the pop-out's buttons.
+  const cmdRef = useRef({ toggleCapture, performSave, update });
+  cmdRef.current = { toggleCapture, performSave, update };
+  useEffect(
+    () =>
+      window.api.onVizCommand((c) => {
+        const { toggleCapture: tc, performSave: ps, update: up } = cmdRef.current;
+        if (c.type === 'toggle-capture') tc();
+        else if (c.type === 'save') void ps();
+        else if (c.type === 'set-visualizer') void up({ visualizer: c.mode });
+      }),
+    [],
+  );
 
   if (!loaded) {
     return <div className="loading">Loading…</div>;
@@ -169,71 +257,152 @@ export default function App() {
   // One class per theme — a binary ternary here silently rendered every theme
   // past the first two with the classic-green chrome.
   const themeClass = `theme-${settings.theme}`;
+  const layout = settings.uiLayout;
+  const customChrome = settings.titleBarMode === 'custom';
+  // The board is the first thing to go: `bar` has no room for it, and there's
+  // no point drawing it twice when the pop-out is showing the same signal.
+  const showBoard = layout !== 'bar' && !(popoutOpen && settings.hideBoardWhenPopped);
+  const showFooter = layout === 'full' && (settings.showSourcePicker || settings.showVizChips);
 
-  return (
-    <div className={`app ${themeClass}`}>
-      <HUD
-        settings={settings}
+  const sourcePicker = (
+    <SourcePicker
+      backend={settings.captureBackend}
+      sources={cs.sources}
+      loopbackDevices={cs.loopbackDevices}
+      selectedId={
+        settings.captureBackend === 'loopback'
+          ? settings.loopbackDeviceId
+          : settings.sourceId
+      }
+      onChange={(id) => {
+        if (settings.captureBackend === 'loopback') {
+          update({ loopbackDeviceId: id });
+        } else {
+          update({ sourceId: id });
+        }
+      }}
+      onRefresh={capture.refreshSources}
+      loopbackSupported={loopbackSupported}
+      compact={layout !== 'full'}
+      onOpenChange={
+        layout === 'bar'
+          ? (open) => window.api.tempExpandWindow(open ? 260 : null)
+          : undefined
+      }
+    />
+  );
+
+  // The one-row control set used by `bar` layout — inside the title bar when
+  // we own it, or as a standalone strip under the OS bar when we don't.
+  const barControls = (
+    <>
+      <span className={`pill mini ${capturing ? 'on' : 'off'}`} title={capturing ? 'Recording' : 'Idle'}>
+        {capturing ? '●' : '○'}
+      </span>
+      {cs.noSignal && !cs.error && (
+        <span
+          className="hud-quiet mini"
+          title="Nothing is playing on the selected output device — WASAPI loopback only delivers audio while it is."
+        >
+          ⚠
+        </span>
+      )}
+      {settings.showVu && (
+        <div className="hud-vu mini" title={`RMS ${(cs.rms * 100).toFixed(0)}%`}>
+          <div className="vu-bar" style={{ width: `${Math.min(100, cs.rms * 240)}%` }} />
+        </div>
+      )}
+      <Transport
         capturing={capturing}
-        rms={cs.rms}
-        bufferedSeconds={cs.bufferedSeconds}
         canSaveNow={canSaveNow}
+        recordMode={settings.recordMode}
+        bufferSeconds={settings.bufferSeconds}
+        labelMode={settings.labelMode === 'auto' ? 'icon' : settings.labelMode}
         onToggleCapture={toggleCapture}
         onManualSave={performSave}
-        onOpenSettings={() => setSettingsOpen(true)}
-        error={cs.error}
+        tight
       />
+      {settings.showSourcePicker && <div className="bar-picker">{sourcePicker}</div>}
+    </>
+  );
 
-      <main className={`board ${capturing ? 'is-capturing' : ''}`}>
-        <VisualizerBoard
-          analyser={cs.analyser}
-          mode={settings.visualizer}
-          theme={settings.theme}
-        />
-      </main>
+  return (
+    <div className={`app ${themeClass} layout-${layout} ${customChrome ? 'has-custom-titlebar' : ''}`}>
+      {customChrome && (
+        <TitleBar
+          settings={settings}
+          onUpdate={update}
+          capturing={capturing}
+          popoutOpen={popoutOpen}
+          onTogglePopout={togglePopout}
+          onOpenSettings={openSettingsPanel}
+        >
+          {layout === 'bar' ? barControls : undefined}
+        </TitleBar>
+      )}
 
-      <footer className="sidebar">
-        <SourcePicker
-          backend={settings.captureBackend}
-          sources={cs.sources}
-          loopbackDevices={cs.loopbackDevices}
-          selectedId={
-            settings.captureBackend === 'loopback'
-              ? settings.loopbackDeviceId
-              : settings.sourceId
-          }
-          onChange={(id) => {
-            if (settings.captureBackend === 'loopback') {
-              update({ loopbackDeviceId: id });
-            } else {
-              update({ sourceId: id });
-            }
-          }}
-          onRefresh={capture.refreshSources}
-          loopbackSupported={loopbackSupported}
+      {layout === 'bar' && !customChrome && <div className="barstrip">{barControls}</div>}
+
+      {layout !== 'bar' && (
+        <HUD
+          settings={settings}
+          capturing={capturing}
+          rms={cs.rms}
+          bufferedSeconds={cs.bufferedSeconds}
+          canSaveNow={canSaveNow}
+          onToggleCapture={toggleCapture}
+          onManualSave={performSave}
+          onOpenSettings={openSettingsPanel}
+          error={cs.error}
+          noSignal={cs.noSignal}
+          hideSettingsButton={customChrome}
         />
-        <div className="viz-buttons">
-          {(['oscilloscope', 'spectrum', 'spectrogram'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              className={`chip ${settings.visualizer === m ? 'on' : ''}`}
-              onClick={() => update({ visualizer: m })}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      </footer>
+      )}
+
+      {showBoard && (
+        <main className={`board ${capturing ? 'is-capturing' : ''}`}>
+          <VisualizerBoard
+            analyser={cs.analyser}
+            mode={settings.visualizer}
+            theme={settings.theme}
+          />
+        </main>
+      )}
+
+      {layout === 'compact' && settings.showSourcePicker && (
+        <footer className="sidebar is-compact">{sourcePicker}</footer>
+      )}
+
+      {showFooter && (
+        <footer className="sidebar">
+          {settings.showSourcePicker ? sourcePicker : <span />}
+          {settings.showVizChips && (
+            <div className="viz-buttons">
+              {(['oscilloscope', 'spectrum', 'spectrogram'] as VisualizerMode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`chip ${settings.visualizer === m ? 'on' : ''}`}
+                  onClick={() => update({ visualizer: m })}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+        </footer>
+      )}
 
       {settingsOpen && (
         <SettingsPanel
           settings={settings}
-          onUpdate={update}
-          onClose={() => setSettingsOpen(false)}
-          onPickFolder={onPickFolder}
+          onUpdate={update as (p: Partial<AppSettings>) => Promise<AppSettings>}
+          onClose={closeSettingsPanel}
+          onPickFolder={() => window.api.pickFolder()}
           active={capturing}
           loopbackSupported={loopbackSupported}
+          popoutOpen={popoutOpen}
+          onTogglePopout={togglePopout}
         />
       )}
 

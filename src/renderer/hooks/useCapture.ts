@@ -3,7 +3,7 @@ import { AppSettings, CaptureSource, LoopbackDevice } from '../../shared/types';
 import { pickSourceAndCapture, listSources } from '../lib/audio-capture';
 import { AudioAnalyser } from '../lib/visualizer';
 import { createRecorder, RecorderHandle } from '../lib/recorder';
-import { startLoopbackStream, LoopbackStream } from '../lib/loopback-capture';
+import { startLoopbackStream, LoopbackStream, resumeContext } from '../lib/loopback-capture';
 
 export interface CaptureState {
   /** Wins are listed when settings.captureBackend === 'desktop'. */
@@ -19,6 +19,13 @@ export interface CaptureState {
   rms: number;
   bufferedSeconds: number;
   error: string | null;
+  /**
+   * Loopback backend only: bound to a device, but nothing has played through
+   * it for a while. WASAPI sends no packets at all when an endpoint is idle,
+   * so this is "the device is quiet", not "the capture broke" — and without
+   * saying so the two look identical.
+   */
+  noSignal: boolean;
 }
 
 /**
@@ -36,11 +43,13 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
   const [analyser, setAnalyser] = useState<AudioAnalyser | null>(null);
   const [recorder, setRecorder] = useState<RecorderHandle | null>(null);
   const [rms, setRms] = useState(0);
+  const [noSignal, setNoSignal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bufferedSeconds, setBufferedSeconds] = useState(0);
 
   const loopbackRef = useRef<LoopbackStream | null>(null);
   const rmsTickRef = useRef<number>(0);
+  const signalSeenRef = useRef(false);
   // Live handles to whatever is currently bound. React state is snapshotted
   // into closures, so teardown reads these refs instead — otherwise stopping a
   // capture leaks the MediaStream tracks and the AudioContext, and Chromium
@@ -108,6 +117,22 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
     }
   }, [capturing, settings.bitrateKbps, settings.bufferSeconds, settings.recordMode, stream]);
 
+  // 2c. Idle-endpoint watch (loopback only). 1.5s of no PCM at all means
+  // nothing is playing through the selected output.
+  useEffect(() => {
+    if (settings.captureBackend !== 'loopback') {
+      setNoSignal(false);
+      return;
+    }
+    const id = setInterval(() => {
+      const h = loopbackRef.current;
+      if (!h) { setNoSignal(false); return; }
+      const last = h.lastFrameAt();
+      setNoSignal(last === 0 || performance.now() - last > 1500);
+    }, 500);
+    return () => clearInterval(id);
+  }, [settings.captureBackend, settings.loopbackDeviceId]);
+
   // 3. Periodic RMS sampling for HUD.
   useEffect(() => {
     if (!analyser) return;
@@ -117,6 +142,13 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
         setBufferedSeconds(recorder.bufferedDuration());
       }
       const { rms } = analyser.sample();
+      // One-shot: the difference between "no audio is playing" and "the graph
+      // isn't running" is invisible in the UI — both are a flat line — so say
+      // so once, the first time real signal arrives.
+      if (rms > 0.0005 && !signalSeenRef.current) {
+        signalSeenRef.current = true;
+        console.info(`[capture] signal detected, rms=${rms.toFixed(4)}`);
+      }
       setRms(rms);
       raf = requestAnimationFrame(tick);
     };
@@ -152,6 +184,7 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
       rms,
       bufferedSeconds,
       error,
+      noSignal,
     } as CaptureState,
     refreshSources,
     stopStreamNow,
@@ -193,10 +226,17 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
 
     const ctx = new AudioContext({ latencyHint: 'interactive' });
     ctxRef.current = ctx;
+    await resumeContext(ctx);
     const sourceNode = ctx.createMediaStreamSource(newStream);
     const newAnalyser = new AudioAnalyser(ctx, sourceNode);
+    // Chromium only renders the part of the graph that reaches a destination.
+    // A gain node connected to nothing is not a destination, so the analyser
+    // upstream of it was never pulled and the visualizer stayed flat. Route
+    // the sink to ctx.destination with the gain pinned at 0 — the graph runs,
+    // and nothing comes out of the speakers.
     const sink = ctx.createGain(); sink.gain.value = 0;
     sourceNode.connect(sink);
+    sink.connect(ctx.destination);
 
     setStream(newStream);
     setAudioCtx(ctx);

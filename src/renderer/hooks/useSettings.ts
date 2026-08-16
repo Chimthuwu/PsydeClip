@@ -11,6 +11,10 @@ export function useSettings() {
       setSettings(s);
       setLoaded(true);
     });
+    // Settings can change outside this window — the tray's always-on-top
+    // toggle, or the other window when the pop-out is open — so mirror the
+    // broadcast main sends after every write.
+    return window.api.onSettingsChanged(setSettings);
   }, []);
 
   async function update(patch: Partial<AppSettings>): Promise<AppSettings> {

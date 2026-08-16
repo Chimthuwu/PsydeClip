@@ -1,5 +1,6 @@
 import { AppSettings } from '../../shared/types';
 import { mmss } from '../../shared/utils';
+import { Transport } from './Transport';
 
 interface Props {
   settings: AppSettings;
@@ -11,6 +12,10 @@ interface Props {
   onManualSave: () => void;
   onOpenSettings: () => void;
   error: string | null;
+  /** Loopback device is bound but silent — see CaptureState.noSignal. */
+  noSignal?: boolean;
+  /** Hide the gear — the custom title bar already carries one. */
+  hideSettingsButton?: boolean;
 }
 
 export function HUD({
@@ -23,29 +28,38 @@ export function HUD({
   onManualSave,
   onOpenSettings,
   error,
+  noSignal,
+  hideSettingsButton,
 }: Props) {
   const bufferPct = settings.recordMode === 'rolling'
     ? Math.min(100, (bufferedSeconds / settings.bufferSeconds) * 100)
     : 0;
 
-  const bufferMinutes = Math.round(settings.bufferSeconds / 60);
-  const saveLabelFull =
-    settings.recordMode === 'rolling' ? `Save last ${bufferMinutes} min` : 'Save recording';
-  // Swapped in by CSS under ~680px so the button never overflows the HUD row.
-  const saveLabelShort = settings.recordMode === 'rolling' ? `Save ${bufferMinutes}m` : 'Save';
+  const compact = settings.uiLayout !== 'full';
+  const showBuffer = settings.showBuffer && settings.recordMode === 'rolling';
 
   return (
-    <header className="hud">
+    <header className={`hud ${compact ? 'is-compact' : ''}`}>
       <div className="hud-status">
         <span className={`pill ${capturing ? 'on' : 'off'}`}>
           {settings.theme === 'kawaii'
             ? capturing ? '♥ LIVE~' : '✿ idle'
             : capturing ? '● LIVE' : '○ idle'}
         </span>
-        <span className="hud-mode">
-          {settings.recordMode === 'rolling' ? 'rolling' : 'press-to-record'}
-        </span>
-        {settings.recordMode === 'rolling' && (
+        {!compact && (
+          <span className="hud-mode">
+            {settings.recordMode === 'rolling' ? 'rolling' : 'press-to-record'}
+          </span>
+        )}
+        {noSignal && !error && (
+          <span
+            className="hud-quiet"
+            title="WASAPI loopback only delivers audio while something is actually playing on the selected output device. Play something and the waveform will appear."
+          >
+            ⚠ device is silent
+          </span>
+        )}
+        {showBuffer && (
           <span className="hud-buffer">
             <progress max={100} value={bufferPct} />
             <em>{mmss(bufferedSeconds)} / {mmss(settings.bufferSeconds)}</em>
@@ -53,32 +67,34 @@ export function HUD({
         )}
       </div>
 
-      <div className="hud-vu" title={`RMS ${(rms * 100).toFixed(0)}%`}>
-        <div className="vu-bar" style={{ width: `${Math.min(100, rms * 240)}%` }} />
-      </div>
+      {settings.showVu && (
+        <div className="hud-vu" title={`RMS ${(rms * 100).toFixed(0)}%`}>
+          <div className="vu-bar" style={{ width: `${Math.min(100, rms * 240)}%` }} />
+        </div>
+      )}
 
       <div className="hud-actions">
-        <button type="button" className="ghost" onClick={onOpenSettings} title="Settings">⚙</button>
-        <button type="button" className="ghost" onClick={onToggleCapture}>
-          {capturing ? 'Stop' : 'Start'}
-        </button>
-        <button
-          type="button"
-          className="primary big"
-          onClick={onManualSave}
-          disabled={!canSaveNow}
-          title={saveLabelFull}
-        >
-          <span className="lbl-full">{saveLabelFull}</span>
-          <span className="lbl-short">{saveLabelShort}</span>
-        </button>
+        {!hideSettingsButton && (
+          <button type="button" className="ghost" onClick={onOpenSettings} title="Settings">⚙</button>
+        )}
+        <Transport
+          capturing={capturing}
+          canSaveNow={canSaveNow}
+          recordMode={settings.recordMode}
+          bufferSeconds={settings.bufferSeconds}
+          labelMode={settings.labelMode}
+          onToggleCapture={onToggleCapture}
+          onManualSave={onManualSave}
+        />
       </div>
 
       {error && <div className="hud-error">{error}</div>}
 
-      <div className="hud-hint">
-        Hotkey: <kbd>{settings.hotkey}</kbd>
-      </div>
+      {settings.showHint && !compact && (
+        <div className="hud-hint">
+          Hotkey: <kbd>{settings.hotkey}</kbd>
+        </div>
+      )}
     </header>
   );
 }

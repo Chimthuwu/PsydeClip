@@ -1,6 +1,6 @@
 {
   "name": "recordr",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Rolling Sampler-style audio recorder with oscilloscope/spectrogram visualizers",
   "main": "dist/main/index.js",
   "author": "Serge",
@@ -14,6 +14,7 @@
     "build": "npm run build:main && npm run build:renderer",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "package": "npm run build && electron-builder",
+    "package:dir": "npm run build && electron-builder --dir",
     "start": "cross-env NODE_ENV=production electron ."
   },
   "devDependencies": {
