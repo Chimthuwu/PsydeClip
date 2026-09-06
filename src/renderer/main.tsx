@@ -2,16 +2,21 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import PopoutApp from './PopoutApp';
+import { ClipWindowApp } from './ClipWindowApp';
 import './styles.css';
 
-// One bundle, two roots. Main runs the pop-out window on the same page with
-// `#popout` in the URL (see src/main/popout.ts) so there's nothing extra to
-// build or ship.
-const isPopout = window.location.hash.replace('#', '') === 'popout';
+// One bundle, several roots — selected by the URL hash so there's nothing extra
+// to build or ship. `#popout` → the visualizer pop-out (src/main/popout.ts);
+// `#clip` → the always-on-top clip-recording indicator (src/main/clip-window.ts).
+const route = window.location.hash.replace('#', '');
+
+// The clip window is a transparent OS window — the page's default opaque
+// background (html/body/#root) has to get out of the way so only the pill shows.
+if (route === 'clip') document.documentElement.classList.add('clip-route');
 
 const rootEl = document.getElementById('root');
 if (rootEl) {
-  createRoot(rootEl).render(
-    <React.StrictMode>{isPopout ? <PopoutApp /> : <App />}</React.StrictMode>,
-  );
+  const view =
+    route === 'popout' ? <PopoutApp /> : route === 'clip' ? <ClipWindowApp /> : <App />;
+  createRoot(rootEl).render(<React.StrictMode>{view}</React.StrictMode>);
 }

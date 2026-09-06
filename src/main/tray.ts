@@ -1,7 +1,9 @@
 import { Tray, Menu, nativeImage, BrowserWindow, app, shell } from 'electron';
-import { AppSettings, UiLayout } from '../shared/types';
-import { applyLayout, snapWindow } from './window-controls';
-import { createPopout, destroyPopout, isPopoutOpen } from './popout';
+import { AppSettings } from '../shared/types';
+import { snapWindow } from './window-controls';
+import { createPopout, destroyPopout, isPopoutOpen, getPopout } from './popout';
+import { resetWorkArea } from './appbar';
+import { ICON_16_DATA_URL, ICON_32_DATA_URL, ICON_256_DATA_URL } from './icon-assets';
 
 let trayInstance: Tray | null = null;
 let isAlwaysOnTop = false;
@@ -24,76 +26,25 @@ let getSettingsRef: (() => AppSettings) | null = null;
 let getWindowRef: (() => BrowserWindow | null) | null = null;
 let onPopoutClosedRef: (() => void) | null = null;
 
-const ACCENT_CYAN = { r: 125, g: 249, b: 255 };
-const REC_RED    = { r: 255, g:  93, b: 108 };
-const IDLE_GREEN = { r: 127, g: 255, b: 175 };
+const REC_RED = { r: 255, g: 93, b: 108 };
 
 /**
- * 16x16 RGBA buffer: red dot centre + cyan halo. The dot turns green when
- * idle, red when capturing. Procedurally drawn so no PNG asset is needed.
+ * The oscilloscope-wave mark (see scripts/make-icon.js for the artwork). The
+ * 16px image carries a @2x representation so it stays crisp on high-DPI
+ * Windows taskbars; recording state is conveyed by the red overlay badge in
+ * refreshTray, not by recolouring the trace.
  */
-function buildIconBuffer(capturing: boolean): Buffer {
-  const size = 16;
-  const buf = Buffer.alloc(size * size * 4);
-  const cx = (size - 1) / 2;
-  const cy = (size - 1) / 2;
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = x - cx;
-      const dy = y - cy;
-      const r2 = dx * dx + dy * dy;
-      const i = (y * size + x) * 4;
-      let col: { r: number; g: number; b: number; a: number };
-      if (r2 < 5) {
-        col = capturing ? { ...REC_RED, a: 255 } : { ...IDLE_GREEN, a: 255 };
-      } else if (r2 < 18) {
-        col = { ...ACCENT_CYAN, a: 200 };
-      } else if (r2 < 32 && (r2 >= 18)) {
-        col = { ...ACCENT_CYAN, a: 60 };
-      } else {
-        col = { r: 0, g: 0, b: 0, a: 0 };
-      }
-      buf[i + 0] = col.r;
-      buf[i + 1] = col.g;
-      buf[i + 2] = col.b;
-      buf[i + 3] = col.a;
-    }
-  }
-  return buf;
+export function makeTrayIcon(_capturing = false): Electron.NativeImage {
+  const img = nativeImage.createFromDataURL(ICON_16_DATA_URL);
+  try {
+    img.addRepresentation({ scaleFactor: 2, dataURL: ICON_32_DATA_URL });
+  } catch { /* ignore — single-scale still fine */ }
+  return img;
 }
 
-export function makeTrayIcon(capturing = false): Electron.NativeImage {
-  return nativeImage.createFromBuffer(buildIconBuffer(capturing), {
-    width: 16,
-    height: 16,
-    scaleFactor: 1.0,
-  });
-}
-
-/** Same artwork at 32x32 — for window title / dock. */
+/** Same artwork at 256px — for window title / dock / taskbar (dev runs). */
 export function makeAppIcon(): Electron.NativeImage {
-  const size = 32;
-  const buf = Buffer.alloc(size * size * 4);
-  const cx = (size - 1) / 2;
-  const cy = (size - 1) / 2;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = x - cx;
-      const dy = y - cy;
-      const r2 = dx * dx + dy * dy;
-      const i = (y * size + x) * 4;
-      let col: { r: number; g: number; b: number; a: number } = { r: 0, g: 0, b: 0, a: 0 };
-      if (r2 < 35) col = { ...REC_RED, a: 255 };
-      else if (r2 < 80) col = { ...ACCENT_CYAN, a: 255 };
-      else if (r2 < 110) col = { ...ACCENT_CYAN, a: 80 };
-      buf[i + 0] = col.r;
-      buf[i + 1] = col.g;
-      buf[i + 2] = col.b;
-      buf[i + 3] = col.a;
-    }
-  }
-  return nativeImage.createFromBuffer(buf, { width: size, height: size, scaleFactor: 1.0 });
+  return nativeImage.createFromDataURL(ICON_256_DATA_URL);
 }
 
 /**
@@ -317,17 +268,33 @@ function buildMenu(): Electron.Menu {
       click: () => togglePopoutFromTray(),
     },
     {
-      label: 'Layout',
-      submenu: (['full', 'compact', 'bar'] as UiLayout[]).map((l) => ({
-        label: l === 'bar' ? 'Bar (thin strip)' : l[0].toUpperCase() + l.slice(1),
-        type: 'radio' as const,
-        checked: (getSettingsRef?.()?.uiLayout ?? 'full') === l,
-        click: () => setLayoutFromTray(l),
-      })),
-    },
-    {
       label: 'Dock to top of screen',
-      click: () => snapWindow(getWindowRef?.() ?? null, 'top'),
+      click: () => {
+        if (!isPopoutOpen()) togglePopoutFromTray();
+        setTimeout(() => {
+          const popout = getPopout();
+          if (popout) snapWindow(popout, 'top');
+        }, 100);
+      },
+    },
+    // Crash recovery, not a feature: a force-killed instance can leave the
+    // desktop work area reserved with no window in it (Windows won't give the
+    // space back on its own). The startup reclaim handles that when a marker
+    // survived; this is the always-available manual fallback.
+    {
+      label: 'Fix desktop work area',
+      enabled: process.platform === 'win32',
+      click: () => {
+        const ok = resetWorkArea();
+        try {
+          trayInstance?.displayBalloon({
+            title: ok ? 'Desktop work area reset' : 'Reset failed',
+            content: ok
+              ? 'If the top of your screen was hidden, it should be back now.'
+              : 'Could not reset the work area. Try logging out and back in.',
+          });
+        } catch { /* ignore */ }
+      },
     },
     { type: 'separator' },
     {
@@ -378,12 +345,6 @@ function togglePopoutFromTray() {
     createPopout(() => onPopoutClosedRef?.());
     setSettingsRef?.({ popoutOpen: true });
   }
-  refreshTray();
-}
-
-function setLayoutFromTray(layout: UiLayout) {
-  setSettingsRef?.({ uiLayout: layout });
-  applyLayout(getWindowRef?.() ?? null, layout);
   refreshTray();
 }
 

@@ -4,13 +4,16 @@ import { TitleBar } from './components/TitleBar';
 import { Transport } from './components/Transport';
 import { VisualizerBoard } from './components/VisualizerBoard';
 import { SourcePicker } from './components/SourcePicker';
+import { FormatPicker } from './components/FormatPicker';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToastStack } from './components/ToastStack';
+import { encodeFromBlob, encodeFromPcm } from './lib/encode';
 import { useSettings } from './hooks/useSettings';
 import { useCapture } from './hooks/useCapture';
 import { useRecorderEvents } from './hooks/useRecorderEvents';
 import { SMOOTHING_FOR_MODE } from './lib/visualizer';
-import { AppSettings, VisualizerMode } from '../shared/types';
+import { AppSettings, VisualizerMode, VISUALIZER_MODES, VISUALIZER_LABELS } from '../shared/types';
+import { CLIP_STOP_PROMPT } from '../shared/utils';
 
 const LOOPBACK_SUPPORTED_PLATFORMS = new Set(['win32']);
 
@@ -20,62 +23,123 @@ const VIZ_FRAME_MS = 33;
 
 export default function App() {
   const { settings, loaded, update } = useSettings();
-  const [capturing, setCapturing] = useState(false);
+  const [capturing, setCapturing] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // A single visualizer pinned into the pop-out window (a split pane's ⧉).
+  // Transient, not a setting — the pop-out normally mirrors the main window.
+  const [popoutOverride, setPopoutOverride] = useState<VisualizerMode | null>(null);
   const capture = useCapture(settings, capturing);
-  const { state: cs } = capture;
+  const { state: cs, beginClip, endClip, discardClip } = capture;
+  // When the clip button was pressed (0 = no clip has been recorded in this
+  // render). State, not a ref, so a change re-renders and feeds the live
+  // elapsed-time display on the record button.
+  const [clipStartedAt, setClipStartedAt] = useState(0);
+  // Live seconds since the clip started, ticked while a clip is active.
+  const [clipElapsed, setClipElapsed] = useState(0);
+  // True while a clip stop/save is in flight (see toggleClipRecording).
+  const clipBusyRef = useRef(false);
+  // True while a traditional-mode Stop is stopping + saving. Guards against a
+  // double-click calling MediaRecorder.stop() twice (the second one throws).
+  const stopSaveBusyRef = useRef(false);
 
   const loopbackSupported = LOOPBACK_SUPPORTED_PLATFORMS.has(window.api.platform);
 
+  // Maximised → drop the rounded bottom corners (they'd leave transparent gaps
+  // at the screen edge). Also gates the transparent-window corner rounding.
+  const [maximized, setMaximized] = useState(false);
+  useEffect(() => window.api.onWindowState((s) => setMaximized(s.maximized)), []);
+
+  const emitToast = (kind: 'saved' | 'error', message: string) =>
+    window.dispatchEvent(new CustomEvent('recordr:local-toast', { detail: { kind, message } }));
+
+  /** Write already-encoded bytes and surface a toast. */
+  async function writeRecording(bytes: Uint8Array, ext: string, durationSec: number): Promise<boolean> {
+    const res = await window.api.saveRecording({
+      folder: settings.saveFolder,
+      bytes,
+      ext,
+      durationSec,
+      deviceName: selectDeviceName(),
+    });
+    if (res.ok) {
+      emitToast(
+        'saved',
+        `Saved ${(res.bytes! / 1024).toFixed(1)} KB (${durationSec.toFixed(1)}s)\n${(res.path ?? '').split(/[\\/]/).pop()}`,
+      );
+    } else {
+      emitToast('error', res.error ?? 'Save failed');
+    }
+    return res.ok;
+  }
+
+  /** Encode a WebM/Opus blob to the selected format, then write it. */
+  async function encodeAndWriteBlob(blob: Blob, durationSec: number): Promise<boolean> {
+    if (blob.size === 0) return false;
+    const fmt = settings.recordingFormat;
+    try {
+      if (fmt !== 'webm') emitToast('saved', `Encoding ${fmt.toUpperCase()}…`);
+      const enc = await encodeFromBlob(blob, fmt, settings.bitrateKbps);
+      return await writeRecording(enc.bytes, enc.ext, durationSec);
+    } catch (e: any) {
+      emitToast('error', `Encode failed: ${e?.message ?? e}`);
+      return false;
+    }
+  }
+
+  /**
+   * Save the current rolling buffer (or a [start,end] crop of it, expressed
+   * in ABSOLUTE session seconds). Phase 3 sample-accurate export.
+   */
+  async function saveCurrent(bounds: [number, number] | null): Promise<boolean> {
+    if (!cs.recorder) return false;
+    if (!settings.saveFolder) {
+      alert('Pick a save folder in Settings first.');
+      return false;
+    }
+    const fmt = settings.recordingFormat;
+
+    try {
+      if (fmt !== 'webm') emitToast('saved', `Encoding ${fmt.toUpperCase()}…`);
+      // Let the toast paint before the encoder blocks the main thread.
+      await new Promise((r) => setTimeout(r, 16));
+      
+      const { exportSelection } = await import('./lib/export-engine');
+      const res = await exportSelection(cs.recorder, cs.historyModel ?? null, bounds, fmt, settings.bitrateKbps);
+      return await writeRecording(res.bytes, res.ext, res.durationSec);
+    } catch (e: any) {
+      emitToast('error', `Encode failed: ${e?.message ?? e}`);
+      return false;
+    }
+  }
+
   // Hotkey handler — mode-aware:
-  //  - rolling:        snapshot the rolling buffer and save it
-  //  - traditional:    if currently recording -> stop and save; otherwise start
-  const handleHotkey = useCallback(async () => {
+  //  - rolling:      start / stop-and-save a clip (independent of the rolling
+  //                  buffer — it is never touched). Stopping via the hotkey
+  //                  saves without the keep/discard prompt; the clip panel has
+  //                  an explicit ✕ to discard instead.
+  //  - traditional:  if currently recording -> stop and save; otherwise start.
+  async function handleHotkey() {
+    if (settings.recordMode === 'rolling') {
+      await toggleClipRecording(true);
+      return;
+    }
+
     if (!cs.recorder) {
       // No source bound yet. Fall back to: just toggle capturing on.
       if (settings.sourceId) setCapturing(true);
       return;
     }
 
-    if (settings.recordMode === 'traditional') {
-      if (cs.recorder.isActive()) {
-        // Stop & auto-save.
-        const blob = await cs.recorder.stop();
-        const folder = settings.saveFolder;
-        if (folder && blob.size > 0) {
-          const buf = new Uint8Array(await blob.arrayBuffer());
-          const dur = cs.recorder.bufferedDuration();
-          const res = await window.api.saveRecording({ folder, bytes: buf, durationSec: dur, deviceName: selectDeviceName() });
-          if (res.ok) {
-            window.dispatchEvent(new CustomEvent('recordr:local-toast', {
-              detail: { kind: 'saved', message: `Saved ${(res.bytes! / 1024).toFixed(1)} KB (${dur.toFixed(1)}s)\n${(res.path ?? '').split(/[\\/]/).pop()}` },
-            }));
-          }
-        }
-        setCapturing(false);
-      } else {
-        setCapturing(true);
-      }
-      return;
+    if (cs.recorder.isActive()) {
+      // Stop & auto-save.
+      const blob = await cs.recorder.stop();
+      const dur = cs.recorder.bufferedDuration();
+      if (settings.saveFolder) await encodeAndWriteBlob(blob, dur);
+      setCapturing(false);
+    } else {
+      setCapturing(true);
     }
-
-    // Rolling mode: just snapshot.
-    const folder = settings.saveFolder;
-    if (!folder) {
-      alert('Pick a save folder in Settings first.');
-      return;
-    }
-    const blob = await cs.recorder.snapshotBuffer();
-    if (blob.size === 0) return;
-    const buf = new Uint8Array(await blob.arrayBuffer());
-    const dur = cs.recorder.bufferedDuration();
-    const res = await window.api.saveRecording({ folder, bytes: buf, durationSec: dur, deviceName: selectDeviceName() });
-    if (res.ok) {
-      window.dispatchEvent(new CustomEvent('recordr:local-toast', {
-        detail: { kind: 'saved', message: `Saved ${(res.bytes! / 1024).toFixed(1)} KB (${dur.toFixed(1)}s)\n${(res.path ?? '').split(/[\\/]/).pop()}` },
-      }));
-    }
-  }, [cs.recorder, settings.recordMode, settings.saveFolder, settings.sourceId, settings.loopbackDeviceId, cs.loopbackDevices, cs.sources]);
+  }
 
   /** Pick a friendly device/source name for the {device} filename token. */
   function selectDeviceName(): string | undefined {
@@ -90,25 +154,129 @@ export default function App() {
     return undefined;
   }
 
+  const selectionRef = useRef<[number, number] | null>(null);
+
   // Manually-triggered save (always a snapshot). Only meaningful in rolling mode.
-  const performSave = useCallback(async () => {
-    if (!cs.recorder) return;
-    const folder = settings.saveFolder;
-    if (!folder) {
-      alert('Pick a save folder in Settings first.');
-      return;
+  // A History selection is only honoured when History is the sole visible board
+  // (the mosaic panes are read-only, so there's no selection to crop to).
+  async function performSave() {
+    const shown = VISUALIZER_MODES.filter((m) => !settings.vizHidden.includes(m));
+    const soleHistory = shown.length === 1 && shown[0] === 'history';
+    const bounds = soleHistory ? selectionRef.current : null;
+    await saveCurrent(bounds);
+  }
+
+  /**
+   * Dedicated record button: press once to start an isolated clip recording
+   * (only the clip's own seconds accumulate, nothing from the rolling buffer),
+   * press again to stop — asking whether to keep (save) or discard it. Works
+   * in any mode, even with the rolling recorder idle.
+   *
+   * `skipAsk` is used for pop-out-invoked stops: the pop-out window asks its
+   * own confirm() (it may be the only window on screen — the main window can
+   * be hidden), so asking again here would double-prompt.
+   */
+  async function toggleClipRecording(skipAsk = false) {
+    // Guard against a double-click starting a phantom second clip while the
+    // first is still being stopped (stop → save is async).
+    if (clipBusyRef.current) return;
+    clipBusyRef.current = true;
+    try {
+      if (cs.clipActive) {
+        const keep = skipAsk || window.confirm(CLIP_STOP_PROMPT);
+        if (!keep) {
+          await discardClip();
+          emitToast('saved', 'Clip discarded.');
+          return;
+        }
+        // The clip was streamed chunk-by-chunk to a temp file as it recorded;
+        // endClip reads it back once, then the temp file is deleted. WebM is a
+        // direct passthrough; WAV/MP3 decode the whole (clip-sized) stream and
+        // re-encode it. Either way the save is a single transient read+write,
+        // not a growing in-memory buffer.
+        const bytes = await endClip();
+        const dur = Math.max(0.1, (Date.now() - clipStartedAt) / 1000);
+        if (!bytes) {
+          emitToast('error', 'Clip was empty — nothing to save.');
+          return;
+        }
+        if (settings.recordingFormat === 'webm') {
+          await writeRecording(bytes, 'webm', dur);
+        } else {
+          try {
+            emitToast('saved', `Encoding ${settings.recordingFormat.toUpperCase()}…`);
+            // `bytes.slice()` copies onto a fresh ArrayBuffer — the IPC bytes
+            // are Uint8Array<ArrayBufferLike> and Blob wants ArrayBuffer-backed.
+            const enc = await encodeFromBlob(
+              new Blob([bytes.slice()], { type: 'audio/webm' }),
+              settings.recordingFormat,
+              settings.bitrateKbps,
+            );
+            await writeRecording(enc.bytes, enc.ext, dur);
+          } catch (e: any) {
+            emitToast('error', `Encode failed: ${e?.message ?? e}`);
+          }
+        }
+        return;
+      }
+      if (!settings.saveFolder) {
+        // A toast, not alert() — the hotkey can fire this while the main
+        // window is hidden behind the pop-out, where a modal would just block.
+        emitToast('error', 'Pick a save folder in Settings before recording a clip.');
+        return;
+      }
+      if (!cs.stream) {
+        emitToast('error', 'No audio source bound yet — pick one first.');
+        return;
+      }
+      if (await beginClip()) setClipStartedAt(Date.now());
+    } finally {
+      clipBusyRef.current = false;
     }
-    const blob = await cs.recorder.snapshotBuffer();
-    if (blob.size === 0) return;
-    const buf = new Uint8Array(await blob.arrayBuffer());
-    const dur = cs.recorder.bufferedDuration();
-    const res = await window.api.saveRecording({ folder, bytes: buf, durationSec: dur, deviceName: selectDeviceName() });
-    if (res.ok) {
-      window.dispatchEvent(new CustomEvent('recordr:local-toast', {
-        detail: { kind: 'saved', message: `Saved ${(res.bytes! / 1024).toFixed(1)} KB (${dur.toFixed(1)}s)\n${(res.path ?? '').split(/[\\/]/).pop()}` },
-      }));
+  }
+
+  /** Pop-out "discard" command: stop the clip and delete its temp file.
+   *  (The pop-out asked the user already; here we just carry it out.) */
+  async function discardClipRecording() {
+    if (clipBusyRef.current || !cs.clipActive) return;
+    clipBusyRef.current = true;
+    try {
+      await discardClip();
+      emitToast('saved', 'Clip discarded.');
+    } finally {
+      clipBusyRef.current = false;
     }
-  }, [cs.recorder, settings.saveFolder, settings.captureBackend, settings.sourceId, settings.loopbackDeviceId, cs.loopbackDevices, cs.sources, selectDeviceName]);
+  }
+
+  // True once a temp file for the current selection is written and a drag-out
+  // would actually produce something. Reset the moment the selection changes.
+  const [dragReady, setDragReady] = useState(false);
+  const dragSeqRef = useRef(0);
+
+  const handleSelectionChange = useCallback(async (sel: [number, number] | null) => {
+    selectionRef.current = sel;
+    const seq = ++dragSeqRef.current;
+    setDragReady(false);
+    if (!sel || !cs.recorder || !cs.historyModel) return;
+    try {
+      const { exportSelection } = await import('./lib/export-engine');
+      // What gets dragged OUT is always WAV: it's the only sample-accurate
+      // format here and the one every DAW imports (WebM/Opus is on no DAW's
+      // list). The manual Save button still honours the chosen format.
+      const dragFmt = settings.recordingFormat === 'mp3' ? 'mp3' : 'wav';
+      const res = await exportSelection(cs.recorder, cs.historyModel, sel, dragFmt, settings.bitrateKbps);
+      if (seq !== dragSeqRef.current) return; // a newer selection superseded this
+      if (res.bytes.length === 0) {
+        emitToast('error', 'Nothing captured in that range yet — try a wider selection.');
+        return;
+      }
+      window.api.prepareDragFile({ bytes: res.bytes, ext: res.ext });
+      setDragReady(true);
+    } catch (e: any) {
+      console.error('Failed to prepare drag file:', e);
+      emitToast('error', `Couldn't prepare that snippet: ${e?.message ?? e}`);
+    }
+  }, [cs.recorder, cs.historyModel, settings.recordingFormat, settings.bitrateKbps]);
 
   // Bridge local-toast events into the same toast array as 'recording:event'.
   const [toasts, setToasts] = useState<{ id: number; kind: 'saved' | 'error'; message: string }[]>([]);
@@ -141,12 +309,24 @@ export default function App() {
   // the draw loop is requestAnimationFrame-driven and stops dead while this
   // window is hidden — which is exactly the case when the pop-out is the only
   // thing on screen and still needs correctly-smoothed frames.
+  //
+  // The split view renders several modes from one AnalyserNode, which can only
+  // carry a single smoothing constant. The spectrogram is a *time history*,
+  // so it degrades first when smoothing climbs (every transient smears across
+  // dozens of columns); while it's on screen a low middle value keeps it
+  // readable at the cost of slightly livelier spectrum bars.
   useEffect(() => {
     const node = cs.analyser?.analyser;
     if (node && typeof node.smoothingTimeConstant === 'number') {
-      node.smoothingTimeConstant = SMOOTHING_FOR_MODE[settings.visualizer];
+      const shown = VISUALIZER_MODES.filter((m) => !settings.vizHidden.includes(m));
+      const multi = shown.length > 1;
+      node.smoothingTimeConstant = multi
+        ? shown.includes('spectrogram')
+          ? 0.3
+          : SMOOTHING_FOR_MODE.spectrum
+        : SMOOTHING_FOR_MODE[shown[0] ?? settings.visualizer];
     }
-  }, [cs.analyser, settings.visualizer]);
+  }, [cs.analyser, settings.visualizer, settings.vizHidden]);
 
   // Right-click anywhere → the native quick menu (device, visualizer, layout).
   // Form fields keep the OS text menu.
@@ -163,23 +343,12 @@ export default function App() {
     if (loaded) window.api.setTrayCapturing(capturing);
   }, [capturing, loaded]);
 
-  const [dockedTop, setDockedTop] = useState(false);
-  useEffect(() => {
-    const unsub = window.api.onWindowState((s) => setDockedTop(s.dockedTop));
-    return unsub;
-  }, []);
-
-  // A 38px-tall bar has nowhere to draw a modal, so opening settings from
-  // that layout grows the window for as long as the panel is up.
-  const barLayout = settings.uiLayout === 'bar';
   const openSettingsPanel = useCallback(() => {
-    if (barLayout) window.api.tempExpandWindow(640);
     setSettingsOpen(true);
-  }, [barLayout]);
+  }, []);
   const closeSettingsPanel = useCallback(() => {
     setSettingsOpen(false);
-    if (barLayout) window.api.tempExpandWindow(null);
-  }, [barLayout]);
+  }, []);
 
   // Listen for "open settings" requests from the tray menu.
   useEffect(() => {
@@ -195,6 +364,22 @@ export default function App() {
   const togglePopout = useCallback(() => {
     void window.api.togglePopout();
   }, []);
+
+  // Closing the pop-out ends any pinned single-visualizer view.
+  useEffect(() => {
+    if (!popoutOpen) setPopoutOverride(null);
+  }, [popoutOpen]);
+
+  /** Pop the pop-out open pinned to one visualizer (split pane's ⧉). */
+  const popOutMode = useCallback(
+    (mode: VisualizerMode) => {
+      // ⧉ opens the pop-out *alongside* the main window: the main window
+      // keeps its split view while the one visualizer gets its own window.
+      if (!popoutOpen) void window.api.togglePopout(true, { keepMain: true });
+      setPopoutOverride(mode);
+    },
+    [popoutOpen],
+  );
 
   const events = useRecorderEvents({
     onHotkey: handleHotkey,
@@ -214,8 +399,41 @@ export default function App() {
       alert('Pick an audio source first.');
       return;
     }
+    // Traditional mode: the Stop button ends a recording session, so save it
+    // here — the same way handleHotkey does. A plain setCapturing(false) would
+    // tear the recorder down in useCapture, which stops and *discards* the
+    // chunks.
+    const rec = cs.recorder;
+    if (settings.recordMode === 'traditional' && capturing && rec?.isActive()) {
+      if (stopSaveBusyRef.current) return;
+      stopSaveBusyRef.current = true;
+      void (async () => {
+        try {
+          const blob = await rec.stop();
+          const dur = rec.bufferedDuration();
+          if (settings.saveFolder) {
+            await encodeAndWriteBlob(blob, dur);
+          } else {
+            emitToast('error', 'No save folder — recording was not saved. Pick one in Settings.');
+          }
+        } finally {
+          stopSaveBusyRef.current = false;
+        }
+        // Only after the save settles does the recorder tear down (its chunks
+        // are already gone, so teardownRecorder just releases the handle).
+        setCapturing(false);
+      })();
+      return;
+    }
     setCapturing((c) => !c);
-  }, [settings.sourceId, settings.loopbackDeviceId]);
+  }, [
+    settings.sourceId,
+    settings.loopbackDeviceId,
+    settings.recordMode,
+    settings.saveFolder,
+    capturing,
+    cs.recorder,
+  ]);
 
   // ----- Pop-out bridge ----------------------------------------------------
   // Stream analyser frames to the pop-out while it's open. Refs keep the
@@ -243,6 +461,33 @@ export default function App() {
     return () => clearInterval(id);
   }, [popoutOpen]);
 
+  // Live elapsed time on the record button while a clip is recording. An
+  // interval rather than rAF so it keeps ticking even when this window is
+  // hidden behind the pop-out (backgroundThrottling is off, so it does).
+  useEffect(() => {
+    if (!cs.clipActive) {
+      setClipElapsed(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setClipElapsed(Math.max(0, (Date.now() - clipStartedAt) / 1000));
+    }, 100);
+    return () => clearInterval(id);
+  }, [cs.clipActive, clipStartedAt]);
+
+  // Drive the always-on-top clip-recording window. It's a separate OS window so
+  // the indicator + stop button stay visible no matter what state the app is in
+  // — minimised, hidden to the tray, docked, or with the visualizer popped out.
+  useEffect(() => {
+    if (!loaded) return;
+    window.api.setClipWindow({
+      active: cs.clipActive,
+      startedAt: clipStartedAt,
+      format: settings.recordingFormat,
+      theme: settings.theme,
+    });
+  }, [loaded, cs.clipActive, clipStartedAt, settings.recordingFormat, settings.theme]);
+
   // Slower-moving state. bufferedSeconds is floored so this fires about once a
   // second instead of on every animation frame.
   const bufferedWhole = Math.floor(cs.bufferedSeconds);
@@ -252,28 +497,82 @@ export default function App() {
       capturing,
       hasSource: !!cs.analyser,
       canSave: canSaveNow,
+      clipActive: cs.clipActive,
+      clipStartedAt,
+      format: settings.recordingFormat,
       bufferedSeconds: bufferedWhole,
       bufferSeconds: settings.bufferSeconds,
       recordMode: settings.recordMode,
       theme: settings.theme,
       visualizer: settings.visualizer,
+      overrideMode: popoutOverride,
       rms: cs.rms,
     });
   }, [
-    popoutOpen, capturing, canSaveNow, bufferedWhole, cs.analyser,
+    popoutOpen, capturing, canSaveNow, bufferedWhole, cs.analyser, cs.clipActive, clipStartedAt,
     settings.bufferSeconds, settings.recordMode, settings.theme, settings.visualizer,
+    settings.recordingFormat, popoutOverride,
   ]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The pop-out has no buffer of its own — its history pane is fed from the
+  // main window's peak track, and its spectrogram pane needs the same time
+  // stamp for its selection layer. Stream whenever either is on the (shared)
+  // board. The main window's own board reads the local buffer directly.
+  useEffect(() => {
+    if (!popoutOpen || !cs.peakBuffer) return;
+    const needsTimeStream =
+      !settings.vizHidden.includes('history') || !settings.vizHidden.includes('spectrogram');
+    if (!needsTimeStream) return;
+    const id = setInterval(() => {
+      if (cs.peakBuffer && cs.historyModel) {
+        // Stamp the session clock so the pop-out's selections land on the same
+        // absolute seconds as the main window's (todo.md §11.4 D1).
+        window.api.sendVizHistory({
+          ...cs.peakBuffer.getState(),
+          newestSec: cs.historyModel.newestSec,
+        });
+      }
+    }, 200);
+    return () => clearInterval(id);
+  }, [popoutOpen, settings.vizHidden, cs.peakBuffer]);
+
   // Commands coming back from the pop-out's buttons.
-  const cmdRef = useRef({ toggleCapture, performSave, update });
-  cmdRef.current = { toggleCapture, performSave, update };
+  const cmdRef = useRef({
+    toggleCapture,
+    performSave,
+    update,
+    handleSelectionChange,
+    toggleClipRecording,
+    discardClipRecording,
+  });
+  cmdRef.current = {
+    toggleCapture,
+    performSave,
+    update,
+    handleSelectionChange,
+    toggleClipRecording,
+    discardClipRecording,
+  };
   useEffect(
     () =>
       window.api.onVizCommand((c) => {
-        const { toggleCapture: tc, performSave: ps, update: up } = cmdRef.current;
+        const {
+          toggleCapture: tc,
+          performSave: ps,
+          update: up,
+          handleSelectionChange: hsc,
+          toggleClipRecording: tcr,
+          discardClipRecording: dcr,
+        } = cmdRef.current;
         if (c.type === 'toggle-capture') tc();
         else if (c.type === 'save') void ps();
+        // The pop-out asked keep/discard itself, so the save path skips the
+        // confirm here.
+        else if (c.type === 'toggle-clip') void tcr(true);
+        else if (c.type === 'discard-clip') void dcr();
         else if (c.type === 'set-visualizer') void up({ visualizer: c.mode });
+        else if (c.type === 'set-override') setPopoutOverride(c.mode);
+        else if (c.type === 'selection-change') hsc(c.selection);
       }),
     [],
   );
@@ -285,12 +584,20 @@ export default function App() {
   // One class per theme — a binary ternary here silently rendered every theme
   // past the first two with the classic-green chrome.
   const themeClass = `theme-${settings.theme}`;
-  const layout = settings.uiLayout;
   const customChrome = settings.titleBarMode === 'custom';
-  // The board is the first thing to go: `bar` has no room for it, and there's
-  // no point drawing it twice when the pop-out is showing the same signal.
-  const showBoard = layout !== 'bar' && !(popoutOpen && settings.hideBoardWhenPopped);
-  const showFooter = layout === 'full' && (settings.showSourcePicker || settings.showVizChips);
+  // The board is skipped when the pop-out is showing the same signal.
+  const showBoard = !(popoutOpen && settings.hideBoardWhenPopped);
+  // The footer always shows — it carries the save-format picker, which has no
+  // other home on-screen (the quick menu aside). There is only one layout now
+  // (the compact mode was retired); short windows shed chrome via CSS.
+
+  const formatPicker = (
+    <FormatPicker
+      value={settings.recordingFormat}
+      onChange={(f) => update({ recordingFormat: f })}
+      compact
+    />
+  );
 
   const sourcePicker = (
     <SourcePicker
@@ -311,67 +618,70 @@ export default function App() {
       }}
       onRefresh={capture.refreshSources}
       loopbackSupported={loopbackSupported}
-      compact={layout !== 'full'}
-      onOpenChange={
-        layout === 'bar'
-          ? (open) => window.api.tempExpandWindow(open ? 260 : null)
-          : undefined
-      }
     />
   );
 
-  // The one-row control set used by `bar` layout — inside the title bar when
-  // we own it, or as a standalone strip under the OS bar when we don't.
-  const barControls = (
-    <>
-      <span className={`pill mini ${capturing ? 'on' : 'off'}`} title={capturing ? 'Recording' : 'Idle'}>
-        {capturing ? '●' : '○'}
-      </span>
-      {cs.noSignal && !cs.error && (
-        <span
-          className="hud-quiet mini"
-          title="Nothing is playing on the selected output device — WASAPI loopback only delivers audio while it is."
-        >
-          ⚠
-        </span>
-      )}
-      {settings.showVu && (
-        <div className="hud-vu mini" title={`RMS ${(cs.rms * 100).toFixed(0)}%`}>
-          <div className="vu-bar" style={{ width: `${Math.min(100, cs.rms * 240)}%` }} />
-        </div>
-      )}
-      <Transport
-        capturing={capturing}
-        canSaveNow={canSaveNow}
-        recordMode={settings.recordMode}
-        bufferSeconds={settings.bufferSeconds}
-        labelMode={settings.labelMode === 'auto' ? 'icon' : settings.labelMode}
-        onToggleCapture={toggleCapture}
-        onManualSave={performSave}
-        tight
-      />
-      {settings.showSourcePicker && <div className="bar-picker">{sourcePicker}</div>}
-    </>
-  );
+  // ---- Board membership -------------------------------------------------
+  // The board shows every mode that isn't in `vizHidden`: one → a single
+  // interactive board, several → a read-only mosaic. The footer chips toggle
+  // membership directly — there is no separate split/single switch.
+  const hiddenSet = new Set(settings.vizHidden);
+  const visibleModes = (() => {
+    const shown = VISUALIZER_MODES.filter((m) => !hiddenSet.has(m));
+    return shown.length ? shown : [settings.visualizer];
+  })();
+  const gridView = visibleModes.length > 1;
+
+  /** Show or hide one mode on the board (pane ✕s + chips). Never hides the
+   *  last visible mode — the board always shows at least one. */
+  const setPaneHidden = (mode: VisualizerMode, hidden: boolean) => {
+    if (hidden && visibleModes.length === 1 && visibleModes[0] === mode) return;
+    const next = hidden
+      ? Array.from(new Set([...settings.vizHidden, mode]))
+      : settings.vizHidden.filter((m) => m !== mode);
+    // Keep `visualizer` pointed at a mode that's actually on screen.
+    const shownAfter = VISUALIZER_MODES.filter((m) => !next.includes(m));
+    const patch: Partial<AppSettings> = { vizHidden: next };
+    if (!hidden) patch.visualizer = mode;
+    else if (!shownAfter.includes(settings.visualizer)) patch.visualizer = shownAfter[0];
+    void update(patch);
+  };
+
+  /** Each chip is an independent on/off for its visualizer. All the lit ones
+   *  are on the board: one → a single interactive board, several → a mosaic.
+   *  The last lit chip can't be switched off. */
+  const toggleMode = (mode: VisualizerMode) => setPaneHidden(mode, !hiddenSet.has(mode));
 
   const vizChips = settings.showVizChips && (
     <div className="viz-buttons">
-      {(['oscilloscope', 'spectrum', 'spectrogram'] as VisualizerMode[]).map((m) => (
-        <button
-          key={m}
-          type="button"
-          className={`chip ${settings.visualizer === m ? 'on' : ''}`}
-          onClick={() => update({ visualizer: m })}
-        >
-          {m}
-        </button>
-      ))}
+      {VISUALIZER_MODES.map((m) => {
+        const active = !hiddenSet.has(m);
+        const only = active && visibleModes.length === 1;
+        return (
+          <button
+            key={m}
+            type="button"
+            className={`chip ${active ? 'on' : ''}`}
+            aria-pressed={active}
+            title={
+              only
+                ? `${VISUALIZER_LABELS[m]} — the board's only view`
+                : active
+                  ? `Hide ${VISUALIZER_LABELS[m]}`
+                  : `Show ${VISUALIZER_LABELS[m]} (turn on more than one for a split view)`
+            }
+            onClick={() => toggleMode(m)}
+          >
+            {m}
+          </button>
+        );
+      })}
     </div>
   );
 
   return (
     <div
-      className={`app ${themeClass} layout-${layout} ${customChrome ? 'has-custom-titlebar' : ''} ${dockedTop ? 'is-docked' : ''}`}
+      className={`app ${themeClass} layout-full ${customChrome ? 'has-custom-titlebar' : ''}${maximized ? ' is-maximized' : ''}`}
       onContextMenu={handleContextMenu}
     >
       {customChrome && (
@@ -382,50 +692,102 @@ export default function App() {
           popoutOpen={popoutOpen}
           onTogglePopout={togglePopout}
           onOpenSettings={openSettingsPanel}
-        >
-          {layout === 'bar' ? barControls : undefined}
-        </TitleBar>
-      )}
-
-      {layout === 'bar' && !customChrome && <div className="barstrip">{barControls}</div>}
-
-      {layout !== 'bar' && (
-        <HUD
-          settings={settings}
-          capturing={capturing}
-          rms={cs.rms}
-          bufferedSeconds={cs.bufferedSeconds}
-          canSaveNow={canSaveNow}
-          onToggleCapture={toggleCapture}
-          onManualSave={performSave}
-          onOpenSettings={openSettingsPanel}
-          error={cs.error}
-          noSignal={cs.noSignal}
-          hideSettingsButton={customChrome}
         />
       )}
 
+      <HUD
+        settings={settings}
+        capturing={capturing}
+        bufferedSeconds={cs.bufferedSeconds}
+        canSaveNow={canSaveNow}
+        onToggleCapture={toggleCapture}
+        onManualSave={performSave}
+        onOpenSettings={openSettingsPanel}
+        error={cs.error}
+        noSignal={cs.noSignal}
+        hideSettingsButton={customChrome}
+        formatControl={formatPicker}
+        clipActive={cs.clipActive}
+        clipElapsed={cs.clipActive ? clipElapsed : undefined}
+        onToggleClip={() => toggleClipRecording(true)}
+        clipEnabled={!!cs.stream && !!settings.saveFolder}
+      />
+
+      {/* The capture cue only lights up for bounded recordings — a clip in
+          progress or a traditional-mode session. The always-on rolling buffer
+          gets no highlight: a border that never turns off conveys nothing. */}
       {showBoard && (
-        <main className={`board ${capturing ? 'is-capturing' : ''}`}>
-          <VisualizerBoard
-            analyser={cs.analyser}
-            mode={settings.visualizer}
-            theme={settings.theme}
-          />
-          {dockedTop && vizChips}
+        <main className={`board ${cs.clipActive || (settings.recordMode === 'traditional' && capturing) ? 'is-capturing' : ''}`}>
+          {gridView ? (
+            <div className={`viz-grid panes-${visibleModes.length}`}>
+              {visibleModes.map((m) => (
+                <div className="viz-pane" key={m}>
+                  <VisualizerBoard
+                    analyser={cs.analyser}
+                    mode={m}
+                    theme={settings.theme}
+                    gain={settings.vizGain}
+                    historyModel={cs.historyModel}
+                    /* The History pane stays interactive even in the split so you
+                       can highlight + drag a snippet out without leaving the
+                       mosaic. Other panes are read-only overviews. */
+                    interactive={m === 'history' || m === 'spectrogram'}
+                    dragReady={m === 'history' || m === 'spectrogram' ? dragReady : undefined}
+                    onSelectionChange={
+                      m === 'history' || m === 'spectrogram' ? handleSelectionChange : undefined
+                    }
+                    onDragNotReady={() =>
+                      emitToast('error', 'Snippet still preparing — give it a second, then drag.')
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="viz-pane-pop"
+                    title={`Pop the ${VISUALIZER_LABELS[m]} view into its own window`}
+                    aria-label={`Pop ${VISUALIZER_LABELS[m]} view out`}
+                    onClick={() => popOutMode(m)}
+                  >
+                    ⧉
+                  </button>
+                  <button
+                    type="button"
+                    className="viz-pane-x"
+                    title={`Close the ${VISUALIZER_LABELS[m]} view`}
+                    aria-label={`Close ${VISUALIZER_LABELS[m]} view`}
+                    onClick={() => setPaneHidden(m, true)}
+                  >
+                    ✕
+                  </button>
+                  <span className="viz-pane-tag">{VISUALIZER_LABELS[m]}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <VisualizerBoard
+                analyser={cs.analyser}
+                mode={visibleModes[0]}
+                theme={settings.theme}
+                gain={settings.vizGain}
+                historyModel={cs.historyModel}
+                dragReady={dragReady}
+                onSelectionChange={handleSelectionChange}
+                onDragNotReady={() =>
+                  emitToast('error', 'Snippet still preparing — give it a second, then drag.')
+                }
+              />
+              <span className="board-mode-tag" aria-hidden="true">
+                {VISUALIZER_LABELS[visibleModes[0]]}
+              </span>
+            </>
+          )}
         </main>
       )}
 
-      {layout === 'compact' && settings.showSourcePicker && !dockedTop && (
-        <footer className="sidebar is-compact">{sourcePicker}</footer>
-      )}
-
-      {showFooter && !dockedTop && (
-        <footer className="sidebar">
-          {settings.showSourcePicker ? sourcePicker : <span />}
-          {vizChips}
-        </footer>
-      )}
+      <footer className="sidebar">
+        {settings.showSourcePicker ? sourcePicker : <span />}
+        {vizChips || <span />}
+      </footer>
 
       {settingsOpen && (
         <SettingsPanel

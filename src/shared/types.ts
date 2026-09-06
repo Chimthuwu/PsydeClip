@@ -7,9 +7,74 @@ export type Theme =
   | 'cyberpunk'
   | 'synthwave'
   | 'monochrome'
-  | 'kawaii';
-export type VisualizerMode = 'oscilloscope' | 'spectrum' | 'spectrogram';
+  | 'kawaii'
+  | 'aqua'
+  | 'sakura'
+  | 'lime'
+  | 'blood-red'
+  | 'nocturnal'
+  | 'black-ice';
+
+/** Every theme, in menu order. The one list both the Settings panel and the
+ *  right-click quick menu read from, so they can't drift apart. */
+export const THEMES: readonly { value: Theme; label: string; swatch: string }[] = [
+  { value: 'modern', label: 'Modern neon', swatch: '#7df9ff' },
+  { value: 'classic', label: 'Classic green', swatch: '#00ff00' },
+  { value: 'cyberpunk', label: 'Cyberpunk', swatch: '#fcee0a' },
+  { value: 'synthwave', label: 'Synthwave', swatch: '#ff7700' },
+  { value: 'monochrome', label: 'Monochrome', swatch: '#ffffff' },
+  { value: 'kawaii', label: 'Hyper kawaii ✿', swatch: '#ff8fc7' },
+  { value: 'aqua', label: 'Aqua', swatch: '#2dd4bf' },
+  { value: 'sakura', label: 'Sakura', swatch: '#d8a0d8' },
+  { value: 'lime', label: 'Lime green', swatch: '#39ff5a' },
+  { value: 'blood-red', label: 'Blood red', swatch: '#ff1024' },
+  { value: 'nocturnal', label: 'Nocturnal', swatch: '#6a8dff' },
+  { value: 'black-ice', label: 'Black ice', swatch: '#7fe3f5' },
+];
+
+export type VisualizerMode = 'oscilloscope' | 'spectrum' | 'spectrogram' | 'history';
+
+/**
+ * All visualizer modes, in the fixed order the split view lays them out.
+ * (Chrome reads its mode list from this too, so the two can't drift apart.)
+ */
+export const VISUALIZER_MODES: readonly VisualizerMode[] = [
+  'oscilloscope',
+  'spectrum',
+  'spectrogram',
+  'history',
+];
+
+/** User-facing name for each visualizer mode (pane tags, add-tile buttons). */
+export const VISUALIZER_LABELS: Record<VisualizerMode, string> = {
+  oscilloscope: 'Oscilloscope',
+  spectrum: 'Spectrum',
+  spectrogram: 'Spectrogram',
+  history: 'History',
+};
+
+/**
+ * Presets offered by the quick visualizer-sensitivity menus (title bar +
+ * right-click). Multiples of the neutral 1× draw-time gain.
+ */
+export const VIZ_GAIN_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
+
+/** Preset rolling-buffer lengths in seconds offered by the quick menus. */
+export const BUFFER_PRESETS_SEC = [60, 120, 300, 600, 900, 1800, 3600] as const;
+
+/** Which quick menu the title-bar buttons ask main to pop up. */
+export type TitleMenuKind = 'format' | 'gain' | 'buffer';
+
 export type RecordMode = 'rolling' | 'traditional';
+/**
+ * On-disk container for saved recordings.
+ *   - 'webm' = the raw MediaRecorder output (Opus in WebM). Cheapest, smallest.
+ *   - 'wav'  = 16-bit PCM. Lossless, large, plays everywhere.
+ *   - 'mp3'  = re-encoded to MP3 (via lamejs) at the configured bitrate.
+ * wav / mp3 are produced from a decoded PCM copy at save time, so choosing one
+ * costs a little CPU (and, in rolling mode, a parallel PCM buffer in RAM).
+ */
+export type RecordingFormat = 'webm' | 'wav' | 'mp3';
 /**
  * Where audio comes from:
  *   - 'desktop'   = pick a screen/window from Electron desktopCapturer
@@ -19,12 +84,14 @@ export type CaptureBackend = 'desktop' | 'loopback';
 
 /**
  * How much chrome the main window shows.
- *   - 'full'    = title bar + HUD + visualizer + footer (the original layout)
- *   - 'compact' = title bar + a single control row + visualizer
- *   - 'bar'     = one thin strip: transport + meter only, no visualizer.
- *                 Meant to be docked to the top edge of a monitor.
+ *
+ * The old 'compact' mode (title bar + single control row + visualizer) was
+ * retired: the full layout already sheds chrome to a strip through its
+ * height/width breakpoints, and the pop-out window covers the small-monitor
+ * use case. The union keeps 'compact' so pre-existing settings files parse,
+ * but main normalizes any stored 'compact' to 'full' (see settings.ts).
  */
-export type UiLayout = 'full' | 'compact' | 'bar';
+export type UiLayout = 'full' | 'compact';
 
 /** 'system' = the OS title bar; 'custom' = our own 26px frameless strip. */
 export type TitleBarMode = 'system' | 'custom';
@@ -83,12 +150,33 @@ export interface AppSettings {
   recordMode: RecordMode;
   /** Visual theme. */
   theme: Theme;
-  /** Active visualizer mode. */
+  /**
+   * The "primary" visualizer mode — the one a lone-pane view shows, and what
+   * the smoothing / quick-menu / pop-out fallback key off. Kept in sync with
+   * the first entry of the visible set (`VISUALIZER_MODES` minus `vizHidden`).
+   */
   visualizer: VisualizerMode;
+  /**
+   * Modes NOT shown on the board. The board renders every mode in
+   * `VISUALIZER_MODES` that isn't in here: one un-hidden mode → a single
+   * interactive board; several → a read-only mosaic. The footer chips toggle
+   * membership directly (there is no separate split/single switch). At least
+   * one mode is always visible.
+   */
+  vizHidden: VisualizerMode[];
+  /**
+   * Visualizer sensitivity multiplier (0.5×–4×, 1× = neutral). Scales the
+   * analyser data at draw time only, so recordings and their volume are
+   * completely unaffected — it just makes quiet sources light up the
+   * visualizers more.
+   */
+  vizGain: number;
   /** Buffer length in seconds, applies to rolling mode. */
   bufferSeconds: number;
-  /** Opus bitrate kbps. */
+  /** Opus bitrate kbps. Also the target bitrate when saving as MP3 (clamped to 128–320). */
   bitrateKbps: number;
+  /** Container written to disk on save (webm / wav / mp3). */
+  recordingFormat: RecordingFormat;
   /** Whether the main window stays above other applications. */
   alwaysOnTop: boolean;
   /** Template used to name saved recordings. */
@@ -105,9 +193,7 @@ export interface AppSettings {
   titleBarMode: TitleBarMode;
   /** Button label strategy as the window narrows. */
   labelMode: LabelMode;
-  /** Show the VU meter row in the HUD. */
-  showVu: boolean;
-  /** Show the rolling-buffer fill bar in the HUD. */
+  /** Show the rolling-buffer waveform strip in the HUD. */
   showBuffer: boolean;
   /** Show the source / output-device picker in the footer. */
   showSourcePicker: boolean;
@@ -146,7 +232,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  hotkey: 'Shift+Alt+R',
+  hotkey: 'Alt+R',
   saveFolder: '',
   captureBackend: 'desktop',
   sourceId: null,
@@ -154,15 +240,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
   recordMode: 'rolling',
   theme: 'modern',
   visualizer: 'oscilloscope',
+  // Everything except the primary mode starts hidden → a single board.
+  vizHidden: ['spectrum', 'spectrogram', 'history'],
+  vizGain: 1,
   bufferSeconds: 15 * 60,
   bitrateKbps: 96,
+  recordingFormat: 'webm',
   alwaysOnTop: false,
   fileNameTemplate: 'recordr_{date}_{time}',
 
   uiLayout: 'full',
   titleBarMode: 'custom',
   labelMode: 'auto',
-  showVu: true,
   showBuffer: true,
   // Off by default: the device lives in the right-click quick menu and in
   // Settings, and on a short window the footer strip was costing the
@@ -187,12 +276,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
  */
 export const LAYOUT_MIN_SIZE: Record<UiLayout, { width: number; height: number }> = {
   full: { width: 240, height: 190 },
-  compact: { width: 200, height: 120 },
-  bar: { width: 180, height: 34 },
+  compact: { width: 200, height: 32 },
 };
-
-/** Height the window is snapped to when entering `bar` layout. */
-export const BAR_LAYOUT_HEIGHT = 38;
 
 /**
  * Tokens supported in `fileNameTemplate`. The renderer surfaces these as
@@ -230,6 +315,7 @@ export const IpcChannel = {
   sourcesPick: 'sources:pick',
   folderPick: 'folder:pick',
   saveRecording: 'recording:save',
+  dragExport: 'drag:export',
   recordingEvent: 'recording:event',
   hotkeySet: 'hotkey:set',
   loopbackList: 'loopback:list',
@@ -237,6 +323,15 @@ export const IpcChannel = {
   loopbackStop: 'loopback:stop',
   loopbackSamples: 'loopback:samples',
   loopbackEvent: 'loopback:event',
+  /** Stream a dedicated clip recording straight to a temp file on disk. */
+  clipStart: 'clip:start',
+  clipAppend: 'clip:append',
+  clipRead: 'clip:read',
+  clipAbort: 'clip:abort',
+  /** Main renderer → main: show/hide the always-on-top clip-recording window. */
+  clipWindowSet: 'clip:window-set',
+  /** Main → clip window: the timer/format/theme it should display. */
+  clipWindowState: 'clip:window-state',
   windowSetAlwaysOnTop: 'window:set-always-on-top',
   openSettings: 'window:open-settings',
   traySetCapturing: 'tray:set-capturing',
@@ -252,6 +347,13 @@ export const IpcChannel = {
   vizFrame: 'viz:frame',
   vizState: 'viz:state',
   vizCommand: 'viz:command',
+  vizHistory: 'viz:history',
+  dragExportProxy: 'drag:export-proxy',
+  requestDragExport: 'drag:request-export',
+  dragPrepare: 'drag:prepare',
+  dragExportPrepared: 'drag:export-prepared',
+  /** Pop a native menu for a title-bar knob (format / sensitivity / buffer). */
+  titleMenu: 'titlebar:menu',
 } as const;
 
 /** Simple window verbs the custom title bar can ask main to perform. */
@@ -267,24 +369,72 @@ export interface VizFrame {
   maxDecibels: number;
 }
 
+/**
+ * Main window → pop-out: the rolling peak track plus its session clock.
+ *
+ * The pop-out reconstructs a `HistoryModel` from this. `newestSec` is the
+ * session-relative second of the newest bucket as stamped by the main window,
+ * so both windows agree on what a selection's absolute seconds mean even
+ * though each renderer's `performance.now()` has an independent origin
+ * (todo.md §11.4, D1).
+ */
+export interface HistoryStream {
+  buffer: Float32Array;
+  head: number;
+  count: number;
+  capacity: number;
+  /** Session-relative seconds of the newest bucket at capture time. */
+  newestSec: number;
+}
+
 /** Slower-moving state the pop-out mirrors (sent only when it changes). */
 export interface VizState {
   capturing: boolean;
   hasSource: boolean;
   canSave: boolean;
+  /** A dedicated clip recording is in progress. */
+  clipActive: boolean;
+  /** Epoch ms when the active clip started (0 when none) — for the live
+   *  stopwatch on the pop-out's record button. */
+  clipStartedAt: number;
+  /** Container a save will be written as — shown on the pop-out's buttons. */
+  format: RecordingFormat;
   bufferedSeconds: number;
   bufferSeconds: number;
   recordMode: RecordMode;
   theme: Theme;
   visualizer: VisualizerMode;
+  /**
+   * When non-null, the pop-out shows ONLY this visualizer, pinned from a
+   * split-view pane's ⧉ button, instead of mirroring the main window's view.
+   * Transient (not a setting): cleared when the pop-out closes.
+   */
+  overrideMode: VisualizerMode | null;
   rms: number;
+}
+
+/**
+ * What the always-on-top clip-recording window shows. `active: false` tells it
+ * to close. Sent by the main renderer (which owns the clip recorder) and
+ * relayed by main.
+ */
+export interface ClipWindowState {
+  active: boolean;
+  /** Epoch ms the clip started (for the live timer). */
+  startedAt: number;
+  format: RecordingFormat;
+  theme: Theme;
 }
 
 /** Commands the pop-out sends back to the main renderer. */
 export type VizCommand =
   | { type: 'toggle-capture' }
   | { type: 'save' }
-  | { type: 'set-visualizer'; mode: VisualizerMode };
+  | { type: 'toggle-clip' }
+  | { type: 'discard-clip' }
+  | { type: 'set-visualizer'; mode: VisualizerMode }
+  | { type: 'set-override'; mode: VisualizerMode | null }
+  | { type: 'selection-change'; selection: [number, number] | null };
 
 export type RecorderEvent =
   | { type: 'saved'; path: string; bytes: number; durationSec: number }

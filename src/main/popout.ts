@@ -19,6 +19,21 @@ const isDev = process.env.NODE_ENV === 'development';
 
 let popoutWindow: BrowserWindow | null = null;
 
+/**
+ * Set when the pop-out is opened *alongside* the main window (the per-pane ⧉
+ * flow) rather than as a swap. `applyPopoutWindowSwap` in index.ts consumes
+ * it on the open transition so the main window is not hidden.
+ */
+let keepMainVisible = false;
+export function markPopoutKeepMain() {
+  keepMainVisible = true;
+}
+export function consumePopoutKeepMain(): boolean {
+  const v = keepMainVisible;
+  keepMainVisible = false;
+  return v;
+}
+
 export function getPopout(): BrowserWindow | null {
   return popoutWindow && !popoutWindow.isDestroyed() ? popoutWindow : null;
 }
@@ -110,6 +125,11 @@ export function forwardVizFrame(payload: unknown) {
 export function forwardVizState(payload: unknown) {
   const w = getPopout();
   if (w) w.webContents.send(IpcChannel.vizState, payload);
+}
+
+export function forwardVizHistory(payload: unknown) {
+  const w = getPopout();
+  if (w) w.webContents.send(IpcChannel.vizHistory, payload);
 }
 
 /** Re-apply the pop-out's window-level settings after a settings save. */

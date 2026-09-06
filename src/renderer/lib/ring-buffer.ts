@@ -8,8 +8,8 @@
  */
 export interface RollingBuffer {
   push(chunk: Blob): void;
-  /** Returns a single concatenated Blob of everything currently buffered. */
-  snapshot(): Promise<Blob>;
+  /** Returns a single concatenated Blob of everything currently buffered. Optionally cropped to a fractional window [start, end]. */
+  snapshot(bounds?: [number, number]): Promise<Blob>;
   /** Number of chunks currently held. */
   size(): number;
   /** Approximate buffered duration in seconds (sum of chunk durations). */
@@ -25,6 +25,11 @@ interface Chunk {
 
 export function createRollingBuffer(maxAgeMs: number): RollingBuffer {
   const chunks: Chunk[] = [];
+  // MediaRecorder only writes the WebM/EBML header (Segment, Info, Tracks) into
+  // its very first chunk; every later chunk is a bare Cluster. Drop that first
+  // chunk and the concatenation is an undecodable, headerless stream. So keep it
+  // forever, separate from the pruned window, and prepend it on snapshot.
+  let initSegment: Blob | null = null;
 
   function prune(now: number) {
     while (chunks.length && now - chunks[0].ts > maxAgeMs) {
@@ -35,14 +40,22 @@ export function createRollingBuffer(maxAgeMs: number): RollingBuffer {
   return {
     push(blob: Blob) {
       const now = performance.now();
+      if (!initSegment) initSegment = blob;
       // Roughly: 1 second per chunk (MediaRecorder timeslice). If you want a
       // tighter estimate, pass duration via push(dur) — but 1 s is plenty
       // accurate for circular buffer caps.
       chunks.push({ blob, ts: now, dur: 1.0 });
       prune(now);
     },
-    async snapshot() {
-      const blobs = chunks.map((c) => c.blob);
+    async snapshot(bounds?: [number, number]) {
+      let activeChunks = chunks;
+      if (bounds) {
+        const startIdx = Math.floor(bounds[0] * chunks.length);
+        const endIdx = Math.ceil(bounds[1] * chunks.length);
+        activeChunks = chunks.slice(startIdx, endIdx);
+      }
+      const blobs = activeChunks.map((c) => c.blob);
+      if (initSegment && blobs[0] !== initSegment) blobs.unshift(initSegment);
       return new Blob(blobs, { type: 'audio/webm' });
     },
     size() {
@@ -53,6 +66,7 @@ export function createRollingBuffer(maxAgeMs: number): RollingBuffer {
     },
     clear() {
       chunks.length = 0;
+      initSegment = null;
     },
   };
 }

@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { AppSettings } from '../../shared/types';
 import { mmss } from '../../shared/utils';
 import { Transport } from './Transport';
@@ -5,7 +6,6 @@ import { Transport } from './Transport';
 interface Props {
   settings: AppSettings;
   capturing: boolean;
-  rms: number;
   bufferedSeconds: number;
   canSaveNow: boolean;
   onToggleCapture: () => void;
@@ -16,12 +16,19 @@ interface Props {
   noSignal?: boolean;
   /** Hide the gear — the custom title bar already carries one. */
   hideSettingsButton?: boolean;
+  /** The save-format picker — lives in the status row now, not the footer. */
+  formatControl?: ReactNode;
+  /** Dedicated clip recording (rolling mode only). */
+  clipActive?: boolean;
+  /** Live seconds since the clip started (undefined when not recording). */
+  clipElapsed?: number;
+  onToggleClip?: () => void;
+  clipEnabled?: boolean;
 }
 
 export function HUD({
   settings,
   capturing,
-  rms,
   bufferedSeconds,
   canSaveNow,
   onToggleCapture,
@@ -30,27 +37,43 @@ export function HUD({
   error,
   noSignal,
   hideSettingsButton,
+  formatControl,
+  clipActive,
+  clipElapsed,
+  onToggleClip,
+  clipEnabled,
 }: Props) {
-  const bufferPct = settings.recordMode === 'rolling'
-    ? Math.min(100, (bufferedSeconds / settings.bufferSeconds) * 100)
-    : 0;
-
-  const compact = settings.uiLayout !== 'full';
   const showBuffer = settings.showBuffer && settings.recordMode === 'rolling';
+  const bufferFull = bufferedSeconds >= settings.bufferSeconds - 2;
 
   return (
-    <header className={`hud ${compact ? 'is-compact' : ''}`}>
+    <header className="hud">
       <div className="hud-status">
-        <span className={`pill ${capturing ? 'on' : 'off'}`}>
-          {settings.theme === 'kawaii'
-            ? capturing ? '♥ LIVE~' : '✿ idle'
-            : capturing ? '● LIVE' : '○ idle'}
-        </span>
-        {!compact && (
-          <span className="hud-mode">
-            {settings.recordMode === 'rolling' ? 'rolling' : 'press-to-record'}
+        {/* LIVE + the rolling-buffer readout as one connected pill. */}
+        <span className="hud-live">
+          <span className={`pill ${capturing ? 'on' : 'off'}`}>
+            {settings.theme === 'kawaii'
+              ? capturing ? '♥ LIVE~' : '✿ idle'
+              : capturing ? '● LIVE' : '○ idle'}
           </span>
-        )}
+          {showBuffer && (
+            <span
+              className={`hud-buffered${bufferFull ? ' is-full' : ''}`}
+              title={
+                bufferFull
+                  ? `Rolling — the last ${mmss(settings.bufferSeconds)} of audio is always kept and slides forward; older audio rolls off. Save or hit the hotkey to keep a chunk.`
+                  : `Building the rolling buffer — ${mmss(bufferedSeconds)} of ${mmss(settings.bufferSeconds)} held.`
+              }
+            >
+              {bufferFull
+                ? mmss(settings.bufferSeconds)
+                : `${mmss(bufferedSeconds)} / ${mmss(settings.bufferSeconds)}`}
+            </span>
+          )}
+        </span>
+
+        {formatControl}
+
         {noSignal && !error && (
           <span
             className="hud-quiet"
@@ -59,18 +82,12 @@ export function HUD({
             ⚠ device is silent
           </span>
         )}
-        {showBuffer && (
-          <span className="hud-buffer">
-            <progress max={100} value={bufferPct} />
-            <em>{mmss(bufferedSeconds)} / {mmss(settings.bufferSeconds)}</em>
-          </span>
-        )}
       </div>
 
-      {settings.showVu && (
-        <div className="hud-vu" title={`RMS ${(rms * 100).toFixed(0)}%`}>
-          <div className="vu-bar" style={{ width: `${Math.min(100, rms * 240)}%` }} />
-        </div>
+      {settings.showHint && (
+        <span className="hud-hint" title="Global hotkey — starts / stops a clip recording">
+          <kbd>{settings.hotkey}</kbd>
+        </span>
       )}
 
       <div className="hud-actions">
@@ -85,16 +102,15 @@ export function HUD({
           labelMode={settings.labelMode}
           onToggleCapture={onToggleCapture}
           onManualSave={onManualSave}
+          clipActive={clipActive}
+          clipElapsed={clipElapsed}
+          onToggleClip={onToggleClip}
+          clipEnabled={clipEnabled}
+          format={settings.recordingFormat}
         />
       </div>
 
       {error && <div className="hud-error">{error}</div>}
-
-      {settings.showHint && !compact && (
-        <div className="hud-hint">
-          Hotkey: <kbd>{settings.hotkey}</kbd>
-        </div>
-      )}
     </header>
   );
 }

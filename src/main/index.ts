@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, screen } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import { readSettings, writeSettings } from './settings';
 import { HotkeyManager } from './hotkeys';
@@ -18,7 +19,15 @@ import {
   removeAppBar,
   wireAppBarTeardown,
 } from './appbar';
-import { applyPopoutSettings, createPopout, destroyPopout, getPopout } from './popout';
+import {
+  applyPopoutSettings,
+  consumePopoutKeepMain,
+  createPopout,
+  destroyPopout,
+  getPopout,
+} from './popout';
+import { pruneAbandonedClips } from './clip';
+import { destroyClipWindow } from './clip-window';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -52,10 +61,13 @@ function createWindow(bounds?: Electron.Rectangle) {
     minWidth: min.width,
     minHeight: min.height,
     // 'custom' drops the OS title bar entirely; the renderer draws a 26px
-    // strip instead (src/renderer/components/TitleBar.tsx).
+    // strip instead (src/renderer/components/TitleBar.tsx). It's also
+    // transparent so `.app` can round its bottom corners (Win10 won't round a
+    // frameless window itself).
     frame: settings.titleBarMode !== 'custom',
+    transparent: settings.titleBarMode === 'custom',
     title: 'Recordr',
-    backgroundColor: '#070a1c',
+    backgroundColor: settings.titleBarMode === 'custom' ? '#00000000' : '#070a1c',
     autoHideMenuBar: true,
     show: false, // show after ready-to-show
     icon: makeAppIcon(),
@@ -133,19 +145,13 @@ function createWindow(bounds?: Electron.Rectangle) {
 
   const pushWindowState = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    const b = mainWindow.getBounds();
-    const wa = screen.getDisplayMatching(b).workArea;
-    const dockedTop = b.y === wa.y && b.width === wa.width;
-    
-    if (!dockedTop) {
-      const min = LAYOUT_MIN_SIZE[readSettings().uiLayout];
-      if (min) mainWindow.setMinimumSize(min.width, min.height);
-    }
+
+    const min = LAYOUT_MIN_SIZE[readSettings().uiLayout];
+    if (min) mainWindow.setMinimumSize(min.width, min.height);
 
     mainWindow.webContents.send(IpcChannel.windowState, {
       maximized: mainWindow.isMaximized(),
       focused: mainWindow.isFocused(),
-      dockedTop,
     });
   };
   mainWindow.on('maximize', pushWindowState);
@@ -224,12 +230,17 @@ function handleSettingsChanged(s: AppSettings) {
 function applyPopoutWindowSwap(s: AppSettings) {
   if (s.popoutOpen === lastPopoutOpen) return;
   lastPopoutOpen = s.popoutOpen;
-  if (!s.hideMainWhenPopped) return;
   const w = mainWindow;
   if (!w || w.isDestroyed()) return;
   if (s.popoutOpen) {
+    // A per-pane ⧉ pop-out opens *alongside* the main window — the main
+    // window keeps showing the rest of the split view while the popped
+    // visualizer gets its own window. Only the plain pop-out toggle swaps
+    // (hide main while popped).
+    if (consumePopoutKeepMain() || !s.hideMainWhenPopped) return;
     w.hide();
   } else {
+    if (!s.hideMainWhenPopped) return;
     w.show();
     w.focus();
   }
@@ -254,7 +265,75 @@ function applyHotkey(hotkey: string) {
   });
 }
 
+/**
+ * Keep the logon auto-recovery in place — the layer beyond the startup
+ * reclaim. Together the two cover every "closed unexpectedly" timeline:
+ *
+ *  1. Relaunch Recordr      → startup reclaim restores the desktop instantly.
+ *  2. Never launch it again → at the very next logon this launcher reclaims
+ *     the space on its own, zero manual steps.
+ *
+ * Mechanism: a tiny VBScript dropped into the per-user Startup folder, which
+ * runs at every logon with no special privileges (unlike a Task Scheduler
+ * logon task, which schtasks refuses to create unelevated). The script checks
+ * the crash marker *before* booting anything — a healthy logon costs nothing;
+ * only a crashed session (marker left behind) launches `Recordr.exe
+ * --fix-workarea`, hidden, which reclaims the space and exits without UI.
+ *
+ * Rewritten on every packaged startup, so it follows the exe if the install
+ * moves (e.g. the win-unpacked build being superseded by the NSIS install),
+ * and a deleted launcher quietly comes back. Best-effort: if writing fails,
+ * the startup reclaim and the tray's "Fix desktop work area" item still cover
+ * recovery. Keep in sync with scripts/install-recovery-launcher.js.
+ */
+function ensureDesktopRecoveryTask(): void {
+  if (!app.isPackaged || process.platform !== 'win32') return;
+  const startUpDir = path.join(
+    app.getPath('appData'),
+    'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup',
+  );
+  const vbsPath = path.join(startUpDir, 'Recordr Desktop Recovery.vbs');
+  const script = buildRecoveryLauncher(process.execPath);
+  try {
+    fs.mkdirSync(startUpDir, { recursive: true });
+    fs.writeFileSync(vbsPath, script, 'utf8');
+  } catch (err) {
+    console.warn('[appbar] could not write desktop-recovery launcher:', err);
+  }
+}
+
+/**
+ * The VBScript source for the Startup-folder launcher (the standalone script
+ * scripts/install-recovery-launcher.js generates the same file, for use
+ * outside the app). VBS ends strings by doubling quotes, so `"""<exe>""`
+ * renders the quoted command line WScript.Shell.Run expects.
+ */
+function buildRecoveryLauncher(exePath: string): string {
+  const marker = path.join(app.getPath('userData'), 'appbar-active');
+  // VBS treats backslashes literally (no escape sequences), but JS template
+  // literals would eat `\r`/`\u`… out of a Windows path — double them first.
+  const vbs = (p: string) => p.replace(/\\/g, '\\\\').replace(/"/g, '""');
+  return [
+    `' Recordr desktop recovery: reclaims the top-of-screen strip an unexpected`,
+    `' exit can leave reserved. Generated by Recordr at startup; safe to delete.`,
+    `On Error Resume Next`,
+    `Set fso = CreateObject("Scripting.FileSystemObject")`,
+    `If Not fso.FileExists("${vbs(marker)}") Then WScript.Quit 0`,
+    `CreateObject("WScript.Shell").Run """${vbs(exePath)}"" --fix-workarea", 0, False`,
+    '',
+  ].join('\n');
+}
+
 function init() {
+  // ----- One-shot desktop recovery mode -----------------------------------
+  // `Recordr.exe --fix-workarea` exists so a reservation left behind by an
+  // unexpected exit can be reclaimed *without launching the app proper* — the
+  // Startup-folder launcher kept from ensureDesktopRecoveryTask() below runs
+  // it automatically at logon. The single-instance lock doubles as the safety
+  // check: if a live instance is running it owns any reservation, so we must
+  // not touch the desktop.
+  const fixWorkAreaMode = process.argv.includes('--fix-workarea');
+
   // ----- Single-instance lock ----------------------------------------------
   // A second launch focuses the existing window instead of opening a new one.
   const gotLock = app.requestSingleInstanceLock();
@@ -263,6 +342,7 @@ function init() {
     return;
   }
   app.on('second-instance', () => {
+    if (fixWorkAreaMode) return;
     const w = mainWindow;
     if (!w || w.isDestroyed()) return;
     if (w.isMinimized()) w.restore();
@@ -276,9 +356,26 @@ function init() {
   wireAppBarTeardown(app);
 
   app.whenReady().then(() => {
+    if (fixWorkAreaMode) {
+      // No window, no tray: reclaim whatever the last run left behind and exit
+      // before any UI could ever flash on screen.
+      reclaimStaleAppBar();
+      app.exit(0);
+      return;
+    }
+
     // If the last run died holding a reservation, the desktop is still short of
     // that space. Reclaim before anything can register a new one.
     reclaimStaleAppBar();
+
+    // The "fixes on its own even if Recordr is never launched again" layer:
+    // keep the logon scheduled task registered. See the function's doc.
+    ensureDesktopRecoveryTask();
+
+    // Same "the last run died mid-action" housekeeping: drop any clip temp
+    // files a crashed renderer never got to abort. startClip() also prunes,
+    // so this is belt-and-braces for runs where no new clip is ever started.
+    void pruneAbandonedClips();
 
     // The shell notifies appbars of layout changes through a window message
     // Electron doesn't dispatch, so these stand in for ABN_POSCHANGED.
@@ -330,6 +427,7 @@ function init() {
     hotkeyMgr.unregister();
     destroyTray();
     if (getPopout()) destroyPopout();
+    destroyClipWindow();
   });
 
   app.on('window-all-closed', () => {

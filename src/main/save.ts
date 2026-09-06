@@ -23,13 +23,16 @@ export function resetSaveCounter(): void {
  *   - leaves unknown `{token}` segments intact (so users notice typos)
  *   - sanitises OS-illegal characters (`/ \ : * ? " < > |`) to `_`
  *   - collapses runs of `_` left behind by sanitisation
- *   - falls back to `recordr_{date}_{time}.webm` if template ever yields a
+ *   - normalises the extension to `ctx.ext` (default `webm`), replacing any
+ *     audio extension the template may already carry
+ *   - falls back to `recordr_{date}_{time}.<ext>` if template ever yields a
  *     bare extension or empty string
  */
 export function formatFileName(
   template: string,
-  ctx: { settings: AppSettings; deviceName?: string; counter: number },
+  ctx: { settings: AppSettings; deviceName?: string; counter: number; ext?: string },
 ): string {
+  const ext = (ctx.ext ?? 'webm').replace(/^\./, '').toLowerCase();
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -68,11 +71,13 @@ export function formatFileName(
   // If the resulting name is empty or matches only an extension, substitute.
   const trimmed = out.trim();
   if (!trimmed || /^\.+$/.test(trimmed)) {
-    out = `recordr_${date}_${time}.webm`;
+    out = `recordr_${date}_${time}`;
   }
 
-  // Append .webm if no recognised extension is present.
-  if (!/\.(webm|ogg|opus)$/i.test(out)) out += '.webm';
+  // Normalise the extension: drop any audio extension the template carried, then
+  // append the one the caller asked for.
+  out = out.replace(/\.(webm|wav|mp3|ogg|opus|m4a|flac)$/i, '');
+  out += `.${ext}`;
 
   // Strip any leading dot or path-separator that would be problematic on
   // any of the supported OSes.
@@ -86,6 +91,8 @@ export interface SaveOptions {
   template: string;
   settings: AppSettings;
   deviceName?: string;
+  /** File extension / container to write. Defaults to `webm`. */
+  ext?: string;
   /** Optional explicit counter; if omitted we use the in-process counter. */
   counter?: number;
 }
@@ -97,15 +104,18 @@ export interface SaveResult {
 }
 
 /**
- * Save a buffer of WebM/Opus bytes to disk with a templated filename.
+ * Save a buffer of encoded audio bytes to disk with a templated filename.
+ * The container is whatever `opts.ext` says (webm / wav / mp3); the caller is
+ * responsible for having encoded `opts.bytes` to match.
  */
-export async function saveWebm(opts: SaveOptions): Promise<SaveResult> {
+export async function saveRecordingFile(opts: SaveOptions): Promise<SaveResult> {
   await fs.mkdir(opts.folder, { recursive: true });
   const counter = opts.counter ?? ++saveCounter;
   const fileName = formatFileName(opts.template, {
     settings: opts.settings,
     deviceName: opts.deviceName,
     counter,
+    ext: opts.ext,
   });
   const full = path.join(opts.folder, fileName);
   await fs.writeFile(full, opts.bytes);
