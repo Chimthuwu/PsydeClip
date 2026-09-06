@@ -109,9 +109,8 @@ export function SourcePicker({
     <div
       className={`picker-row picker-row-stack${compact ? ' is-compact' : ''}`}
       ref={wrapRef}
+      title={headerHint}
     >
-      {!compact && <label htmlFor="source-trigger">{labelText}</label>}
-
       <div className="picker-select-wrap">
         <button
           id="source-trigger"
@@ -123,11 +122,9 @@ export function SourcePicker({
           aria-label={labelText}
           aria-expanded={open}
         >
-          {compact && (
-            <span className="dd-icon" aria-hidden="true">
-              {backend === 'loopback' ? '🔊' : '🖵'}
-            </span>
-          )}
+          <span className="dd-icon" aria-hidden="true">
+            {backend === 'loopback' ? '🔊' : '🖵'}
+          </span>
           <span className="dd-label">{selectedLabel}</span>
           <span className="dd-chevron" aria-hidden="true">
             ▾
@@ -170,8 +167,6 @@ export function SourcePicker({
           </div>
         )}
       </div>
-
-      {!compact && <small>{headerHint}</small>}
     </div>
   );
 }

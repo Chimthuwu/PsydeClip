@@ -1,12 +1,21 @@
-import { ipcMain, dialog, BrowserWindow, desktopCapturer, Menu, MenuItemConstructorOptions } from 'electron';
+import { app, ipcMain, dialog, BrowserWindow, desktopCapturer, Menu, MenuItemConstructorOptions, nativeImage } from 'electron';
+import path from 'node:path';
+import fs from 'node:fs';
+import { ICON_32_DATA_URL } from './icon-assets';
 import {
   AppSettings,
+  BUFFER_PRESETS_SEC,
   CaptureSource,
+  ClipWindowState,
   IpcChannel,
   LoopbackDevice,
   SaveResult,
   SnapTarget,
+  TitleMenuKind,
   UiLayout,
+  THEMES,
+  VIZ_GAIN_PRESETS,
+  VISUALIZER_MODES,
   VisualizerMode,
   WindowAction,
 } from '../shared/types';
@@ -17,10 +26,15 @@ import {
   destroyPopout,
   forwardVizFrame,
   forwardVizState,
+  forwardVizHistory,
+  getPopout,
   isPopoutOpen,
+  markPopoutKeepMain,
 } from './popout';
 import { readSettings, writeSettings } from './settings';
-import { saveWebm } from './save';
+import { saveRecordingFile } from './save';
+import { startClip, appendClip, readClip, abortClip } from './clip';
+import { setClipWindow } from './clip-window';
 import {
   listLoopbackDevices,
   loopbackManager,
@@ -30,6 +44,27 @@ import {
   notifySaveCompleted,
   setCapturingState as setTrayCapturingState,
 } from './tray';
+
+let preparedDragFilePath: string | null = null;
+
+/**
+ * Windows aborts `webContents.startDrag()` when the icon is missing or empty —
+ * historically we passed a 1×1 transparent PNG, which some Windows builds still
+ * treat as empty and drop the drag on the floor. Use the real app icon (a
+ * proper 32×32 raster) so the drag always takes.
+ */
+let dragIconCache: Electron.NativeImage | null = null;
+function dragIcon(): Electron.NativeImage {
+  if (!dragIconCache) {
+    const img = nativeImage.createFromDataURL(ICON_32_DATA_URL);
+    dragIconCache = img.isEmpty()
+      ? nativeImage.createFromDataURL(
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        )
+      : img;
+  }
+  return dragIconCache;
+}
 
 export interface IpcContext {
   getWindow: () => BrowserWindow | null;
@@ -82,16 +117,17 @@ export function registerIpc(ctx: IpcContext) {
 
   ipcMain.handle(
     IpcChannel.saveRecording,
-    async (_e, args: { folder: string; bytes: Uint8Array; durationSec?: number; deviceName?: string }): Promise<SaveResult> => {
+    async (_e, args: { folder: string; bytes: Uint8Array; ext?: string; durationSec?: number; deviceName?: string }): Promise<SaveResult> => {
       try {
         if (!args.folder) return { ok: false, error: 'No save folder configured' };
         const settings = readSettings();
-        const r = await saveWebm({
+        const r = await saveRecordingFile({
           folder: args.folder,
           bytes: args.bytes,
           template: settings.fileNameTemplate,
           settings,
           deviceName: args.deviceName,
+          ext: args.ext,
         });
         // Notify the tray so the recent-saves menu + tooltip update and (on
         // Windows) a balloon pops up showing the new filename.
@@ -101,6 +137,84 @@ export function registerIpc(ctx: IpcContext) {
         return { ok: false, error: (err as Error).message };
       }
     },
+  );
+
+  // ------- Dedicated clip recording (streams to a temp file) ----------------
+
+  ipcMain.handle(IpcChannel.clipStart, () => startClip());
+  ipcMain.on(IpcChannel.clipAppend, (_e, bytes: Uint8Array) => {
+    void appendClip(bytes);
+  });
+  ipcMain.handle(IpcChannel.clipRead, () => readClip());
+  ipcMain.on(IpcChannel.clipAbort, () => void abortClip());
+
+  // Show / hide the always-on-top clip-recording window to match the main
+  // renderer's clip state.
+  ipcMain.on(IpcChannel.clipWindowSet, (_e, state: ClipWindowState) => {
+    setClipWindow(state);
+  });
+
+  ipcMain.on(
+    IpcChannel.dragExport,
+    (e, args: { bytes: Uint8Array; deviceName?: string; ext?: string }) => {
+      try {
+        const now = new Date();
+        const ext = args.ext || 'webm';
+        const stamp = `${now.getHours()}${now.getMinutes()}${now.getSeconds()}`;
+        const tempPath = path.join(app.getPath('temp'), `recordr_snippet_${stamp}.${ext}`);
+        fs.writeFileSync(tempPath, args.bytes);
+        e.sender.startDrag({ file: tempPath, icon: dragIcon() });
+      } catch (err) {
+        console.error('Drag export failed:', err);
+      }
+    }
+  );
+
+  ipcMain.on(
+    IpcChannel.dragPrepare,
+    (_e, args: { bytes: Uint8Array; ext?: string }) => {
+      try {
+        if (preparedDragFilePath && fs.existsSync(preparedDragFilePath)) {
+          try {
+            fs.unlinkSync(preparedDragFilePath);
+          } catch { /* ignore */ }
+        }
+        const now = new Date();
+        const ext = args.ext || 'webm';
+        const stamp = `${now.getHours()}${now.getMinutes()}${now.getSeconds()}${now.getMilliseconds()}`;
+        const tempPath = path.join(app.getPath('temp'), `recordr_snippet_${stamp}.${ext}`);
+        fs.writeFileSync(tempPath, args.bytes);
+        preparedDragFilePath = tempPath;
+      } catch (err) {
+        console.error('Drag preparation failed:', err);
+      }
+    }
+  );
+
+  ipcMain.on(
+    IpcChannel.dragExportPrepared,
+    (e) => {
+      try {
+        if (!preparedDragFilePath || !fs.existsSync(preparedDragFilePath)) {
+          console.error('[drag] no prepared file — selection not ready yet');
+          return;
+        }
+        e.sender.startDrag({ file: preparedDragFilePath, icon: dragIcon() });
+      } catch (err) {
+        console.error('Drag export prepared failed:', err);
+      }
+    }
+  );
+
+  ipcMain.on(
+    IpcChannel.dragExportProxy,
+    (e, args: { bounds: [number, number] }) => {
+      // Popout window requested a drag. We ask the main window to perform the export.
+      const mainWin = ctx.getWindow();
+      if (mainWin && !mainWin.isDestroyed()) {
+        mainWin.webContents.send(IpcChannel.requestDragExport, args);
+      }
+    }
   );
 
   // ------- WASAPI loopback helpers ---------------------------------------------------------
@@ -165,8 +279,23 @@ export function registerIpc(ctx: IpcContext) {
   ipcMain.handle(
     IpcChannel.windowSnap,
     (e, args: { target: SnapTarget }): void => {
-      const w = BrowserWindow.fromWebContents(e.sender) ?? ctx.getWindow();
-      snapWindow(w, args.target);
+      const w = BrowserWindow.fromWebContents(e.sender);
+      if (w === ctx.getWindow() && args.target === 'top') {
+        if (!isPopoutOpen()) {
+          createPopout(() => {
+            ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
+          });
+          ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: true }));
+        }
+        setTimeout(() => {
+          const popout = getPopout();
+          if (popout) snapWindow(popout, 'top');
+        }, 100);
+        return;
+      }
+
+      const targetWin = w ?? ctx.getWindow();
+      snapWindow(targetWin, args.target);
     },
   );
 
@@ -241,12 +370,29 @@ export function registerIpc(ctx: IpcContext) {
         : [{ label: 'No sources found', enabled: false }];
     }
 
-    const vizItem = (mode: VisualizerMode, label: string): MenuItemConstructorOptions => ({
-      label,
-      type: 'radio',
-      checked: s.visualizer === mode,
-      click: () => apply({ visualizer: mode }),
-    });
+    // The board shows every ticked visualizer: one → a single board, several →
+    // a mosaic. Each item is an independent on/off; the last one can't be
+    // unticked.
+    const shownModes = VISUALIZER_MODES.filter((m) => !s.vizHidden.includes(m));
+    const vizItem = (mode: VisualizerMode, label: string): MenuItemConstructorOptions => {
+      const on = shownModes.includes(mode);
+      return {
+        label,
+        type: 'checkbox',
+        checked: on,
+        enabled: !(on && shownModes.length === 1),
+        click: () => {
+          const next = on
+            ? s.vizHidden.concat(mode)
+            : s.vizHidden.filter((m) => m !== mode);
+          const shownAfter = VISUALIZER_MODES.filter((m) => !next.includes(m));
+          apply({
+            vizHidden: next,
+            visualizer: on ? (shownAfter[0] ?? s.visualizer) : mode,
+          });
+        },
+      };
+    };
 
     const template: MenuItemConstructorOptions[] = [
       { label: s.captureBackend === 'loopback' ? 'Output device' : 'Capture source', enabled: false },
@@ -274,12 +420,55 @@ export function registerIpc(ctx: IpcContext) {
       vizItem('oscilloscope', 'Oscilloscope'),
       vizItem('spectrum', 'Spectrum'),
       vizItem('spectrogram', 'Spectrogram'),
+      vizItem('history', 'History'),
+      { type: 'separator' },
+      {
+        label: 'Save as',
+        submenu: ([
+          ['webm', 'WebM / Opus (smallest)'],
+          ['wav', 'WAV (16-bit PCM)'],
+          ['mp3', 'MP3'],
+        ] as const).map(([fmt, label]) => ({
+          label,
+          type: 'radio' as const,
+          checked: s.recordingFormat === fmt,
+          click: () => apply({ recordingFormat: fmt }),
+        })),
+      },
+      { type: 'separator' },
+      {
+        label: 'Theme',
+        submenu: THEMES.map((t) => ({
+          label: t.label,
+          type: 'radio' as const,
+          checked: s.theme === t.value,
+          click: () => apply({ theme: t.value }),
+        })),
+      },
       { type: 'separator' },
       {
         label: 'Rolling buffer',
         type: 'checkbox',
         checked: s.recordMode === 'rolling',
         click: () => apply({ recordMode: s.recordMode === 'rolling' ? 'traditional' : 'rolling' }),
+      },
+      {
+        label: 'Buffer length',
+        submenu: BUFFER_PRESETS_SEC.map((sec) => ({
+          label: `${Math.round(sec / 60)} min`,
+          type: 'radio' as const,
+          checked: s.bufferSeconds === sec,
+          click: () => apply({ bufferSeconds: sec }),
+        })),
+      },
+      {
+        label: 'Visualizer sensitivity',
+        submenu: VIZ_GAIN_PRESETS.map((g) => ({
+          label: `${g}×`,
+          type: 'radio' as const,
+          checked: s.vizGain === g,
+          click: () => apply({ vizGain: g }),
+        })),
       },
       {
         label: 'Always on top',
@@ -306,7 +495,18 @@ export function registerIpc(ctx: IpcContext) {
       { type: 'separator' },
       {
         label: 'Dock to top of screen',
-        click: () => snapWindow(win, 'top'),
+        click: () => {
+          if (!isPopoutOpen()) {
+            createPopout(() => {
+              ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
+            });
+            apply({ popoutOpen: true });
+          }
+          setTimeout(() => {
+            const popout = getPopout();
+            if (popout) snapWindow(popout, 'top');
+          }, 100);
+        },
       },
       {
         label: 'Docking reserves screen space',
@@ -321,18 +521,6 @@ export function registerIpc(ctx: IpcContext) {
           apply({ dockReservesSpace: next });
           if (next) snapWindow(win, 'top');
         },
-      },
-      {
-        label: 'Layout',
-        submenu: (['full', 'compact', 'bar'] as UiLayout[]).map((l) => ({
-          label: l === 'bar' ? 'Bar (thin strip)' : l[0].toUpperCase() + l.slice(1),
-          type: 'radio' as const,
-          checked: s.uiLayout === l,
-          click: () => {
-            applyLayout(ctx.getWindow(), l);
-            apply({ uiLayout: l });
-          },
-        })),
       },
       {
         label: 'Show device picker in window',
@@ -357,11 +545,59 @@ export function registerIpc(ctx: IpcContext) {
     Menu.buildFromTemplate(template).popup({ window: win });
   });
 
+  // ------- Title-bar knob menus ----------------------------------------------
+
+  // The title bar's format / sensitivity / buffer buttons ask for a native
+  // menu (same reason as the quick menu: a DOM popover would be clipped at
+  // the edge of a short or docked window). The menu pops at the cursor, which
+  // is exactly over the button that asked for it.
+  ipcMain.handle(
+    IpcChannel.titleMenu,
+    async (e, args: { kind: TitleMenuKind }): Promise<void> => {
+      const win = BrowserWindow.fromWebContents(e.sender) ?? ctx.getWindow();
+      if (!win || win.isDestroyed()) return;
+      const s = readSettings();
+      const apply = (patch: Partial<AppSettings>) => {
+        ctx.onSettingsChanged(writeSettings({ ...readSettings(), ...patch }));
+      };
+
+      let template: MenuItemConstructorOptions[];
+      if (args.kind === 'format') {
+        template = ([
+          ['webm', 'WebM / Opus'],
+          ['wav', 'WAV (16-bit PCM)'],
+          ['mp3', 'MP3'],
+        ] as const).map(([fmt, label]) => ({
+          label,
+          type: 'radio' as const,
+          checked: s.recordingFormat === fmt,
+          click: () => apply({ recordingFormat: fmt }),
+        }));
+      } else if (args.kind === 'gain') {
+        template = VIZ_GAIN_PRESETS.map((g) => ({
+          label: `${g}×`,
+          type: 'radio' as const,
+          checked: s.vizGain === g,
+          click: () => apply({ vizGain: g }),
+        }));
+      } else {
+        template = BUFFER_PRESETS_SEC.map((sec) => ({
+          label: `${Math.round(sec / 60)} min`,
+          type: 'radio' as const,
+          checked: s.bufferSeconds === sec,
+          click: () => apply({ bufferSeconds: sec }),
+        }));
+      }
+
+      Menu.buildFromTemplate(template).popup({ window: win });
+    },
+  );
+
   // ------- Pop-out visualizer ------------------------------------------------
 
   ipcMain.handle(
     IpcChannel.popoutToggle,
-    (_e, args: { open?: boolean } = {}): { open: boolean } => {
+    (_e, args: { open?: boolean; keepMain?: boolean } = {}): { open: boolean } => {
       const want = args.open ?? !isPopoutOpen();
       if (want) {
         createPopout(() => {
@@ -374,6 +610,9 @@ export function registerIpc(ctx: IpcContext) {
       } else {
         destroyPopout();
       }
+      // A per-pane ⧉ pop-out opens alongside the main window: tell the swap
+      // policy (which fires on this settings transition) to leave it visible.
+      if (want && args.keepMain) markPopoutKeepMain();
       // Route through onSettingsChanged rather than writing quietly: main hides
       // or restores the main window off this transition, and the pop-out's own
       // useSettings only learns about it from the settings:changed broadcast.
@@ -388,6 +627,7 @@ export function registerIpc(ctx: IpcContext) {
   // `handle`/`invoke` — no promise per frame, and nothing to await.
   ipcMain.on(IpcChannel.vizFrame, (_e, payload) => forwardVizFrame(payload));
   ipcMain.on(IpcChannel.vizState, (_e, payload) => forwardVizState(payload));
+  ipcMain.on(IpcChannel.vizHistory, (_e, payload) => forwardVizHistory(payload));
   ipcMain.on(IpcChannel.vizCommand, (_e, payload) => {
     const w = ctx.getWindow();
     if (w && !w.isDestroyed()) w.webContents.send(IpcChannel.vizCommand, payload);

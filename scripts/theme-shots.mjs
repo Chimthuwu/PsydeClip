@@ -1,0 +1,136 @@
+/**
+ * Capture screenshots of the cyberpunk / synthwave / kawaii themes from the
+ * Recordr dev instance (CDP). Refuses to shoot unless the page is Recordr.
+ *
+ * Usage: node scripts/theme-shots.mjs [port] [outDir]
+ * Requires: `npm run dev:renderer` and
+ *   `NODE_ENV=development electron . --remote-debugging-port=<port>`
+ */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+const port = process.argv[2] ?? '9223';
+const outDir = process.argv[3] ?? path.join(os.tmpdir(), 'recordr-theme-shots');
+const themes = ['cyberpunk', 'synthwave', 'kawaii'];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function getTarget() {
+  for (let i = 0; i < 40; i++) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/json/list`);
+      const list = await res.json();
+      const page = list.find((t) => t.type === 'page' && !t.url.includes('#popout'));
+      if (page) return page;
+    } catch {
+      /* not up */
+    }
+    await sleep(500);
+  }
+  throw new Error('no page target');
+}
+
+function connect(wsUrl) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+    const pending = new Map();
+    let id = 0;
+    ws.onopen = () =>
+      resolve({
+        send(method, params = {}) {
+          return new Promise((res, rej) => {
+            const msgId = ++id;
+            pending.set(msgId, { res, rej });
+            ws.send(JSON.stringify({ id: msgId, method, params }));
+          });
+        },
+        close: () => ws.close(),
+      });
+    ws.onerror = (e) => reject(new Error('ws error'));
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.id && pending.has(msg.id)) {
+        const p = pending.get(msg.id);
+        pending.delete(msg.id);
+        msg.error ? p.rej(new Error(msg.error.message)) : p.res(msg.result);
+      }
+    };
+  });
+}
+
+async function evalJs(cdp, expression) {
+  const r = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  if (r.exceptionDetails) throw new Error(`eval failed: ${JSON.stringify(r.exceptionDetails).slice(0, 300)}`);
+  return r.result?.value;
+}
+
+const GUARD = `({
+  ok: !!document.querySelector('.app, .popout'),
+  hasPhaser: !!document.querySelector('#phaser-container, canvas.phaser'),
+  api: typeof window.api,
+  bodyClass: document.body.className,
+})`;
+
+async function main() {
+  const target = await getTarget();
+  const cdp = await connect(target.webSocketDebuggerUrl);
+  await cdp.send('Page.enable');
+  await cdp.send('Runtime.enable');
+
+  const g = await evalJs(cdp, `(${GUARD})`);
+  console.log('guard:', JSON.stringify(g));
+  if (!g.ok || g.hasPhaser) {
+    throw new Error('Page is NOT Recordr — aborting screenshot run.');
+  }
+
+  fs.mkdirSync(outDir, { recursive: true });
+  const shots = [];
+  const setTheme = (t) =>
+    evalJs(cdp, `window.api.setSettings({ theme: '${t}' }).then(() => true)`);
+  const bg = () => evalJs(cdp, `getComputedStyle(document.querySelector('.app')).getPropertyValue('--bg-app').trim()`);
+
+  for (const theme of themes) {
+    await setTheme(theme);
+    await sleep(900);
+    console.log(`${theme}: --bg-app =`, await bg());
+    const file = path.join(outDir, `main-${theme}.png`);
+    const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(file, Buffer.from(shot.data, 'base64'));
+    shots.push(file);
+  }
+
+  // Pop-out (drag strip + board) per theme.
+  await evalJs(cdp, `window.api.togglePopout(true).then(() => true)`);
+  await sleep(1500);
+  let pop = null;
+  for (let i = 0; i < 20 && !pop; i++) {
+    const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    pop = list.find((t) => t.type === 'page' && t.url.includes('#popout'));
+    if (!pop) await sleep(300);
+  }
+  if (!pop) throw new Error('pop-out did not open');
+  const pcdp = await connect(pop.webSocketDebuggerUrl);
+  await pcdp.send('Page.enable');
+  await pcdp.send('Runtime.enable');
+  const pg = await evalJs(pcdp, `({ ok: !!document.querySelector('.popout'), phaser: !!document.querySelector('#phaser-container') })`);
+  if (!pg.ok || pg.phaser) throw new Error('pop-out is not Recordr — aborting');
+  for (const theme of themes) {
+    await setTheme(theme);
+    await sleep(900);
+    const file = path.join(outDir, `popout-${theme}.png`);
+    const shot = await pcdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(file, Buffer.from(shot.data, 'base64'));
+    shots.push(file);
+  }
+  pcdp.close();
+  await evalJs(cdp, `window.api.togglePopout(false).then(() => true)`);
+  cdp.close();
+
+  console.log('Wrote:');
+  for (const f of shots) console.log(`  ${f} (${fs.statSync(f).size} bytes)`);
+}
+
+main().catch((e) => {
+  console.error(e.message || e);
+  process.exit(1);
+});

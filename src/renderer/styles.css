@@ -55,6 +55,10 @@
   --bg-app: #070a1c;
   --bg-surface: #0a0f26;
   --bg-surface-elevated: #0c1133;
+  --bg-gradient:
+    radial-gradient(ellipse at 20% 20%, rgba(125, 249, 255, 0.08), transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(180, 139, 255, 0.08), transparent 60%),
+    var(--bg-app);
 
   --text-primary: #e8edff;
   --text-secondary: #b6c2e8;
@@ -90,6 +94,7 @@
   --bg-app: #000000;
   --bg-surface: #000000;
   --bg-surface-elevated: #001100;
+  --bg-gradient: var(--bg-app);
 
   --text-primary: #00ff00;
   --text-secondary: #00cc00;
@@ -124,8 +129,14 @@
 /* --- Cyber: dark technical instrument panel. Luminous, still restrained. -- */
 .theme-cyberpunk {
   --bg-app: #0f0518;
-  --bg-surface: #150725;
-  --bg-surface-elevated: #1a0524;
+  --bg-surface: rgba(21, 7, 37, 0.72);
+  --bg-surface-elevated: rgba(32, 8, 50, 0.66);
+  --bg-gradient:
+    radial-gradient(ellipse at 18% 10%, rgba(0, 255, 255, 0.17), transparent 55%),
+    radial-gradient(ellipse at 85% 15%, rgba(255, 0, 200, 0.13), transparent 55%),
+    radial-gradient(ellipse at 78% 92%, rgba(255, 0, 60, 0.14), transparent 60%),
+    radial-gradient(ellipse at 28% 85%, rgba(252, 238, 10, 0.07), transparent 55%),
+    var(--bg-app);
 
   --text-primary: #f6e9ff;
   --text-secondary: #cbb2e0;
@@ -152,14 +163,20 @@
   --radius: 2px;
   --radius-lg: 3px;
   --radius-pill: 3px;
-  --panel-blur: 6px;
+  --panel-blur: 12px;
 }
 
 /* --- Synthwave: nocturnal, deeper surfaces, softer light. ----------------- */
 .theme-synthwave {
   --bg-app: #140c28;
-  --bg-surface: #1c1038;
-  --bg-surface-elevated: #2b1055;
+  --bg-surface: rgba(28, 16, 56, 0.72);
+  --bg-surface-elevated: rgba(50, 19, 98, 0.66);
+  --bg-gradient:
+    radial-gradient(ellipse at 20% 12%, rgba(255, 0, 160, 0.19), transparent 55%),
+    radial-gradient(ellipse at 86% 18%, rgba(0, 229, 255, 0.14), transparent 55%),
+    radial-gradient(ellipse at 76% 92%, rgba(255, 119, 0, 0.14), transparent 60%),
+    radial-gradient(ellipse at 24% 82%, rgba(120, 60, 220, 0.12), transparent 55%),
+    var(--bg-app);
 
   --text-primary: #ffe9f7;
   --text-secondary: #d7b8e8;
@@ -186,7 +203,7 @@
   --radius: 14px;
   --radius-lg: 20px;
   --radius-pill: 999px;
-  --panel-blur: 14px;
+  --panel-blur: 16px;
 }
 
 /* --- Monochrome: the acceptance test made literal. No hue at all. -------- */
@@ -194,6 +211,7 @@
   --bg-app: #000000;
   --bg-surface: #0a0a0a;
   --bg-surface-elevated: #141414;
+  --bg-gradient: var(--bg-app);
 
   --text-primary: #ffffff;
   --text-secondary: #cccccc;
@@ -228,6 +246,11 @@
   --bg-app: #fff0f7;
   --bg-surface: #fffafd;
   --bg-surface-elevated: #ffffff;
+  --bg-gradient:
+    radial-gradient(ellipse at 15% 10%, rgba(255, 143, 199, 0.28), transparent 58%),
+    radial-gradient(ellipse at 85% 85%, rgba(179, 157, 255, 0.26), transparent 58%),
+    radial-gradient(ellipse at 60% 40%, rgba(127, 231, 220, 0.18), transparent 55%),
+    var(--bg-app);
 
   --text-primary: #6b3f5b;
   --text-secondary: #9b6d88;
@@ -259,6 +282,240 @@
   color-scheme: light;
 }
 
+/* --- Aqua: dark teal lab. Vivid spring-green trace on a clean teal ground. */
+.theme-aqua {
+  --bg-app: #071e24;
+  --bg-surface: #0a272d;
+  --bg-surface-elevated: #0c2f36;
+  --bg-gradient:
+    radial-gradient(ellipse at 25% 12%, rgba(45, 212, 191, 0.1), transparent 60%),
+    radial-gradient(ellipse at 82% 90%, rgba(56, 189, 248, 0.07), transparent 60%),
+    var(--bg-app);
+
+  --text-primary: #e5f7f3;
+  --text-secondary: #a8dbd5;
+  --text-muted: #78b7b1;
+
+  --accent: #2dd4bf;
+  --accent-bright: #5eead4;
+  --accent-soft: #3ee879;
+
+  --border: rgba(45, 212, 191, 0.28);
+  --border-soft: rgba(45, 212, 191, 0.1);
+  --border-active: rgba(94, 234, 212, 0.72);
+
+  --waveform: #3ee879;
+  --grid-major: rgba(45, 212, 191, 0.22);
+  --grid-minor: rgba(45, 212, 191, 0.09);
+
+  --success: #3ee879;
+  --warning: #ffcc66;
+  --danger: #ff5d6c;
+  --rec: #3ee879;
+
+  --glow: 0.55;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --panel-blur: 10px;
+}
+
+/* --- Sakura: vivid fuchsia bloom on wine-plum. A dark, hot kawaii. -------- */
+.theme-sakura {
+  --bg-app: #190617;
+  --bg-surface: #230a20;
+  --bg-surface-elevated: #2b0c28;
+  --bg-gradient:
+    radial-gradient(ellipse at 34% 32%, rgba(240, 90, 210, 0.22), transparent 60%),
+    radial-gradient(ellipse at 84% 88%, rgba(180, 100, 230, 0.13), transparent 60%),
+    var(--bg-app);
+
+  --text-primary: #ffe6fb;
+  --text-secondary: #e2accd;
+  --text-muted: #b47caa;
+
+  --accent: #ee5fd0;
+  --accent-bright: #ff8fe0;
+  --accent-soft: #b98dff;
+
+  --border: rgba(238, 95, 208, 0.3);
+  --border-soft: rgba(238, 95, 208, 0.1);
+  --border-active: rgba(255, 143, 224, 0.7);
+
+  --waveform: #dd82dc;
+  --grid-major: rgba(238, 95, 208, 0.22);
+  --grid-minor: rgba(238, 95, 208, 0.08);
+
+  --success: #7fd8ff;
+  --warning: #ffce8a;
+  --danger: #ff6b8e;
+  --rec: #ff8fe0;
+
+  --glow: 0.62;
+  --radius: 16px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --panel-blur: 12px;
+}
+/* Lit chip: with the bright fuchsia accent, translucent-accent-on-dark loses
+   contrast — give it a solid bright fill + dark text (still on-theme, punchy). */
+.theme-sakura button.chip.on,
+.popout.theme-sakura button.chip.on {
+  background: var(--accent);
+  color: #2a0522;
+  border-color: var(--accent-bright);
+}
+
+/* --- Lime: high-saturation electric lime on a green-tinted black. -------- */
+.theme-lime {
+  --bg-app: #041306;
+  --bg-surface: #061c0a;
+  --bg-surface-elevated: #08240d;
+  --bg-gradient:
+    radial-gradient(ellipse at 25% 12%, rgba(46, 255, 74, 0.12), transparent 60%),
+    var(--bg-app);
+
+  --text-primary: #dcffe0;
+  --text-secondary: #98f0a4;
+  --text-muted: #62bd70;
+
+  --accent: #2eff4a;
+  --accent-bright: #7dff8f;
+  --accent-soft: #c6ff33;
+
+  --border: rgba(46, 255, 74, 0.26);
+  --border-soft: rgba(46, 255, 74, 0.08);
+  --border-active: rgba(46, 255, 74, 0.62);
+
+  --waveform: #2eff4a;
+  --grid-major: rgba(46, 255, 74, 0.2);
+  --grid-minor: rgba(46, 255, 74, 0.07);
+
+  --success: #2eff4a;
+  --warning: #eaff5a;
+  --danger: #ff5d6c;
+  --rec: #2eff4a;
+
+  --glow: 0.62;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --panel-blur: 8px;
+}
+
+/* --- Blood red: near-black, deep crimson, high-saturation red trace. ----- */
+.theme-blood-red {
+  --bg-app: #000000;
+  --bg-surface: #0d0202;
+  --bg-surface-elevated: #160303;
+  --bg-gradient:
+    radial-gradient(ellipse at 28% 12%, rgba(255, 12, 30, 0.13), transparent 60%),
+    radial-gradient(ellipse at 82% 90%, rgba(190, 0, 20, 0.09), transparent 60%),
+    var(--bg-app);
+
+  --text-primary: #ffe0e0;
+  --text-secondary: #e88f8f;
+  --text-muted: #b45f5f;
+
+  --accent: #ff1024;
+  --accent-bright: #ff4055;
+  --accent-soft: #ff3d8f;
+
+  --border: rgba(255, 16, 36, 0.3);
+  --border-soft: rgba(255, 16, 36, 0.09);
+  --border-active: rgba(255, 64, 85, 0.72);
+
+  --waveform: #ff1024;
+  --grid-major: rgba(255, 16, 36, 0.22);
+  --grid-minor: rgba(255, 16, 36, 0.07);
+
+  --success: #ff3355;
+  --warning: #ffb84d;
+  --danger: #ff2020;
+  --rec: #ff1024;
+
+  --glow: 0.62;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --panel-blur: 6px;
+}
+
+/* --- Nocturnal: deep indigo midnight studio. Periwinkle trace, soft glow. */
+.theme-nocturnal {
+  --bg-app: #0e0a1c;
+  --bg-surface: #14102a;
+  --bg-surface-elevated: #191333;
+  --bg-gradient:
+    radial-gradient(ellipse at 30% 28%, rgba(122, 141, 255, 0.17), transparent 62%),
+    radial-gradient(ellipse at 82% 88%, rgba(150, 110, 255, 0.1), transparent 60%),
+    var(--bg-app);
+
+  --text-primary: #e7e9ff;
+  --text-secondary: #b4b9ea;
+  --text-muted: #8186ba;
+
+  --accent: #6a8dff;
+  --accent-bright: #9ab0ff;
+  --accent-soft: #b98dff;
+
+  --border: rgba(122, 141, 255, 0.24);
+  --border-soft: rgba(122, 141, 255, 0.08);
+  --border-active: rgba(154, 176, 255, 0.64);
+
+  --waveform: #5b7fff;
+  --grid-major: rgba(122, 141, 255, 0.18);
+  --grid-minor: rgba(122, 141, 255, 0.07);
+
+  --success: #6fd6ff;
+  --warning: #ffcc7a;
+  --danger: #ff6b8e;
+  --rec: #6fd6ff;
+
+  --glow: 0.55;
+  --radius: 14px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+  --panel-blur: 12px;
+}
+
+/* --- Black ice: pure black, icy pale-cyan trace. Minimal, cold. --------- */
+.theme-black-ice {
+  --bg-app: #000000;
+  --bg-surface: #050708;
+  --bg-surface-elevated: #080b0d;
+  --bg-gradient:
+    radial-gradient(ellipse at 30% 14%, rgba(168, 240, 255, 0.06), transparent 60%),
+    var(--bg-app);
+
+  --text-primary: #eafaff;
+  --text-secondary: #a9cdd6;
+  --text-muted: #6f929b;
+
+  --accent: #7fe3f5;
+  --accent-bright: #c4f4fc;
+  --accent-soft: #a8f0d8;
+
+  --border: rgba(168, 240, 255, 0.16);
+  --border-soft: rgba(168, 240, 255, 0.05);
+  --border-active: rgba(168, 240, 255, 0.5);
+
+  --waveform: #c4f4fc;
+  --grid-major: rgba(168, 240, 255, 0.1);
+  --grid-minor: rgba(168, 240, 255, 0.04);
+
+  --success: #7fe3f5;
+  --warning: #ffcc7a;
+  --danger: #ff6b8e;
+  --rec: #7fe3f5;
+
+  --glow: 0.35;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --panel-blur: 0px;
+}
+
 /* --- Legacy aliases ------------------------------------------------------
    The original token names, expressed in terms of the semantic ones. This is
    what lets the token layer land without touching 1800 lines of rules in the
@@ -271,6 +528,12 @@
 .theme-synthwave,
 .theme-monochrome,
 .theme-kawaii,
+.theme-aqua,
+.theme-sakura,
+.theme-lime,
+.theme-blood-red,
+.theme-nocturnal,
+.theme-black-ice,
 :root {
   --bg: var(--bg-app);
   --bg-2: var(--bg-surface-elevated);
@@ -291,6 +554,22 @@ html, body, #root {
   color: var(--fg);
 }
 
+/* Transparent clip window (index.html#clip): nothing paints a background
+   except the floating pill itself. */
+html.clip-route,
+html.clip-route body,
+html.clip-route #root {
+  background: transparent;
+}
+
+/* Custom-titlebar window is transparent (main.ts) so `.app` can round its own
+   bottom corners — nothing behind it may paint an opaque rectangle. */
+html:has(.app.has-custom-titlebar),
+html:has(.app.has-custom-titlebar) body,
+html:has(.app.has-custom-titlebar) #root {
+  background: transparent;
+}
+
 .app {
   /* Flex, not grid: which rows exist now depends on the layout and on the
      visibility toggles (title bar? HUD? board? footer?), and a column flexbox
@@ -300,192 +579,125 @@ html, body, #root {
   flex-direction: column;
   height: 100%;
   position: relative;
-  background:
-    radial-gradient(ellipse at 20% 20%, rgba(125, 249, 255, 0.08), transparent 60%),
-    radial-gradient(ellipse at 80% 80%, rgba(180, 139, 255, 0.08), transparent 60%),
-    var(--bg);
+  background: var(--bg-gradient);
   overflow: hidden;
 }
 
-.app.theme-classic {
-  background: #000;
-  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, monospace;
-  color: #00ff00;
+/* Round only the bottom two corners; the title bar stays flush to the top
+   edge. Dropped when maximised (would leave transparent slivers at the
+   screen edge). */
+.app.has-custom-titlebar {
+  border-radius: 0 0 12px 12px;
 }
-.app.theme-classic :root {
-  color-scheme: dark;
-}
-
-.app.theme-cyberpunk {
-  --bg: #0f0518;
-  --bg-2: #1a0524;
-  --fg: #fcee0a;
-  --muted: #887a05;
-  --accent: #fcee0a;
-  --accent-2: #00ffff;
-  --accent-3: #ff003c;
-  --danger: #ff003c;
-  --ok: #00ffff;
-  --line: rgba(252, 238, 10, 0.25);
-  --line-soft: rgba(252, 238, 10, 0.1);
-  background:
-    radial-gradient(ellipse at 20% 20%, rgba(0, 255, 255, 0.08), transparent 60%),
-    radial-gradient(ellipse at 80% 80%, rgba(255, 0, 60, 0.08), transparent 60%),
-    var(--bg);
-}
-
-.app.theme-synthwave {
-  --bg: #140c28;
-  --bg-2: #2b1055;
-  --fg: #ff7700;
-  --muted: #b35900;
-  --accent: #ff7700;
-  --accent-2: #ff00a0;
-  --accent-3: #00e5ff;
-  --danger: #ff0055;
-  --ok: #00e5ff;
-  --line: rgba(255, 119, 0, 0.25);
-  --line-soft: rgba(255, 119, 0, 0.1);
-  background:
-    radial-gradient(ellipse at 20% 20%, rgba(255, 0, 160, 0.08), transparent 60%),
-    radial-gradient(ellipse at 80% 80%, rgba(0, 229, 255, 0.08), transparent 60%),
-    var(--bg);
+.app.has-custom-titlebar.is-maximized {
+  border-radius: 0;
 }
 
 .app.theme-monochrome {
-  --bg: #000000;
-  --bg-2: #111111;
-  --fg: #ffffff;
-  --muted: #888888;
-  --accent: #ffffff;
-  --accent-2: #cccccc;
-  --accent-3: #aaaaaa;
-  --danger: #ffffff;
-  --ok: #ffffff;
-  --line: rgba(255, 255, 255, 0.2);
-  --line-soft: rgba(255, 255, 255, 0.08);
-  background: var(--bg);
   filter: grayscale(100%);
 }
 
 /* HUD -------------------------------------------------------------------- */
 
+/* One row: status on the left, hotkey + transport on the right — a recording
+   console strip, not a stack of half-empty rows. Wraps only when genuinely out
+   of width; `.hud-error` is the sole thing allowed its own line. */
 .hud {
-  display: grid;
-  grid-template-rows: auto auto auto auto;
-  gap: clamp(4px, 1vw, 8px);
-  padding: clamp(8px, 1.8vw, 16px) clamp(10px, 2vw, 20px);
-  border-bottom: 1px solid var(--line);
-  background: rgba(7, 10, 28, 0.65);
-  backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 20; /* the format-picker popover has to clear the board below */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: clamp(10px, 1.6vw, 18px);
+  row-gap: 6px;
+  padding: clamp(6px, 0.9vw, 10px) clamp(10px, 2vw, 20px);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface-elevated);
+  backdrop-filter: blur(var(--panel-blur));
   min-width: 0;
-}
-.app.theme-classic .hud {
-  background: #000;
-  border-bottom: 1px solid #003300;
 }
 
 .hud-status {
   display: flex;
   align-items: center;
-  gap: clamp(6px, 1.2vw, 12px);
+  gap: clamp(8px, 1.2vw, 14px);
   flex-wrap: wrap;
-  min-width: 0;
-}
-
-.pill {
-  font-size: 12px;
-  padding: 4px 10px;
-  white-space: nowrap;
-  border-radius: 999px;
-  letter-spacing: 0.04em;
-}
-.pill.on {
-  background: rgba(127, 255, 175, 0.12);
-  color: var(--ok);
-  border: 1px solid rgba(127, 255, 175, 0.35);
-}
-.pill.off {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--muted);
-  border: 1px solid var(--line);
-}
-.app.theme-classic .pill.on {
-  background: #001a00;
-  color: #00ff00;
-  border: 1px solid #00ff00;
-}
-.app.theme-classic .pill.off {
-  background: transparent;
-  color: #00aa00;
-  border: 1px solid #005500;
-}
-
-.hud-mode {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-/* Grows to eat the leftover row space and shrinks to a 40px stub rather than
-   pushing the elapsed-time readout off the right edge. */
-.hud-buffer {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--muted);
-  flex: 1 1 140px;
-  min-width: 0;
-}
-.hud-buffer em {
-  white-space: nowrap;
-}
-.hud-buffer progress {
   flex: 1 1 auto;
-  width: auto;
-  min-width: 40px;
-  max-width: 130px;
-  height: 6px;
-  border: none;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-}
-.hud-buffer progress::-webkit-progress-bar {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-}
-.hud-buffer progress::-webkit-progress-value {
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  border-radius: 4px;
-}
-.app.theme-classic .hud-buffer progress {
-  background: #001a00;
-}
-.app.theme-classic .hud-buffer progress::-webkit-progress-bar {
-  background: #001a00;
-}
-.app.theme-classic .hud-buffer progress::-webkit-progress-value {
-  background: #00ff00;
+  min-width: 0;
 }
 
-.hud-vu {
-  position: relative;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 4px;
+/* LIVE + the rolling-buffer time as ONE capsule: a single border wraps both,
+   coloured by capture state, with a thin divider between the two halves. */
+.hud-live {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
   overflow: hidden;
 }
-.vu-bar {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
-  transition: width 60ms linear;
+.hud-live:has(.pill.on) {
+  border-color: var(--success);
+  box-shadow: 0 0 calc(8px * var(--glow)) var(--success);
 }
-.app.theme-classic .vu-bar {
-  background: #00ff00;
+.pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  padding: 4px 11px;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-pill);
+}
+/* Inside the capsule the pill drops its own chrome — the wrapper carries it. */
+.hud-live .pill {
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: var(--bg-surface-elevated);
+}
+.hud-live .pill.on { color: var(--success); }
+.hud-live .pill.off { color: var(--text-muted); background: var(--bg-surface); }
+.hud-buffered {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  background: var(--bg-surface-elevated);
+  border-left: 1px solid var(--border);
+}
+.hud-live:has(.pill.on) .hud-buffered {
+  border-left-color: color-mix(in srgb, var(--success) 40%, transparent);
+}
+.hud-buffered.is-full {
+  color: var(--accent-bright);
+}
+/* Themes that border `.pill` directly would double up inside the capsule. */
+.app.theme-kawaii .hud-live .pill.on,
+.app.theme-kawaii .hud-live .pill.off {
+  border: none;
+}
+
+/* The save-format picker sits in the status row now (was the footer). Its
+   popover has to open DOWNWARD here — up would go behind the title bar. */
+.hud .format-picker {
+  flex: 0 0 auto;
+}
+.hud .format-picker .picker-select-wrap {
+  max-width: none;
+}
+.hud .format-picker .dd-popover {
+  top: calc(100% + 6px);
+  bottom: auto;
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.55),
+    0 0 0 1px var(--border-soft),
+    0 0 calc(30px * var(--glow)) var(--border-active);
 }
 
 .hud-actions {
@@ -493,6 +705,7 @@ html, body, #root {
   gap: clamp(5px, 1vw, 8px);
   align-items: center;
   flex-wrap: wrap;
+  flex: 0 0 auto;
   min-width: 0;
 }
 /* The save button carries the longest label, so it's the one that shrinks and
@@ -527,6 +740,20 @@ html, body, #root {
 .labels-icon .lbl-short { display: none; }
 .labels-icon .lbl-icon { display: inline; }
 
+/* Format tag on the transport buttons — always visible, even in icon-only
+   label mode, so you can see what a save/clip will be written as. */
+.lbl-ext {
+  margin-left: 6px;
+  font-size: 0.8em;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+button.is-live .lbl-ext {
+  color: inherit;
+  opacity: 0.85;
+}
+
 /* Tight variant: bar strip + pop-out overlay. */
 button.is-tight {
   padding: 3px 8px;
@@ -543,20 +770,51 @@ button.is-tight.labels-icon {
 }
 .transport-toggle.is-live .lbl-icon { color: var(--danger); }
 
+/* Dedicated record (clip) button: idle shows a red ● on a red-tinted border
+   so it reads as a record control next to the blue Save button, and while a
+   clip is being recorded the dot pulses and the border turns full danger. */
+.transport-record {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.transport-record .lbl-icon {
+  color: var(--danger);
+}
+.transport-record.is-live .lbl-icon {
+  color: var(--danger);
+  animation: rec-pulse 1.1s ease-in-out infinite;
+}
+.transport-record.is-live {
+  border-color: var(--danger);
+  box-shadow: 0 0 calc(10px * var(--glow)) var(--danger);
+}
+/* The record button shows a live stopwatch while a clip is recording —
+   tabular numerals keep the label from shifting sideways every tick. */
+.transport-record .lbl-full,
+.transport-record .lbl-short {
+  font-variant-numeric: tabular-nums;
+}
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Sits just left of the transport as a quiet reminder of the global hotkey. */
 .hud-hint {
-  font-size: 11px;
-  color: var(--muted);
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--muted);
 }
 .hud-hint kbd {
-  padding: 2px 6px;
+  padding: 2px 7px;
   border: 1px solid var(--line);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.03);
-  font-family: inherit;
-  color: var(--fg);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
 }
 
 /* "The device is quiet" is a state, not an error — it's what an idle WASAPI
@@ -577,11 +835,13 @@ button.is-tight.labels-icon {
 }
 
 .hud-error {
+  flex: 1 1 100%;
+  order: 9;
   font-size: 12px;
   color: var(--danger);
   background: rgba(255, 93, 108, 0.08);
   border: 1px solid rgba(255, 93, 108, 0.25);
-  padding: 6px 10px;
+  padding: 5px 10px;
   border-radius: 6px;
 }
 
@@ -593,51 +853,14 @@ button.is-tight.labels-icon {
   margin: clamp(6px, 1.6vw, 16px);
   min-width: 0;
   min-height: 0;
-  border-radius: clamp(8px, 1.4vw, 14px);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--line);
-  background: #050717;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
   box-shadow:
     inset 0 0 60px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(120, 150, 255, 0.06);
+    0 0 0 1px var(--border-soft);
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-.board.is-capturing {
-  border-color: #39ff14;
-  box-shadow:
-    inset 0 0 60px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(120, 150, 255, 0.06),
-    0 0 24px rgba(57, 255, 20, 0.4);
-}
-.app.theme-classic .board {
-  background: #000;
-  border: 1px solid #003300;
-  box-shadow: none;
-}
-.app.theme-classic .board.is-capturing {
-  border-color: #ffff00;
-  box-shadow: 0 0 24px rgba(255, 255, 0, 0.4);
-}
-.app.theme-cyberpunk .board.is-capturing {
-  border-color: #00ffff;
-  box-shadow:
-    inset 0 0 60px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(0, 255, 255, 0.06),
-    0 0 24px rgba(0, 255, 255, 0.4);
-}
-.app.theme-synthwave .board.is-capturing {
-  border-color: #ff00a0;
-  box-shadow:
-    inset 0 0 60px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 0, 160, 0.06),
-    0 0 24px rgba(255, 0, 160, 0.4);
-}
-.app.theme-monochrome .board.is-capturing {
-  border-color: #ffffff;
-  box-shadow:
-    inset 0 0 60px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 0 24px rgba(255, 255, 255, 0.4);
 }
 .board canvas {
   width: 100%;
@@ -645,66 +868,177 @@ button.is-tight.labels-icon {
   display: block;
 }
 
+/* Split view — all four visualizers at once ------------------------------ */
+/* When `vizGrid` is on the board hosts a row of read-only panes that always
+   fills the whole board, each pane side by side — never stacked into rows,
+   no matter how many are open (4 across, 3 across, 2 across, or a single
+   full-board pane). Panes carry an ✕ (close) and a name tag; closed modes
+   return via the chips row or the floating ＋ Add view menu (bottom-right
+   of the board). */
+.viz-grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 2px;
+  background: var(--border); /* the 2px gutters read as hairlines */
+}
+.viz-pane {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+.viz-pane-x,
+.viz-pane-pop {
+  position: absolute;
+  top: 6px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.viz-pane-x {
+  right: 6px;
+}
+/* Pop-out sits just left of the ✕ so the two read as one close/float pair. */
+.viz-pane-pop {
+  right: 32px;
+}
+/* The whole corner cluster — ✕, ⧉ and the name tag — stays out of the way
+   until the cursor is over the window, then ✕/⧉ come to 0.6 and to full on
+   the pane itself (or keyboard focus). */
+.app:hover .viz-pane-x,
+.app:hover .viz-pane-pop,
+.popout:hover .viz-pane-x,
+.popout:hover .viz-pane-pop {
+  opacity: 0.6;
+}
+.viz-pane:hover .viz-pane-x,
+.viz-pane:hover .viz-pane-pop,
+.viz-pane-x:focus-visible,
+.viz-pane-pop:focus-visible {
+  opacity: 1;
+}
+.viz-pane-x:hover,
+.viz-pane-pop:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.75);
+}
+.viz-pane-tag {
+  position: absolute;
+  top: 8px;
+  right: 60px; /* clear of the ✕ + ⧉ pair */
+  z-index: 1;
+  pointer-events: none;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 3px 6px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+/* Pane name tags stay out of the way until the cursor is over the window. */
+.app:hover .viz-pane-tag,
+.popout:hover .viz-pane-tag {
+  opacity: 1;
+}
+/* Single-view mode label: the active visualizer's name in the top-right
+   corner, revealed only while the cursor is over the window — same rule as
+   the split-view pane tags above. */
+.board-mode-tag {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 3;
+  pointer-events: none;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 3px 6px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.app:hover .board-mode-tag,
+.popout:hover .board-mode-tag {
+  opacity: 1;
+}
+
 /* Sidebar ---------------------------------------------------------------- */
 
+/* One tight row — device on the left, mode chips, then FORMAT on the right.
+   (Same treatment as the HUD: no stretched columns of empty space.) */
 .sidebar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: clamp(8px, 1.4vw, 12px);
-  padding: clamp(8px, 1.4vw, 12px) clamp(10px, 2vw, 20px) clamp(10px, 2vw, 20px);
-  border-top: 1px solid var(--line);
-  background: rgba(7, 10, 28, 0.5);
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  column-gap: clamp(10px, 1.6vw, 18px);
+  row-gap: 6px;
+  padding: clamp(5px, 0.8vw, 9px) clamp(10px, 2vw, 20px);
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface-elevated);
   min-width: 0;
 }
+.sidebar > .picker-row { flex: 0 1 auto; min-width: 0; }
+.sidebar > .viz-buttons { flex: 0 1 auto; }
+.sidebar > .format-picker { margin-left: auto; }
+/* empty <span/> placeholders shouldn't claim a gap */
+.sidebar > span:empty { display: none; }
 .sidebar > * {
   min-width: 0;
 }
-.app.theme-classic .sidebar {
-  background: #000;
-  border-top: 1px solid #003300;
-}
 
 .picker-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: clamp(6px, 1.2vw, 12px);
+  gap: clamp(6px, 1.2vw, 10px);
   min-width: 0;
 }
-.picker-row-stack {
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto auto;
-}
 .picker-row label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   line-height: 1.15;
-}
-.picker-row small {
-  grid-column: 2 / 3;
-  font-size: 11px;
-  color: var(--muted);
+  flex: 0 0 auto;
 }
 .picker-select-wrap {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   position: relative; /* anchors the dropdown popover */
   min-width: 0;
   /* Device names are short; letting the trigger run the full width of the
      window made the picker look like the most important control in the app. */
-  max-width: 460px;
+  max-width: 360px;
 }
 
 select, input[type='text'], input[type='number'] {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line);
-  color: var(--fg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-family: inherit;
   font-size: 13px;
   outline: none;
@@ -713,8 +1047,8 @@ select:focus, input:focus {
   border-color: var(--accent);
 }
 option {
-  background: var(--bg-2);
-  color: var(--fg);
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
 }
 
 /* Custom dropdown listbox ----------------------------------------------- */
@@ -728,25 +1062,25 @@ option {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line);
-  color: var(--fg);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
   padding: 8px 12px 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-family: inherit;
   font-size: 13px;
   text-align: left;
   cursor: pointer;
   outline: none;
-  transition: border-color 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .dd-trigger:hover {
-  border-color: rgba(125, 249, 255, 0.35);
+  border-color: var(--border-active);
 }
 .dd-trigger:focus,
 .dd-trigger[aria-expanded='true'] {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(125, 249, 255, 0.12);
+  box-shadow: 0 0 calc(8px * var(--glow)) var(--border-active);
 }
 .dd-trigger.is-disabled {
   opacity: 0.5;
@@ -760,7 +1094,7 @@ option {
 }
 .dd-trigger .dd-chevron {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--text-muted);
   transition: transform 120ms ease;
 }
 .dd-trigger[aria-expanded='true'] .dd-chevron {
@@ -778,17 +1112,46 @@ option {
   bottom: calc(100% + 6px);
   left: 0;
   right: 40px; /* leave room for refresh button */
-  background: linear-gradient(180deg, #0c1133 0%, #0a0f29 100%);
-  border: 1px solid rgba(125, 249, 255, 0.28);
-  border-radius: 10px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-lg);
   box-shadow:
     0 -18px 48px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(125, 249, 255, 0.06),
-    0 0 30px rgba(125, 249, 255, 0.12);
+    0 0 0 1px var(--border-soft),
+    0 0 calc(30px * var(--glow)) var(--border-active);
   padding: 4px;
   max-height: min(320px, 45vh);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* Format picker: the trigger is only wide enough for "MP3 ▾", so pin the
+   popover to the trigger's right edge and let it grow leftward to a width
+   that actually fits "WebM · Opus, smallest" without clipping. */
+.dd-popover.dd-popover-tight {
+  right: 0;
+  left: auto;
+  min-width: 200px;
+  width: max-content;
+  max-width: 260px;
+}
+.dd-popover.dd-popover-tight .dd-item {
+  white-space: nowrap;
+  overflow: visible;
+}
+.format-picker {
+  justify-self: end;
+}
+.format-picker .picker-select-wrap {
+  max-width: 200px;
+}
+.dd-item-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.dd-item.is-selected .dd-item-hint {
+  color: inherit;
+  opacity: 0.75;
 }
 
 /* Custom scrollbar inside the popover */
@@ -799,13 +1162,13 @@ option {
   background: transparent;
 }
 .dd-popover::-webkit-scrollbar-thumb {
-  background: rgba(125, 249, 255, 0.22);
+  background: var(--border-active);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 .dd-popover::-webkit-scrollbar-thumb:hover {
-  background: rgba(125, 249, 255, 0.45);
+  background: var(--accent);
   background-clip: content-box;
 }
 
@@ -821,7 +1184,7 @@ option {
 .dd-empty {
   padding: 14px 12px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
   text-align: center;
 }
 
@@ -829,9 +1192,9 @@ option {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 13px;
-  color: var(--fg);
+  color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
   transition: background 90ms ease, color 90ms ease;
@@ -840,12 +1203,12 @@ option {
   text-overflow: ellipsis;
 }
 .dd-item:hover {
-  background: rgba(125, 249, 255, 0.12);
-  color: #ffffff;
+  background: var(--border-soft);
+  color: var(--text-primary);
 }
 .dd-item.is-selected {
-  background: rgba(180, 139, 255, 0.18);
-  color: #ffffff;
+  background: var(--border);
+  color: var(--accent-bright);
 }
 .dd-item.is-selected::before {
   content: '✓ ';
@@ -853,67 +1216,18 @@ option {
   margin-right: 4px;
 }
 .dd-item.is-placeholder {
-  color: var(--muted);
+  color: var(--text-muted);
   font-style: italic;
   cursor: default;
 }
 .dd-item.is-placeholder:hover {
   background: transparent;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .dd-item-label {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Classic theme live-update */
-.app.theme-classic .dd-trigger {
-  background: #000;
-  border-color: #00ff00;
-  color: #00ff00;
-}
-.app.theme-classic .dd-trigger .dd-chevron {
-  color: #00ff00;
-}
-.app.theme-classic .dd-trigger[aria-expanded='true'] .dd-chevron {
-  color: #00ff00;
-}
-.app.theme-classic .dd-popover {
-  background: #000;
-  border-color: #00ff00;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 255, 0, 0.18);
-}
-.app.theme-classic .dd-item {
-  color: #00ff00;
-}
-.app.theme-classic .dd-item:hover {
-  background: rgba(0, 255, 0, 0.10);
-  color: #ffffff;
-}
-.app.theme-classic .dd-item.is-selected {
-  background: rgba(0, 255, 0, 0.20);
-  color: #ffffff;
-}
-.app.theme-classic .dd-item.is-selected::before {
-  color: #00ff00;
-}
-.app.theme-classic .dd-empty {
-  color: #00aa00;
-}
-
-/* Ensure native <select> inside SettingsPanel/templating fields still get
-   the dark scheme (OS might still render the popup light, but the closed
-   field will be correct). */
-.app.theme-classic select,
-.app.theme-classic input {
-  background: #000;
-  border: 1px solid #00ff00;
-  color: #00ff00;
-}
-.app.theme-classic option {
-  background: #000;
-  color: #00ff00;
 }
 
 .viz-buttons {
@@ -930,8 +1244,8 @@ button {
   font-family: inherit;
   font-size: 13px;
   cursor: pointer;
-  border-radius: 8px;
-  transition: transform 80ms ease, background 120ms ease, border-color 120ms ease;
+  border-radius: var(--radius);
+  transition: transform 80ms ease, background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 button:disabled {
   opacity: 0.5;
@@ -945,53 +1259,43 @@ button:active {
   transform: scale(0.97);
 }
 button.primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, var(--accent), var(--accent-bright));
   border: 0;
   padding: 8px 14px;
-  color: #04122a;
+  color: var(--bg-app);
   font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+button.primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 calc(8px * var(--glow)) var(--border-active);
 }
 button.primary.big {
-  padding: 10px 18px;
-  font-size: 14px;
+  padding: 7px 15px;
+  font-size: 13px;
 }
 button.ghost {
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--fg);
-  border: 1px solid var(--line);
+  background: var(--border-soft);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   padding: 8px 10px;
 }
 button.ghost:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-.app.theme-classic button.primary {
-  background: #00ff00;
-  color: #000;
-}
-.app.theme-classic button.ghost {
-  background: transparent;
-  color: #00ff00;
-  border: 1px solid #00ff00;
-}
-.app.theme-classic button.ghost:hover {
-  background: #001a00;
+  background: var(--border);
+  border-color: var(--border-active);
 }
 button.chip {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line);
-  color: var(--muted);
+  background: var(--border-soft);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 button.chip.on {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(125, 249, 255, 0.08);
-}
-.app.theme-classic button.chip.on {
-  background: #001a00;
-  border-color: #00ff00;
-  color: #00ff00;
+  background: var(--border);
+  box-shadow: 0 0 calc(6px * var(--glow)) var(--border-active);
 }
 
 .theme-row {
@@ -1036,6 +1340,15 @@ button.chip.on {
   flex: 1;
   accent-color: var(--accent);
 }
+.slider-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.slider-meta .chip {
+  flex: 0 0 auto;
+}
 
 .checkbox-row {
   display: grid;
@@ -1053,20 +1366,20 @@ button.chip.on {
 .checkbox-row em {
   display: block;
   font-size: 11px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-style: normal;
   margin-top: 2px;
 }
-.app.theme-classic .checkbox-row {
-  background: #000;
-  border: 1px solid #00ff00;
+.checkbox-row {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-active);
 }
 
 .template-tokens {
   margin-top: 8px;
 }
 .template-tokens .chip {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -1083,10 +1396,10 @@ button.chip.on {
   z-index: 50;
 }
 .modal {
-  background: #0c1133;
-  color: var(--fg);
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: clamp(12px, 2.4vw, 18px) clamp(12px, 2.6vw, 20px);
   width: min(560px, 94vw);
   max-height: 92vh;
@@ -1094,11 +1407,7 @@ button.chip.on {
   overflow-x: hidden;
   display: grid;
   gap: 14px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 60px rgba(125, 249, 255, 0.06);
-}
-.app.theme-classic .modal {
-  background: #000;
-  border: 1px solid #00ff00;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 calc(60px * var(--glow)) var(--border-active);
 }
 .modal header {
   display: flex;
@@ -1156,7 +1465,7 @@ button.chip.on {
   background: transparent;
 }
 .modal::-webkit-scrollbar-thumb {
-  background: var(--line);
+  background: var(--border);
   border-radius: 999px;
 }
 .modal::-webkit-scrollbar-thumb:hover {
@@ -1166,7 +1475,7 @@ button.chip.on {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .modal footer {
   display: flex;
@@ -1183,14 +1492,14 @@ button.chip.on {
   align-items: flex-start;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface-elevated);
   cursor: pointer;
 }
 .radio input { margin-top: 4px; }
 .radio strong { display: block; font-size: 13px; }
-.radio em { display: block; font-size: 11px; color: var(--muted); font-style: normal; margin-top: 2px; }
+.radio em { display: block; font-size: 11px; color: var(--text-muted); font-style: normal; margin-top: 2px; }
 .folder-row {
   display: flex;
   align-items: center;
@@ -1198,18 +1507,18 @@ button.chip.on {
 }
 .folder-row code {
   flex: 1;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 8px;
+  background: var(--bg-surface);
+  border-radius: var(--radius);
   padding: 8px 10px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 small {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 /* Toasts ----------------------------------------------------------------- */
@@ -1226,25 +1535,20 @@ small {
   pointer-events: none;
 }
 .toast {
-  background: #0c1133;
-  border: 1px solid var(--line);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  color: var(--fg);
+  color: var(--text-primary);
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
   max-width: min(360px, 100%);
   animation: slide-in 200ms ease-out;
   pointer-events: auto;
 }
-.toast.ok { border-left-color: var(--ok); }
+.toast.ok { border-left-color: var(--success); }
 .toast.err { border-left-color: var(--danger); }
-.app.theme-classic .toast {
-  background: #000;
-  border: 1px solid #00ff00;
-  color: #00ff00;
-}
 @keyframes slide-in {
   from { transform: translateX(20px); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
@@ -1313,11 +1617,6 @@ small {
   border: 1px solid var(--line);
 }
 
-.app.theme-kawaii .hud-vu,
-.app.theme-kawaii .hud-buffer progress,
-.app.theme-kawaii .hud-buffer progress::-webkit-progress-bar {
-  background: rgba(255, 143, 199, 0.18);
-}
 
 .app.theme-kawaii .board {
   background: #fff8fc;
@@ -1355,91 +1654,13 @@ small {
   text-shadow: 0 1px 2px rgba(190, 90, 145, 0.35);
   box-shadow: 0 3px 0 rgba(255, 143, 199, 0.45);
 }
-.app.theme-kawaii button.ghost,
-.app.theme-kawaii .dd-trigger,
-.app.theme-kawaii select,
-.app.theme-kawaii input[type='text'],
-.app.theme-kawaii input[type='number'] {
-  background: #ffffff;
-  color: var(--fg);
-  border: 1px solid var(--line);
-}
 .app.theme-kawaii button.ghost:hover {
   background: #fff3f9;
 }
-.app.theme-kawaii button.chip {
-  background: #ffffff;
-  border: 1px solid var(--line);
-  color: var(--muted);
-}
-.app.theme-kawaii button.chip.on {
-  background: linear-gradient(135deg, rgba(255, 143, 199, 0.22), rgba(179, 157, 255, 0.22));
-  border-color: #ff8fc7;
-  color: #d1478a;
-  font-weight: 600;
-}
-
-.app.theme-kawaii .dd-popover {
-  background: linear-gradient(180deg, #ffffff 0%, #fff4fa 100%);
-  border: 1px solid rgba(255, 143, 199, 0.5);
-  box-shadow: 0 -14px 40px rgba(214, 132, 178, 0.28), 0 0 24px rgba(179, 157, 255, 0.18);
-}
-.app.theme-kawaii .dd-item {
-  color: var(--fg);
-}
-.app.theme-kawaii .dd-item:hover {
-  background: rgba(255, 143, 199, 0.18);
-  color: #b93d7d;
-}
-.app.theme-kawaii .dd-item.is-selected {
-  background: rgba(179, 157, 255, 0.22);
-  color: #6a4bb5;
-}
 .app.theme-kawaii .dd-item.is-selected::before {
   content: '♥ ';
-  color: #ff5fa2;
+  color: var(--accent-bright);
 }
-.app.theme-kawaii .dd-popover::-webkit-scrollbar-thumb {
-  background: rgba(255, 143, 199, 0.5);
-  background-clip: content-box;
-}
-
-.app.theme-kawaii .modal,
-.app.theme-kawaii .toast {
-  background: #fffafd;
-  border: 1px solid var(--line);
-  color: var(--fg);
-}
-.app.theme-kawaii .modal {
-  box-shadow: 0 24px 60px rgba(190, 120, 165, 0.28), 0 0 40px rgba(179, 157, 255, 0.16);
-}
-.app.theme-kawaii .radio,
-.app.theme-kawaii .checkbox-row,
-.app.theme-kawaii .theme-card {
-  background: #ffffff;
-  border: 1px solid var(--line);
-}
-.app.theme-kawaii .theme-card.on {
-  border-color: #ff8fc7;
-  background: linear-gradient(135deg, rgba(255, 143, 199, 0.18), rgba(179, 157, 255, 0.18));
-}
-.app.theme-kawaii .hud-hint kbd {
-  background: #ffffff;
-  border: 1px solid var(--line);
-  color: #d1478a;
-}
-.app.theme-kawaii .folder-row code {
-  background: rgba(255, 143, 199, 0.12);
-  color: #a2708f;
-}
-.app.theme-kawaii .hud-error {
-  background: rgba(255, 107, 142, 0.12);
-  border: 1px solid rgba(255, 107, 142, 0.4);
-  color: #d63a63;
-}
-
-/* extra UwU ✿ — softer corners, bouncier presses, sparkles */
-.app.theme-kawaii button,
 .app.theme-kawaii .dd-trigger,
 .app.theme-kawaii input[type='text'],
 .app.theme-kawaii input[type='number'],
@@ -1506,6 +1727,149 @@ small {
 }
 .app.theme-kawaii .picker-row label::after {
   content: ' ♬';
+}
+
+/* Clip-recording panel ------------------------------------------------------ */
+/* Lives in its own always-on-top OS window (index.html#clip → .clip-window),
+   so it's visible no matter what the app is doing. Uses the theme's --rec
+   accent (the "recording" colour — neon green in the default theme; the user
+   dislikes a red recording cue). */
+.clip-hud {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 18px 13px;
+  /* Near-opaque so the pill itself is a solid dark card; the *window* around it
+     is transparent (no backdrop-filter — it renders black on transparent
+     windows on some GPUs). */
+  background: #0b0e17;
+  border: 1px solid color-mix(in srgb, var(--rec, #39ff14) 55%, transparent);
+  border-radius: 15px;
+  box-shadow:
+    0 10px 44px rgba(0, 0, 0, 0.6),
+    0 0 26px -6px color-mix(in srgb, var(--rec, #39ff14) 45%, transparent);
+}
+
+.clip-hud-discard {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-secondary, #aab);
+  background: rgba(20, 22, 32, 0.98);
+  border: 1px solid var(--border, #334);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.clip-hud-discard:hover {
+  color: #fff;
+  background: var(--danger, #e0453a);
+  border-color: var(--danger, #e0453a);
+}
+
+.clip-hud-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.clip-hud-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--rec, #39ff14);
+  box-shadow: 0 0 8px var(--rec, #39ff14);
+  animation: clip-hud-pulse 1.15s ease-in-out infinite;
+}
+@keyframes clip-hud-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+.clip-hud-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #9aa);
+}
+.clip-hud-fmt {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: var(--rec, #39ff14);
+  border: 1px solid color-mix(in srgb, var(--rec, #39ff14) 40%, transparent);
+}
+.clip-hud-time {
+  font-family: var(--font-mono);
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  color: #fff;
+  line-height: 1;
+}
+.popout .clip-hud-time { font-size: 18px; }
+
+.clip-hud-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #05140a;
+  background: var(--rec, #39ff14);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 90ms ease;
+}
+.clip-hud-stop:hover { filter: brightness(1.12); }
+.clip-hud-stop:active { transform: scale(0.97); }
+.clip-hud-stop-icon {
+  width: 8px;
+  height: 8px;
+  border-radius: 1.5px;
+  background: currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clip-hud,
+  .clip-window .clip-hud { animation: none; }
+  .clip-hud-dot { animation: none; opacity: 1; }
+}
+
+/* The standalone always-on-top clip window (index.html#clip). The OS window is
+   transparent and frameless; this fills it, centres the panel and makes the
+   whole thing draggable (buttons opt back out). */
+.clip-window {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px 14px;
+  background: transparent;
+  -webkit-app-region: drag;
+}
+.clip-window .clip-hud {
+  position: static;
+  transform: none;
+  animation: clip-window-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes clip-window-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.clip-window .clip-hud-stop,
+.clip-window .clip-hud-discard {
+  -webkit-app-region: no-drag;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1578,9 +1942,9 @@ small {
   }
 }
 
-/* --- floor: icon-only transport, buffer bar collapses to the readout --- */
+/* --- floor: icon-only transport, buffer strip collapses to the readout --- */
 @media (max-width: 420px) {
-  .hud-buffer progress {
+  .hud-buffer-canvas {
     display: none;
   }
   .hud-actions {
@@ -1671,11 +2035,6 @@ small {
     overflow: hidden;
     min-width: 0;
   }
-  .hud-vu {
-    flex: 1 1 40px;
-    min-width: 24px;
-    height: 5px;
-  }
   .hud-actions {
     flex: 0 0 auto;
     flex-wrap: nowrap;
@@ -1731,9 +2090,6 @@ small {
    the waveform or the transport goes; the right-click quick menu carries the
    device picker and the visualizer modes at this size. */
 @media (max-height: 260px) {
-  .hud-vu {
-    display: none;
-  }
   .sidebar {
     display: none;
   }
@@ -1791,8 +2147,8 @@ small {
   box-shadow: 0 0 6px transparent;
 }
 .tb-dot.on {
-  background: var(--danger);
-  box-shadow: 0 0 8px var(--danger);
+  background: var(--rec, #39ff14);
+  box-shadow: 0 0 8px var(--rec, #39ff14);
   animation: tb-breathe 1.6s ease-in-out infinite;
 }
 @keyframes tb-breathe {
@@ -1865,6 +2221,75 @@ small {
   background: rgba(255, 143, 199, 0.18);
 }
 
+/* Quick knob buttons (save format / sensitivity / buffer) in the title bar.
+   They pop native menus (see ipc.ts titleMenu), so nothing here can be
+   clipped by a short window. Values are mono so they read as settings, and
+   the same controls live in the right-click quick menu as the small-window
+   fallback. */
+.tb-ctls {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.tb-ctl {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 6px;
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  color: var(--muted);
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.tb-ctl:hover {
+  color: var(--fg);
+  border-color: var(--border-active);
+  background: rgba(255, 255, 255, 0.06);
+}
+.app.theme-kawaii .tb-ctl:hover {
+  background: rgba(255, 143, 199, 0.16);
+}
+.tb-ctl-chevron {
+  font-size: 8px;
+  opacity: 0.65;
+}
+/* Narrow windows drop the less critical knobs first; the right-click quick
+   menu still carries all three. */
+@media (max-width: 700px) {
+  .tb-ctl-gain,
+  .tb-ctl-buffer {
+    display: none;
+  }
+}
+@media (max-width: 430px) {
+  .tb-ctl-format {
+    display: none;
+  }
+}
+
+/* Same knobs in the pop-out's drag strip (the pop-out is the docked view) —
+   pushed to the right, grouped with the ⤒/⋯/✕ controls, same as the main
+   title bar. The strip is only 20px tall, so trim the buttons to fit. */
+.popout-drag .tb-ctls { margin-left: auto; }
+.popout-drag .tb-ctl {
+  height: 16px;
+  padding: 0 4px;
+  font-size: 9px;
+  letter-spacing: 0;
+}
+.popout-title { min-width: 0; }
+
 /* Bar layout --------------------------------------------------------------
    One row, nothing else. Intended to live docked across the top of a monitor
    with the visualizer popped out into its own window. */
@@ -1886,12 +2311,6 @@ small {
   padding: 2px 6px;
   font-size: 10px;
   flex: 0 0 auto;
-}
-.hud-vu.mini {
-  flex: 1 1 40px;
-  min-width: 24px;
-  max-width: 120px;
-  height: 5px;
 }
 .bar-picker {
   flex: 1 1 60px;
@@ -1922,11 +2341,6 @@ small {
 }
 .hud.is-compact .hud-status {
   flex: 0 1 auto;
-}
-.hud.is-compact .hud-vu {
-  flex: 1 1 50px;
-  min-width: 30px;
-  height: 5px;
 }
 .hud.is-compact .hud-actions {
   flex: 0 0 auto;
@@ -1966,7 +2380,7 @@ small {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #05070f;
+  background: var(--bg-gradient);
   color: var(--fg);
   overflow: hidden;
 }
@@ -2079,6 +2493,27 @@ small {
 .popout.theme-kawaii .popout-controls {
   background: linear-gradient(0deg, rgba(255, 240, 247, 0.9), rgba(255, 240, 247, 0));
 }
+/* Narrow or short pop-out windows keep their transport usable. The format
+   tags are the widest thing on the buttons, so below 560px of width they go;
+   a docked monitor strip is short but wide, so below 240px of height the
+   whole control row tightens instead (media queries are viewport-based, and
+   the pop-out is its own window, so these fire on its own size). */
+@media (max-width: 560px) {
+  .popout .lbl-ext { display: none; }
+  .popout-controls { padding: 3px 5px; gap: 3px; }
+  .popout-chips { gap: 2px; }
+  .popout-chips .chip { padding: 2px 6px; font-size: 11px; }
+}
+@media (max-height: 240px) {
+  .popout .lbl-ext { display: none; }
+  .popout-controls { padding: 2px 5px; gap: 3px; }
+  .popout-controls button.is-tight,
+  .popout-controls button.primary.big.is-tight {
+    padding: 2px 7px;
+    font-size: 11px;
+  }
+  .popout-chips .chip { padding: 1px 6px; font-size: 11px; }
+}
 /* ==========================================================================
    Docked Mode Adjustments
    ========================================================================== */
@@ -2107,3 +2542,262 @@ small {
 .app.is-docked .board:hover .viz-buttons {
   opacity: 1;
 }
+
+/* ==========================================================================
+   History Mode Selection Overlay
+   ========================================================================== */
+
+.history-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.history-interaction-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: text;
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.history-selection {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.history-selection-border {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-left: 2px solid var(--accent-bright);
+}
+.dd-icon {
+  flex: 0 0 auto;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+/* Pop-out visualizer window ------------------------------------------------ */
+
+.popout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-gradient);
+  color: var(--fg);
+  overflow: hidden;
+}
+.popout.theme-kawaii { background: #fff0f7; }
+.popout.theme-classic { background: #000; }
+
+.popout-drag {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 2px 0 8px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.35);
+  flex: 0 0 auto;
+}
+.popout-title {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.popout-drag .tb-btn {
+  height: 18px;
+  width: 22px;
+}
+
+.popout-board {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Recording ring.
+   This used to be a 1px border on `.popout-board`, which failed exactly where
+   it mattered most: docked to the top of a monitor the pop-out is ~100px tall,
+   the board gets ~60px of that, and `.popout-controls` — absolutely positioned
+   at bottom:0 and never fully transparent — covered the bottom edge. One green
+   pixel tucked under the 20px drag strip read as chrome, not as state.
+
+   So the ring now belongs to the window, not to the canvas: an overlay pinned
+   to `.popout` itself, above the controls in paint order, at a thickness that
+   survives a 100px-tall window. It can't be occluded and it can't be squeezed. */
+.popout::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.popout.is-capturing::after {
+  border-color: var(--rec, #39ff14);
+  box-shadow:
+    inset 0 0 22px -6px var(--rec, #39ff14),
+    inset 0 0 3px var(--rec, #39ff14);
+}
+/* Kawaii breathes rather than sitting hard on, matching `.board.is-capturing`. */
+.popout.theme-kawaii.is-capturing::after {
+  animation: popout-rec-pulse 1.8s ease-in-out infinite;
+}
+@keyframes popout-rec-pulse {
+  0%, 100% { box-shadow: inset 0 0 20px -8px var(--rec), inset 0 0 3px var(--rec); }
+  50% { box-shadow: inset 0 0 34px -6px var(--rec), inset 0 0 6px var(--rec); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .popout.theme-kawaii.is-capturing::after {
+    animation: none;
+  }
+}
+.popout-board canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Controls sit over the waveform and fade up on hover so a parked pop-out is
+   just the visualizer. */
+.popout-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+  opacity: 0.25;
+  transition: opacity 140ms ease;
+  flex-wrap: wrap;
+  z-index: 20;
+}
+.popout-controls.is-shown {
+  opacity: 1;
+}
+.popout-chips {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+.popout-chips .chip {
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.popout.theme-kawaii .popout-controls {
+  background: linear-gradient(0deg, rgba(255, 240, 247, 0.9), rgba(255, 240, 247, 0));
+}
+/* ==========================================================================
+}
+
+.app.is-docked .board:hover .docked-hover-controls {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   History Mode Selection Overlay
+   ========================================================================== */
+
+.history-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.history-interaction-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.history-selection {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.15;
+  pointer-events: auto;
+  cursor: grab;
+}
+.history-selection:active {
+  cursor: grabbing;
+}
+
+.history-selection-border {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-left: 2px solid var(--accent-bright);
+  border-right: 2px solid var(--accent-bright);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.history-handle {
+  position: absolute;
+  top: 0;
+  width: 16px;
+  height: 100%;
+  cursor: ew-resize;
+  pointer-events: auto;
+  z-index: 11;
+}
+.history-handle.left {
+  left: -8px;
+}
+.history-handle.right {
+  right: -8px;
+}
+
+.history-interaction-layer:focus {
+  outline: none;
+}
+
+.history-duration {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  pointer-events: none;
+  z-index: 12;
+}
+

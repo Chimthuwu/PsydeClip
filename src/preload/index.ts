@@ -2,15 +2,18 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   AppSettings,
   CaptureSource,
+  ClipWindowState,
   IpcChannel,
   LoopbackDevice,
   LoopbackEvent,
   RecorderEvent,
   SaveResult,
   SnapTarget,
+  TitleMenuKind,
   UiLayout,
   VizCommand,
   VizFrame,
+  HistoryStream,
   VizState,
   WindowAction,
 } from '../shared/types';
@@ -28,13 +31,59 @@ const api = {
   pickFolder(): Promise<string | null> {
     return ipcRenderer.invoke(IpcChannel.folderPick);
   },
-  saveRecording(args: { folder: string; bytes: Uint8Array; durationSec?: number; deviceName?: string }): Promise<SaveResult> {
+  saveRecording(args: { folder: string; bytes: Uint8Array; ext?: string; durationSec?: number; deviceName?: string }): Promise<SaveResult> {
     return ipcRenderer.invoke(IpcChannel.saveRecording, args);
+  },
+  startDragExport(args: { bytes: Uint8Array; deviceName?: string }): void {
+    ipcRenderer.send(IpcChannel.dragExport, args);
+  },
+  prepareDragFile(args: { bytes: Uint8Array; ext?: string }): void {
+    ipcRenderer.send(IpcChannel.dragPrepare, args);
+  },
+  startDragExportPrepared(): void {
+    ipcRenderer.send(IpcChannel.dragExportPrepared);
+  },
+  startDragExportByProxy(bounds: [number, number]): void {
+    ipcRenderer.send(IpcChannel.dragExportProxy, { bounds });
+  },
+  onRequestDragExport(handler: (bounds: [number, number]) => void): () => void {
+    const listener = (_e: unknown, args: { bounds: [number, number] }) => handler(args.bounds);
+    ipcRenderer.on(IpcChannel.requestDragExport, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.requestDragExport, listener);
   },
   onRecorderEvent(handler: (e: RecorderEvent) => void): () => void {
     const listener = (_e: unknown, ev: RecorderEvent) => handler(ev);
     ipcRenderer.on(IpcChannel.recordingEvent, listener);
     return () => ipcRenderer.removeListener(IpcChannel.recordingEvent, listener);
+  },
+
+  // ------- Dedicated clip recording (streamed to a temp file) ----------------
+
+  /** Create the backing temp file for a new clip recording. */
+  clipStart(): Promise<{ ok: boolean; error?: string }> {
+    return ipcRenderer.invoke(IpcChannel.clipStart);
+  },
+  /** Append one encoded chunk to the active clip's temp file. */
+  clipAppend(bytes: Uint8Array): void {
+    ipcRenderer.send(IpcChannel.clipAppend, bytes);
+  },
+  /** Read the whole active clip back (called once, after recording stops). */
+  clipRead(): Promise<Uint8Array | null> {
+    return ipcRenderer.invoke(IpcChannel.clipRead);
+  },
+  /** Delete the active clip's temp file (after save, or on teardown). */
+  clipAbort(): void {
+    ipcRenderer.send(IpcChannel.clipAbort);
+  },
+  /** Main renderer → main: show / update / hide the always-on-top clip window. */
+  setClipWindow(state: ClipWindowState): void {
+    ipcRenderer.send(IpcChannel.clipWindowSet, state);
+  },
+  /** Clip window: receive its timer / format / theme. */
+  onClipWindowState(handler: (s: ClipWindowState) => void): () => void {
+    const listener = (_e: unknown, s: ClipWindowState) => handler(s);
+    ipcRenderer.on(IpcChannel.clipWindowState, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.clipWindowState, listener);
   },
   setAlwaysOnTop(enabled: boolean): void {
     ipcRenderer.invoke(IpcChannel.windowSetAlwaysOnTop, { enabled });
@@ -83,16 +132,24 @@ const api = {
   showContextMenu(): void {
     void ipcRenderer.invoke(IpcChannel.contextMenu);
   },
-  onWindowState(handler: (s: { maximized: boolean; focused: boolean; dockedTop: boolean }) => void): () => void {
-    const listener = (_e: unknown, s: { maximized: boolean; focused: boolean; dockedTop: boolean }) => handler(s);
+  /** Pop the native menu for one of the title-bar knobs (format / gain / buffer). */
+  showTitleMenu(kind: TitleMenuKind): void {
+    void ipcRenderer.invoke(IpcChannel.titleMenu, { kind });
+  },
+  onWindowState(handler: (s: { maximized: boolean; focused: boolean }) => void): () => void {
+    const listener = (_e: unknown, s: { maximized: boolean; focused: boolean }) => handler(s);
     ipcRenderer.on(IpcChannel.windowState, listener);
     return () => ipcRenderer.removeListener(IpcChannel.windowState, listener);
   },
 
   // ------- Pop-out visualizer --------------------------------------------------
 
-  togglePopout(open?: boolean): Promise<{ open: boolean }> {
-    return ipcRenderer.invoke(IpcChannel.popoutToggle, { open });
+  /**
+   * Open/close the pop-out. Pass `keepMain: true` to open it *alongside*
+   * the main window (the per-pane ⧉ flow) instead of swapping windows.
+   */
+  togglePopout(open?: boolean, opts?: { keepMain?: boolean }): Promise<{ open: boolean }> {
+    return ipcRenderer.invoke(IpcChannel.popoutToggle, { open, ...opts });
   },
   onPopoutState(handler: (s: { open: boolean }) => void): () => void {
     const listener = (_e: unknown, s: { open: boolean }) => handler(s);
@@ -116,6 +173,15 @@ const api = {
     const listener = (_e: unknown, s: VizState) => handler(s);
     ipcRenderer.on(IpcChannel.vizState, listener);
     return () => ipcRenderer.removeListener(IpcChannel.vizState, listener);
+  },
+  /** Main window → pop-out: the rolling peak track + session clock stamp. */
+  sendVizHistory(state: HistoryStream): void {
+    ipcRenderer.send(IpcChannel.vizHistory, state);
+  },
+  onVizHistory(handler: (s: HistoryStream) => void): () => void {
+    const listener = (_e: unknown, s: HistoryStream) => handler(s);
+    ipcRenderer.on(IpcChannel.vizHistory, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.vizHistory, listener);
   },
   /** Pop-out → main window: a transport command. */
   sendVizCommand(cmd: VizCommand): void {

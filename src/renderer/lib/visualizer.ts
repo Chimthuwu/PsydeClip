@@ -1,4 +1,5 @@
 import type { Theme, VisualizerMode } from '../../shared/types';
+import { HistoryModel } from './history-model';
 
 /**
  * Audio visualizer rendering routines. Adapted from the reference HTML
@@ -15,6 +16,27 @@ export interface VisualizerState {
   theme: Theme;
   mode: VisualizerMode;
   rms: number;
+  /**
+   * The historical-waveform model (peak track + session clock + viewport).
+   * Owns the coordinate mapping and the per-column decimation, so selection
+   * coordinates and drawing share one time base (todo.md §11.4 Phase 1).
+   */
+  historyModel?: HistoryModel | null;
+  /**
+   * Zoom/pan viewport for the history track, as absolute session seconds
+   * `[start, end]` (already resolved via `HistoryModel.effectiveViewport`).
+   * Absent = fit-all (the whole buffer at the live edge) — what the read-only
+   * split-view panes use.
+   */
+  viewport?: [number, number] | null;
+  isPopout?: boolean;
+  /**
+   * Visualizer sensitivity multiplier (1 = neutral). Applied at draw time
+   * only — the analyser data itself is untouched, so recordings, playback
+   * and their volume are completely unaffected. Quiet sources can be made
+   * to light up the visuals by raising this (up to 4×).
+   */
+  gain?: number;
 }
 
 /**
@@ -48,6 +70,7 @@ export const SMOOTHING_FOR_MODE: Record<VisualizerMode, number> = {
   oscilloscope: 0.82,
   spectrum: 0.82,
   spectrogram: 0.2,
+  history: 0.82,
 };
 
 export class AudioAnalyser implements AnalyserLike {
@@ -107,20 +130,86 @@ export class RemoteAnalyser implements AnalyserLike {
 }
 
 export function drawVisualizer(state: VisualizerState, analyser: AnalyserLike) {
-  const { ctx, width, height, theme, mode } = state;
+  const { ctx, width, height, theme, mode, historyModel } = state;
   // The spectrogram keeps its own scroll buffer, so it repaints in full every
   // frame like the other two modes — no "don't clear" special case.
   ctx.clearRect(0, 0, width, height);
   drawBackground(ctx, width, height, theme);
   analyser.sample();
 
-  if (mode === 'oscilloscope') drawOscilloscope(ctx, analyser.timeData, width, height, theme);
-  else if (mode === 'spectrum') drawSpectrum(ctx, analyser.freqData, analyser.analyser, width, height, theme);
-  else drawSpectrogram(ctx, analyser.freqData, analyser.analyser, width, height, theme);
+  const gain = state.gain ?? 1;
+  if (mode === 'history')
+    drawHistory(ctx, historyModel, state.viewport ?? null, width, height, theme, !!state.isPopout, gain);
+  else if (mode === 'oscilloscope') drawOscilloscope(ctx, analyser.timeData, width, height, theme, gain);
+  else if (mode === 'spectrum') drawSpectrum(ctx, analyser.freqData, analyser.analyser, width, height, theme, gain);
+  else drawSpectrogram(ctx, analyser.freqData, analyser.analyser, width, height, theme, gain);
 }
+
+/** Themes whose oscilloscope trace gets a soft neon bloom. */
+const GLOW_THEMES = new Set<Theme>(['modern', 'aqua', 'lime', 'sakura', 'blood-red', 'nocturnal']);
 
 function palette(theme: Theme) {
   switch (theme) {
+    case 'aqua':
+      return {
+        bg: '#071e24',
+        grid: 'rgba(45,212,191,0.1)',
+        gridStrong: 'rgba(45,212,191,0.22)',
+        wave: '#3ee879',
+        bar: '#3ee879',
+        spike: '#5eead4',
+        accent: '#2dd4bf',
+      };
+    case 'sakura':
+      return {
+        bg: '#190617',
+        grid: 'rgba(238,95,208,0.1)',
+        gridStrong: 'rgba(238,95,208,0.24)',
+        wave: '#dd82dc',
+        bar: '#dd82dc',
+        spike: '#ff8fe0',
+        accent: '#b98dff',
+      };
+    case 'lime':
+      return {
+        bg: '#041306',
+        grid: 'rgba(46,255,74,0.1)',
+        gridStrong: 'rgba(46,255,74,0.22)',
+        wave: '#2eff4a',
+        bar: '#2eff4a',
+        spike: '#c6ff33',
+        accent: '#7dff8f',
+      };
+    case 'blood-red':
+      return {
+        bg: '#000000',
+        grid: 'rgba(255,16,36,0.1)',
+        gridStrong: 'rgba(255,16,36,0.24)',
+        wave: '#ff1024',
+        bar: '#ff1024',
+        spike: '#ff3d8f',
+        accent: '#ff1024',
+      };
+    case 'nocturnal':
+      return {
+        bg: '#0e0a1c',
+        grid: 'rgba(122,141,255,0.09)',
+        gridStrong: 'rgba(122,141,255,0.2)',
+        wave: '#5b7fff',
+        bar: '#5b7fff',
+        spike: '#b98dff',
+        accent: '#6a8dff',
+      };
+    case 'black-ice':
+      return {
+        bg: '#000000',
+        grid: 'rgba(168,240,255,0.05)',
+        gridStrong: 'rgba(168,240,255,0.13)',
+        wave: '#c4f4fc',
+        bar: '#c4f4fc',
+        spike: '#a8f0d8',
+        accent: '#7fe3f5',
+      };
     case 'classic':
       return {
         bg: '#000000',
@@ -212,6 +301,44 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, the
     grad.addColorStop(1, '#f2e6ff');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
+  } else if (theme === 'aqua') {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#0e2c33');
+    grad.addColorStop(1, '#071e24');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  } else if (theme === 'sakura') {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#280a25');
+    grad.addColorStop(1, '#190617');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  } else if (theme === 'lime') {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#0a2411');
+    grad.addColorStop(1, '#041306');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  } else if (theme === 'blood-red') {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#180205');
+    grad.addColorStop(1, '#000000');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  } else if (theme === 'nocturnal') {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#171130');
+    grad.addColorStop(1, '#0e0a1c');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  } else if (theme === 'black-ice') {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    const glow = ctx.createRadialGradient(w * 0.42, h * 0.34, 0, w * 0.42, h * 0.34, Math.max(w, h) * 0.55);
+    glow.addColorStop(0, 'rgba(127, 227, 245, 0.06)');
+    glow.addColorStop(1, 'rgba(127, 227, 245, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
   } else {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
@@ -247,6 +374,7 @@ function drawOscilloscope(
   w: number,
   h: number,
   theme: Theme,
+  gain: number,
 ) {
   drawGrid(ctx, w, h, theme);
   const p = palette(theme);
@@ -255,11 +383,13 @@ function drawOscilloscope(
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.shadowColor = theme === 'kawaii' ? 'rgba(255,143,199,0.8)' : p.wave;
-  ctx.shadowBlur = theme === 'modern' ? 12 : theme === 'kawaii' ? 10 : 0;
+  ctx.shadowBlur = GLOW_THEMES.has(theme) ? 12 : theme === 'kawaii' ? 10 : 0;
   ctx.beginPath();
   const slice = w / data.length;
   for (let i = 0; i < data.length; i++) {
-    const v = data[i];
+    // Sensitivity scales the waveform amplitude; clamped so a big boost can't
+    // throw the trace off-canvas.
+    const v = Math.max(-1, Math.min(1, data[i] * gain));
     const y = h / 2 + v * (h / 2) * 0.9;
     const x = i * slice;
     if (i === 0) ctx.moveTo(x, y);
@@ -276,13 +406,16 @@ function drawSpectrum(
   w: number,
   h: number,
   theme: Theme,
+  gain: number,
 ) {
   drawGrid(ctx, w, h, theme);
   const p = palette(theme);
   const range = analyser.maxDecibels - analyser.minDecibels;
+  // Frequency data is in dB, so a sensitivity multiplier becomes a dB offset.
+  const gainDb = 20 * Math.log10(gain);
   const barWidth = w / data.length;
   for (let i = 0; i < data.length; i++) {
-    const db = data[i];
+    const db = data[i] + gainDb;
     const norm = Math.max(0, Math.min(1, (db - analyser.minDecibels) / range));
     const barHeight = norm * (h - 8);
     let grad: string | CanvasGradient = p.bar;
@@ -316,6 +449,15 @@ function drawSpectrum(
  * The buffer is keyed off the destination context, so each canvas (main window
  * and pop-out) keeps its own independent history.
  */
+/**
+ * How many seconds of audio the scrolling spectrogram shows across its full
+ * width. The scroll is driven by wall-clock time (not per-frame), so this is
+ * an exact mapping: x-fraction `f` across the canvas is
+ * `newestSec - (1 - f) * SPECTRO_VISIBLE_SEC`. The history selection/drag layer
+ * uses that to let you highlight a snippet straight off the spectrogram.
+ */
+export const SPECTRO_VISIBLE_SEC = 15;
+
 interface SpectroBuffer {
   canvas: HTMLCanvasElement;
   bctx: CanvasRenderingContext2D;
@@ -327,6 +469,8 @@ interface SpectroBuffer {
   lo: Int32Array;
   hi: Int32Array;
   frac: Float32Array;
+  /** performance.now() the buffer was last scrolled to (time-based scroll). */
+  lastAdvanceMs: number;
 }
 const spectroBuffers = new WeakMap<CanvasRenderingContext2D, SpectroBuffer>();
 
@@ -403,7 +547,7 @@ function getSpectroBuffer(
     bctx.imageSmoothingEnabled = false;
     drawBackground(bctx, w, h, theme);
     const map = buildRowMap(h, bins);
-    buf = { canvas, bctx, w, h, theme, bins, ...map };
+    buf = { canvas, bctx, w, h, theme, bins, ...map, lastAdvanceMs: 0 };
     spectroBuffers.set(ctx, buf);
   }
   return buf;
@@ -416,6 +560,7 @@ function drawSpectrogram(
   w: number,
   h: number,
   theme: Theme,
+  gain: number,
 ) {
   if (w < 2 || h < 2) return;
   const bins = data.length;
@@ -426,20 +571,43 @@ function drawSpectrogram(
   const { bctx, lo, hi, frac } = buf;
   const min = analyser.minDecibels;
   const range = analyser.maxDecibels - min || 1;
-  // One or two device pixels per frame. The old `w / 480` gave 4px columns on a
-  // wide window, which both coarsened the time axis and scrolled the whole
-  // history off screen in about eight seconds.
-  const col = Math.max(1, Math.round(w / 900));
 
-  // Shift left. 'copy' means the vacated column comes back transparent instead
+  // Time-based scroll: the full width is exactly SPECTRO_VISIBLE_SEC of audio,
+  // so a canvas x maps to a real timestamp and the selection/drag layer can sit
+  // on top of it. Advance by however many whole columns have come due since the
+  // last paint (frame rate independent — and it survives the window being
+  // hidden, which throttles rAF).
+  const msPerCol = (SPECTRO_VISIBLE_SEC * 1000) / Math.max(1, w);
+  const nowMs = performance.now();
+  if (buf.lastAdvanceMs === 0) buf.lastAdvanceMs = nowMs;
+  let col = Math.floor((nowMs - buf.lastAdvanceMs) / msPerCol);
+  if (col <= 0) {
+    // Nothing new is due yet — just re-blit what we have so the pane isn't blank.
+    ctx.drawImage(buf.canvas, 0, 0);
+    return;
+  }
+  if (col >= w) {
+    // Hidden / stalled for longer than the whole window: the buffer is entirely
+    // stale, so repaint one full frame and snap the clock to now (don't let a
+    // huge backlog make every following frame think it's still behind).
+    col = w;
+    buf.lastAdvanceMs = nowMs;
+  } else {
+    buf.lastAdvanceMs += col * msPerCol;
+  }
+
+  // Shift left. 'copy' means the vacated columns come back transparent instead
   // of ghosting the previous frame under the new one.
   bctx.globalCompositeOperation = 'copy';
   bctx.drawImage(buf.canvas, -col, 0);
   bctx.globalCompositeOperation = 'source-over';
 
-  // Paint the newest slice into the freed column.
+  // Paint the newest slice into the freed columns.
   const slice = bctx.createImageData(col, h);
   const px = slice.data;
+  // Sensitivity as a dB offset, applied per slice (existing history keeps its
+  // original appearance; only newly-painted columns reflect the setting).
+  const gainDb = 20 * Math.log10(gain);
   for (let y = 0; y < h; y++) {
     const a = lo[y];
     const b = hi[y];
@@ -461,7 +629,7 @@ function drawSpectrogram(
       db = v0 + (v1 - v0) * f;
     }
 
-    let norm = Number.isFinite(db) ? (db - min) / range : 0;
+    let norm = Number.isFinite(db) ? (db + gainDb - min) / range : 0;
     norm = norm < 0 ? 0 : norm > 1 ? 1 : norm;
     // Contrast curve. Typical music sits at -60…-30 dB, i.e. right in the
     // middle of the -90…-10 window, so a linear map rendered almost the entire
@@ -543,6 +711,48 @@ const RAMPS: Record<Theme, Ramp> = {
     [0.88, 255, 95, 162],
     [1.0, 120, 40, 90],
   ],
+  aqua: [
+    [0.0, 7, 30, 36],
+    [0.3, 13, 82, 80],
+    [0.55, 45, 212, 191],
+    [0.78, 122, 245, 165],
+    [1.0, 226, 255, 242],
+  ],
+  sakura: [
+    [0.0, 25, 6, 23],
+    [0.32, 92, 20, 84],
+    [0.58, 221, 82, 210],
+    [0.8, 255, 143, 224],
+    [1.0, 255, 236, 250],
+  ],
+  lime: [
+    [0.0, 4, 19, 8],
+    [0.33, 10, 88, 26],
+    [0.65, 46, 255, 74],
+    [0.88, 150, 255, 110],
+    [1.0, 232, 255, 214],
+  ],
+  'blood-red': [
+    [0.0, 6, 0, 0],
+    [0.3, 74, 2, 8],
+    [0.6, 255, 16, 36],
+    [0.83, 255, 110, 130],
+    [1.0, 255, 230, 230],
+  ],
+  'black-ice': [
+    [0.0, 0, 0, 0],
+    [0.35, 14, 46, 52],
+    [0.65, 127, 227, 245],
+    [0.88, 200, 245, 251],
+    [1.0, 240, 253, 255],
+  ],
+  nocturnal: [
+    [0.0, 14, 10, 28],
+    [0.3, 30, 26, 72],
+    [0.58, 91, 127, 255],
+    [0.8, 185, 141, 255],
+    [1.0, 236, 238, 255],
+  ],
 };
 
 function magColor(norm: number, theme: Theme): [number, number, number] {
@@ -562,4 +772,161 @@ function magColor(norm: number, theme: Theme): [number, number, number] {
   }
   const last = ramp[ramp.length - 1];
   return [last[1], last[2], last[3]];
+}
+
+/** Height of the time ruler strip along the bottom of the history pane. */
+const HISTORY_RULER_H = 16;
+
+/**
+ * "Nice" tick steps for the history time ruler, in seconds. The ruler picks
+ * the smallest step that keeps ticks ≥ ~80 px apart.
+ */
+const RULER_STEPS = [
+  0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600,
+];
+
+function rulerStep(spanSec: number, widthPx: number): number {
+  const target = (spanSec / Math.max(1, widthPx)) * 80;
+  for (const s of RULER_STEPS) {
+    if (s >= target) return s;
+  }
+  return 7200;
+}
+
+function formatRulerTime(sec: number, step: number): string {
+  if (step < 1) {
+    // Sub-second ticks: show fractional seconds.
+    return `${sec.toFixed(step < 0.1 ? 2 : 1)}s`;
+  }
+  const totalSec = Math.max(0, Math.floor(sec));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  const h = Math.floor(m / 60);
+  if (h > 0) {
+    return `${h}:${String(m % 60).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function drawHistory(
+  ctx: CanvasRenderingContext2D,
+  model: HistoryModel | null | undefined,
+  viewport: [number, number] | null | undefined,
+  width: number,
+  height: number,
+  theme: Theme,
+  isPopout?: boolean,
+  gain: number = 1,
+) {
+  if (!model) {
+    const p = palette(theme);
+    ctx.fillStyle = p.gridStrong;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '12px ui-monospace, Consolas, monospace';
+    if (isPopout) {
+      ctx.fillText('History not available in pop-out', width / 2, height / 2);
+    } else {
+      ctx.fillText('Waiting for recording to start...', width / 2, height / 2);
+    }
+    return;
+  }
+
+  const count = model.peak.getCount();
+  if (count === 0) return;
+
+  const p = palette(theme);
+  // Reserve the bottom strip for the time ruler when there's room for it.
+  const rulerH = height >= 64 ? HISTORY_RULER_H : 0;
+  const plotH = height - rulerH;
+  const midY = plotH / 2;
+
+  // Effective viewport (fit-all when none): the envelope's x-axis is the
+  // viewport's span, and columnPeaks window is its bucket range — the same
+  // call as Phase 1, just over a (possibly) narrowed window.
+  const [vStart, vEnd] = viewport && viewport[1] > viewport[0] ? viewport : [model.oldestSec, model.newestSec];
+  const span = Math.max(1e-6, vEnd - vStart);
+
+  const columns = Math.max(1, Math.floor(width));
+  const fromBucket = Math.max(0, model.secToBucket(vStart));
+  const toBucket = Math.min(count, model.secToBucket(vEnd));
+  const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+
+  if (toBucket - fromBucket > 1e-6) {
+    const { lo, hi } = model.columnPeaks(fromBucket, toBucket, columns);
+    ctx.beginPath();
+    // Top envelope (maxes per column). A `lineTo` as the first path op acts
+    // as a moveTo; empty columns (no bucket in this viewport column) are
+    // skipped so they never paint a spike.
+    for (let c = 0; c < columns; c++) {
+      const mx = hi[c];
+      if (!Number.isFinite(mx)) continue;
+      const x = (c / columns) * width;
+      ctx.lineTo(x, midY - clamp(mx * gain) * midY * 0.9); // 0.9 padding
+    }
+    // Bottom envelope (mins per column), reversed so the shape closes.
+    for (let c = columns - 1; c >= 0; c--) {
+      const mn = lo[c];
+      if (!Number.isFinite(mn)) continue;
+      const x = (c / columns) * width;
+      ctx.lineTo(x, midY - clamp(mn * gain) * midY * 0.9);
+    }
+    ctx.closePath();
+
+    ctx.fillStyle = p.wave;
+    ctx.globalAlpha = 0.5;
+    ctx.fill();
+
+    ctx.strokeStyle = p.wave;
+    ctx.globalAlpha = 0.8;
+    ctx.stroke();
+
+    ctx.globalAlpha = 1.0;
+  }
+
+  // "Now" marker at the live edge, only when the edge is inside the viewport.
+  const newest = model.newestSec;
+  if (newest >= vStart && newest <= vEnd) {
+    const x = ((newest - vStart) / span) * width;
+    ctx.strokeStyle = p.accent;
+    ctx.globalAlpha = 0.65;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, plotH);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+  }
+
+  // Time ruler along the bottom strip: adaptive ticks labelled with
+  // session-relative offsets (0:00 is when the rolling session started).
+  if (rulerH > 0) {
+    const step = rulerStep(span, width);
+    ctx.strokeStyle = p.gridStrong;
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, plotH + 0.5);
+    ctx.lineTo(width, plotH + 0.5);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.font = '10px ui-monospace, Consolas, monospace';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = p.gridStrong;
+    ctx.textAlign = 'left';
+    const first = Math.ceil(vStart / step) * step;
+    for (let t = first; t <= vEnd + 1e-9; t += step) {
+      const x = Math.round(((t - vStart) / span) * width) + 0.5;
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x, plotH + 1);
+      ctx.lineTo(x, height - 1);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Skip the label when it would run past the canvas edge.
+      if (x < width - 34) ctx.fillText(formatRulerTime(t, step), x + 3, plotH + rulerH / 2);
+    }
+  }
 }

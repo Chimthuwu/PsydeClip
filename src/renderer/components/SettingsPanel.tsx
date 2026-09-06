@@ -1,12 +1,14 @@
-import { ChangeEvent, useState, useRef } from 'react';
+import { ChangeEvent, useEffect, useState, useRef } from 'react';
 import {
   AppSettings,
   CaptureBackend,
   Theme,
+  THEMES,
   VisualizerMode,
+  VISUALIZER_MODES,
   RecordMode,
+  DEFAULT_SETTINGS,
   FILENAME_TOKENS,
-  UiLayout,
   TitleBarMode,
   LabelMode,
   SnapTarget,
@@ -27,29 +29,11 @@ interface Props {
   onTogglePopout: () => void;
 }
 
-const LAYOUTS: { value: UiLayout; label: string; help: string }[] = [
-  {
-    value: 'full',
-    label: 'Full',
-    help: 'HUD, visualizer, source picker and visualizer chips. Floor ≈ 240×190.',
-  },
-  {
-    value: 'compact',
-    label: 'Compact',
-    help: 'One control row plus the visualizer. Labels shrink to icons. Floor ≈ 200×120.',
-  },
-  {
-    value: 'bar',
-    label: 'Bar',
-    help: 'A single thin strip — transport, meter, device. No visualizer (pop it out instead). Floor ≈ 180×34.',
-  },
-];
-
 const TITLEBARS: { value: TitleBarMode; label: string; help: string }[] = [
   {
     value: 'custom',
     label: 'Minimal in-app bar',
-    help: '26px strip with pin, dock-to-top, layout, pop-out and window buttons. Frameless window.',
+    help: '26px strip with pin, dock-to-top, pop-out and window buttons. Frameless window.',
   },
   {
     value: 'system',
@@ -73,26 +57,18 @@ const SNAPS: { target: SnapTarget; label: string }[] = [
 ];
 
 const VISIBILITY: { key: keyof AppSettings; label: string }[] = [
-  { key: 'showVu', label: 'VU meter' },
-  { key: 'showBuffer', label: 'Buffer fill bar' },
+  { key: 'showBuffer', label: 'Rolling-buffer waveform' },
   { key: 'showSourcePicker', label: 'Source / output-device picker' },
   { key: 'showVizChips', label: 'Visualizer mode chips' },
-  { key: 'showHint', label: 'Hotkey hint line' },
+  { key: 'showHint', label: 'Hotkey hint' },
 ];
 
-const THEMES: { value: Theme; label: string; preview: string }[] = [
-  { value: 'modern', label: 'Modern neon', preview: '#7df9ff' },
-  { value: 'classic', label: 'Classic green', preview: '#00ff00' },
-  { value: 'cyberpunk', label: 'Cyberpunk', preview: '#fcee0a' },
-  { value: 'synthwave', label: 'Synthwave', preview: '#ff7700' },
-  { value: 'monochrome', label: 'Monochrome', preview: '#ffffff' },
-  { value: 'kawaii', label: 'Hyper kawaii ✿', preview: '#ff8fc7' },
-];
 
 const VISUALIZERS: { value: VisualizerMode; label: string }[] = [
   { value: 'oscilloscope', label: 'Oscilloscope' },
   { value: 'spectrum', label: 'Spectrum bars' },
   { value: 'spectrogram', label: 'Spectrogram' },
+  { value: 'history', label: 'History' },
 ];
 
 const RECORD_MODES: { value: RecordMode; label: string; help: string }[] = [
@@ -141,6 +117,20 @@ export function SettingsPanel({
   const [draft, setDraft] = useState<AppSettings>(settings);
   const [folderBusy, setFolderBusy] = useState(false);
   const templateRef = useRef<HTMLInputElement | null>(null);
+  // Keys the user has touched in this panel but not saved yet. Everything else
+  // tracks the live settings, so a change made elsewhere while the panel is
+  // open (the footer format picker, the quick menu, the pop-out, the tray)
+  // shows here — and Save only writes back what was actually edited instead of
+  // clobbering those external changes with a stale whole-object snapshot.
+  const dirty = useRef<Set<keyof AppSettings>>(new Set());
+
+  useEffect(() => {
+    setDraft((d) => {
+      const merged = { ...settings };
+      for (const k of dirty.current) (merged as any)[k] = (d as any)[k];
+      return merged;
+    });
+  }, [settings]);
 
   function insertTemplateToken(token: string) {
     const el = templateRef.current;
@@ -163,6 +153,7 @@ export function SettingsPanel({
   }
 
   function set<K extends keyof AppSettings>(key: K, val: AppSettings[K]) {
+    dirty.current.add(key);
     setDraft((d) => ({ ...d, [key]: val }));
   }
 
@@ -172,12 +163,19 @@ export function SettingsPanel({
    * reversible with a second click.
    */
   function applyNow(patch: Partial<AppSettings>) {
+    // Applied immediately and persisted, so it's no longer a pending edit.
+    for (const k of Object.keys(patch) as (keyof AppSettings)[]) dirty.current.delete(k);
     setDraft((d) => ({ ...d, ...patch }));
     void onUpdate(patch);
   }
 
   async function save() {
-    await onUpdate(draft);
+    // Only write the fields actually edited in this panel — never a whole-draft
+    // snapshot, which would revert anything changed elsewhere in the meantime.
+    const patch: Partial<AppSettings> = {};
+    for (const k of dirty.current) (patch as any)[k] = (draft as any)[k];
+    if (Object.keys(patch).length) await onUpdate(patch);
+    dirty.current.clear();
     onClose();
   }
 
@@ -303,10 +301,25 @@ export function SettingsPanel({
             />
             <span>{Math.round(draft.bufferSeconds / 60)} min</span>
           </div>
+          <div className="slider-meta">
+            <small>
+              Default {DEFAULT_SETTINGS.bufferSeconds / 60} min — changing this
+              while rolling restarts the buffer.
+            </small>
+            {draft.bufferSeconds !== DEFAULT_SETTINGS.bufferSeconds && (
+              <button
+                type="button"
+                className="chip"
+                onClick={() => set('bufferSeconds', DEFAULT_SETTINGS.bufferSeconds)}
+              >
+                Reset
+              </button>
+            )}
+          </div>
         </section>
 
         <section>
-          <label htmlFor="bitrate">Opus bitrate</label>
+          <label htmlFor="bitrate">Bitrate</label>
           <select
             id="bitrate"
             value={draft.bitrateKbps}
@@ -316,22 +329,108 @@ export function SettingsPanel({
               <option key={b} value={b}>{b} kbps</option>
             ))}
           </select>
+          <div className="slider-meta">
+            <small>Default {DEFAULT_SETTINGS.bitrateKbps} kbps.</small>
+            {draft.bitrateKbps !== DEFAULT_SETTINGS.bitrateKbps && (
+              <button
+                type="button"
+                className="chip"
+                onClick={() => set('bitrateKbps', DEFAULT_SETTINGS.bitrateKbps)}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+          <small>
+            Opus bitrate for WebM captures. When saving as MP3 this is the target
+            bitrate too (clamped to 128–320 kbps). WAV ignores it.
+          </small>
         </section>
 
         <section>
-          <label>Default visualizer</label>
+          <label htmlFor="recording-format">Save format</label>
+          <select
+            id="recording-format"
+            value={draft.recordingFormat}
+            onChange={(e) => set('recordingFormat', e.target.value as AppSettings['recordingFormat'])}
+          >
+            <option value="webm">WebM / Opus — smallest</option>
+            <option value="wav">WAV — 16-bit PCM, lossless</option>
+            <option value="mp3">MP3 — re-encoded</option>
+          </select>
+          <small>
+            WAV / MP3 are produced from a decoded PCM copy when you save. In
+            rolling mode that means a parallel PCM buffer in RAM (~170 MB for
+            15 min of stereo) is kept while one of them is selected.
+          </small>
+        </section>
+
+        <section>
+          <label>Visualizer</label>
           <div className="chip-row">
-            {VISUALIZERS.map((v) => (
+            {VISUALIZERS.map((v) => {
+              const on = !draft.vizHidden.includes(v.value);
+              const only = on && draft.vizHidden.length === VISUALIZERS.length - 1;
+              return (
               <button
                 key={v.value}
                 type="button"
-                className={`chip ${draft.visualizer === v.value ? 'on' : ''}`}
-                onClick={() => set('visualizer', v.value)}
+                className={`chip ${on ? 'on' : ''}`}
+                title={
+                  only
+                    ? `${v.label} — the board's only view`
+                    : on
+                      ? `Hide ${v.label}`
+                      : `Show ${v.label} (turn on more than one for a split view)`
+                }
+                onClick={() => {
+                  if (only) return;
+                  const next = on
+                    ? [...draft.vizHidden, v.value]
+                    : draft.vizHidden.filter((m) => m !== v.value);
+                  const shownAfter = VISUALIZER_MODES.filter((m) => !next.includes(m));
+                  applyNow({
+                    vizHidden: next,
+                    visualizer: on ? (shownAfter[0] ?? draft.visualizer) : v.value,
+                  });
+                }}
               >
                 {v.label}
               </button>
-            ))}
+              );
+            })}
           </div>
+        </section>
+
+        <section>
+          <label>Visualizer sensitivity</label>
+          <div className="slider-row">
+            <input
+              type="range"
+              min={50}
+              max={400}
+              step={10}
+              value={Math.round(draft.vizGain * 100)}
+              onChange={(e) => set('vizGain', Number(e.target.value) / 100)}
+            />
+            <span>{draft.vizGain.toFixed(1)}×</span>
+          </div>
+          <div className="slider-meta">
+            <small>Default {DEFAULT_SETTINGS.vizGain}×.</small>
+            {draft.vizGain !== DEFAULT_SETTINGS.vizGain && (
+              <button
+                type="button"
+                className="chip"
+                onClick={() => set('vizGain', DEFAULT_SETTINGS.vizGain)}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+          <small>
+            How reactive the visualizers are to quiet audio. Display-only — it
+            scales the drawing, never the recording or its volume.
+          </small>
         </section>
 
         <section>
@@ -347,39 +446,11 @@ export function SettingsPanel({
                   void onUpdate({ theme: t.value });
                 }}
               >
-                <span className="swatch" style={{ background: t.preview }} />
+                <span className="swatch" style={{ background: t.swatch }} />
                 <span>{t.label}</span>
               </button>
             ))}
           </div>
-        </section>
-
-        <section>
-          <label>Layout</label>
-          <div className="radio-group">
-            {LAYOUTS.map((l) => (
-              <label key={l.value} className="radio">
-                <input
-                  type="radio"
-                  name="layout"
-                  value={l.value}
-                  checked={draft.uiLayout === l.value}
-                  onChange={() => {
-                    applyNow({ uiLayout: l.value });
-                    window.api.applyLayout(l.value);
-                  }}
-                />
-                <span>
-                  <strong>{l.label}</strong>
-                  <em>{l.help}</em>
-                </span>
-              </label>
-            ))}
-          </div>
-          <small>
-            The title bar's ▤ button cycles these three without opening
-            settings.
-          </small>
         </section>
 
         <section>
@@ -496,9 +567,9 @@ export function SettingsPanel({
             </span>
           </label>
           <small>
-            Dock top spans the full width of the current monitor at the window's
-            present height — pair it with the Bar layout for a strip across the
-            top of the screen.
+            Dock top spans the full width of the current monitor at the
+            window's present height. Shrink the window's height first (or dock
+            the pop-out) for a slim strip across the top of the screen.
           </small>
         </section>
 

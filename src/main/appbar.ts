@@ -213,6 +213,15 @@ export function registerAppBar(win: BrowserWindow | null, heightDip?: number): b
         // shell said no. Either way we must not proceed to SETPOS.
         return false;
       }
+      // Marker goes down *as soon as the shell accepts the registration*, not
+      // after SETPOS commits it. The window between the two is where a crash
+      // used to strand the desktop with no marker for the startup reclaim to
+      // find — that is exactly the dead-strip-with-no-recovery state that
+      // broke a developer's desktop once. A false positive here (crash before
+      // SETPOS actually shrinks the work area) only costs a needless full-
+      // screen reset on the next boot; a false negative costs the user their
+      // screen until they log out.
+      writeMarker();
     }
 
     // Desired strip, in *physical* pixels — the shell knows nothing about DIP.
@@ -306,10 +315,11 @@ function clearMarker(): void {
  *
  * The shell re-reserves the taskbar's own strip immediately, so this restores
  * the correct work area rather than clobbering it. Used only by the stale
- * reclaim below — never on a healthy path, because it would also stomp any
- * legitimate third-party appbar (a dock, a second toolbar).
+ * reclaim below and the tray's manual "Fix desktop work area" item — never on
+ * a healthy path, because it would also stomp any legitimate third-party
+ * appbar (a dock, a second toolbar).
  */
-function resetWorkArea(): boolean {
+export function resetWorkArea(): boolean {
   if (process.platform !== 'win32') return false;
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires

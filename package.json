@@ -1,6 +1,6 @@
 {
   "name": "recordr",
-  "version": "2.0.0",
+  "version": "3.1.0",
   "description": "Rolling Sampler-style audio recorder with oscilloscope/spectrogram visualizers",
   "main": "dist/main/index.js",
   "author": "Serge",
@@ -66,6 +66,7 @@
     }
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "koffi": "^3.1.5"
   }
 }

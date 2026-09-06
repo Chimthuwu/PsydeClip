@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { AppSettings, UiLayout } from '../../shared/types';
+import { AppSettings } from '../../shared/types';
+import { TitleKnobs } from './TitleKnobs';
 
 interface Props {
   settings: AppSettings;
@@ -8,24 +9,17 @@ interface Props {
   popoutOpen: boolean;
   onTogglePopout: () => void;
   onOpenSettings: () => void;
-  /** Controls rendered inline in the strip (used by the `bar` layout). */
+  /** Optional controls rendered inline in the strip between title and actions. */
   children?: ReactNode;
 }
-
-const LAYOUT_ORDER: UiLayout[] = ['full', 'compact', 'bar'];
-const LAYOUT_LABEL: Record<UiLayout, string> = {
-  full: 'Full layout',
-  compact: 'Compact layout',
-  bar: 'Bar layout (thin strip)',
-};
 
 /**
  * The app's own title bar, used when settings.titleBarMode === 'custom'.
  *
  * 26px tall against the OS bar's ~32px, and it earns that space back by
  * carrying the controls that matter for a docked window: pin, dock-to-top,
- * layout switch, pop-out. In `bar` layout the transport buttons render inline
- * here too, so the whole app is one row.
+ * pop-out. (There is no layout switch anymore — the compact layout was
+ * retired, and the full one sheds chrome to a strip via CSS breakpoints.)
  *
  * Dragging: the strip is the drag region (CSS `-webkit-app-region: drag`);
  * every button opts back out with `no-drag`.
@@ -43,19 +37,17 @@ export function TitleBar({
 
   useEffect(() => window.api.onWindowState((s) => setMaximized(s.maximized)), []);
 
-  function cycleLayout() {
-    const i = LAYOUT_ORDER.indexOf(settings.uiLayout);
-    const next = LAYOUT_ORDER[(i + 1) % LAYOUT_ORDER.length];
-    void onUpdate({ uiLayout: next });
-    window.api.applyLayout(next);
-  }
-
   return (
     <div className={`titlebar ${children ? 'has-inline' : ''}`}>
       <span className={`tb-dot ${capturing ? 'on' : ''}`} aria-hidden="true" />
       <span className="tb-name">recordr</span>
 
       {children ? <div className="tb-inline">{children}</div> : <div className="tb-spacer" />}
+
+      {/* Quick knobs — native menus so they're never clipped, even in a
+          docked strip. Each also exists in the right-click quick menu. Grouped
+          with the other controls on the right, not stuck to the wordmark. */}
+      <TitleKnobs settings={settings} />
 
       <div className="tb-actions">
         <button
@@ -73,14 +65,6 @@ export function TitleBar({
           onClick={() => window.api.snapWindow('top')}
         >
           ↥
-        </button>
-        <button
-          type="button"
-          className="tb-btn"
-          title={`${LAYOUT_LABEL[settings.uiLayout]} — click to cycle`}
-          onClick={cycleLayout}
-        >
-          ▤
         </button>
         <button
           type="button"

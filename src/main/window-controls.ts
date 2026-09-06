@@ -1,6 +1,5 @@
 import { BrowserWindow, screen } from 'electron';
 import {
-  BAR_LAYOUT_HEIGHT,
   LAYOUT_MIN_SIZE,
   SnapTarget,
   UiLayout,
@@ -71,7 +70,8 @@ export function snapWindow(win: BrowserWindow | null, target: SnapTarget) {
   // window itself (the shell decides the exact rect), so there's nothing more
   // to do on this path.
   if (target === 'top' && readSettings().dockReservesSpace) {
-    if (registerAppBar(win)) return;
+    win.setMinimumSize(LAYOUT_MIN_SIZE.compact.width, 100);
+    if (registerAppBar(win, 100)) return;
     // Fell through: not Windows, or the shell refused. Plain snap below.
   } else if (appBarOwner() === win) {
     // Moving somewhere else means we're no longer a top strip — give the
@@ -88,7 +88,7 @@ export function snapWindow(win: BrowserWindow | null, target: SnapTarget) {
     case 'top':
       // The user wants a thin strip when docked to the top, so we must drop
       // the layout's minHeight constraint first.
-      win.setMinimumSize(LAYOUT_MIN_SIZE.bar.width, 100);
+      win.setMinimumSize(LAYOUT_MIN_SIZE.compact.width, 100);
       win.setBounds({ x: wa.x, y: wa.y, width: wa.width, height: 100 });
       break;
     case 'bottom':
@@ -209,15 +209,4 @@ export function applyLayout(win: BrowserWindow | null, layout: UiLayout) {
   // A layout switch supersedes any temporary popover expansion — otherwise
   // closing that popover later would restore a height from the old layout.
   preExpandHeight = null;
-
-  const b = win.getBounds();
-  if (layout === 'bar') {
-    if (b.height > BAR_LAYOUT_HEIGHT) restoreHeight = b.height;
-    if (win.isMaximized()) win.unmaximize();
-    win.setBounds({ ...b, height: BAR_LAYOUT_HEIGHT });
-  } else if (b.height <= BAR_LAYOUT_HEIGHT + 4) {
-    // Coming back out of bar mode: give the visualizer somewhere to live.
-    win.setBounds({ ...b, height: Math.max(restoreHeight ?? 0, min.height, 420) });
-    restoreHeight = null;
-  }
 }
