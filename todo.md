@@ -567,47 +567,46 @@ Other paths:
 
 ## 7. What to do next
 
-**Everything originally on this list is now done.** For the record:
-Bug #1 (Start → blank), Bug #2 (dropdown white-on-white), Bug #3 (packaging),
-Bug #4 (chips), Bug #6 (spectrogram), item 4 (always-live visualizer), item 5
-(compact UI — since superseded by the layout system in Phase 8), item 6 (tray
-polish: pop-out toggle, layout radio group and dock-to-top are all in the menu
-now).
+**Through v3.1.0 (2026-09-07) the whole v3 list, the §10 redesign brief, and the
+§11.4 "select & drag out of history" master plan are done** — plus a clip
+recorder + always-on-top clip window, 13 themes, a single-row HUD, rounded
+window corners, and a lot of polish. See the dated bullets at the top of §11
+for the running log. Historical-waveform export is functional (drags a real
+DAW-importable WAV); its sample-accuracy could still be tightened (§11.4 Phase 3
+notes).
 
-**v3 is planned and ordered — see §11.** That section is the working list; the
-order in it was set by the user and should be followed:
+### → NEXT: an Android version
 
-1. ✅ **Bug #8** — the docked pop-out's clipped recording border. Done.
-2. ✅ **Docking reserves screen space** — `SHAppBarMessage` via koffi. Done.
-   ⚠️ Read the warning box in §11 before touching `appbar.ts`.
-3. **Premium visual redesign** — brief in §10. ← **next**
-4. **Historical waveform: select & drag out** — phased, §11.4 (master plan
-   revised 2026-09-04 with links to Rolling Sampler by Bird's and an accurate
-   inventory of the half-built WIP). The user asked specifically that this
-   not be attempted in one turn.
-   * ✅ **Phase 1 — time-coordinate refactor** landed 2026-09-04 (see §11.4):
-     new `HistoryModel` module, selection in absolute session seconds across
-     board / App / pop-out / IPC, per-column decimated drawing, and a fix for
-     the history-mode startup crash.
-   * ✅ **Phase 2 — zoom & pan + time ruler** landed 2026-09-04 (see §11.4):
-     wheel-zoom (around cursor, or selection when one exists), middle/
-     shift-drag pan, double-click fit-all, `+`/`−` keys, bottom time ruler
-     with adaptive ticks + a live-edge "now" marker, viewport-fed column
-     decimation, and a follow-live edge that keeps streaming audio in view.
-     **Next up is Phase 3 — sample-accurate export engine (the real hard
-     part).**
+The user asked for this as the next real project (not "parked" anymore). It is
+**big and does not reuse the recording core** — read §9 first:
+
+* Android has **no WASAPI, no `desktopCapturer`, no global hotkey**. System-audio
+  capture is `AudioPlaybackCapture` (API 29+), a *foreground-service* API that
+  apps can opt out of (`allowAudioPlaybackCapture="false"` / media-protected
+  sessions), so "record whatever is playing" is best-effort in a way it isn't on
+  Windows.
+* **The webapp port is the sensible prerequisite** (see below): the renderer is
+  already isolated behind `window.api`, so a browser-backed implementation of
+  that object is most of the work, and a Capacitor/Tauri wrapper over it with a
+  native `AudioPlaybackCapture` plugin + a foreground service is the cheapest
+  path to Android. A ground-up Kotlin app would reuse only the visualizer maths
+  (`lib/visualizer.ts`), the rolling-buffer model, the filename template and the
+  settings shape.
+* Scope it before starting: pick the shape (Capacitor-over-webapp vs native
+  Kotlin), decide what "capture" means given the opt-out reality, and design the
+  equivalent of the tray / pop-out / snap features (a notification-shade control
+  + a floating bubble on Android).
 
 Not scheduled, in rough priority order:
 
 * **A browser version.** (user-requested, not started.) See §9 — feasible for
-  the desktopCapturer path only. Prerequisite for the Android idea.
+  the desktopCapturer path only (`getDisplayMedia({audio:true})`), File System
+  Access API replaces the folder picker. Prerequisite for the Android version.
 * **Harden `readSettings()`** against a BOM / malformed file: strip a leading
   `﻿`, and log rather than silently reverting to defaults (see §6).
 * **Bug #5** — the cosmetic single-instance lock-file warning. Low value.
 * **Mic capture via WASAPI?** Optional; user asked for output-side only so
   don't introduce unless they ask.
-* **An Android version.** Parked; see §9 for why the recording core doesn't
-  survive the move.
 * **Optional: nice-to-have quality-of-life.** A "preview" capture-before-record,
   a button to rename template tokens on the fly, an in-app audio meter that
   expands the HUD on click. **Not yet asked.**
