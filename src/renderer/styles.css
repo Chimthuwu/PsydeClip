@@ -627,18 +627,20 @@ html:has(.app.has-custom-titlebar) #root {
 }
 
 /* LIVE + the rolling-buffer time as ONE capsule: a single border wraps both,
-   coloured by capture state, with a thin divider between the two halves. */
+   coloured by capture state, with a thin divider between the two halves. The
+   children round their outer corners to match, so `overflow:hidden` doesn't
+   let their rectangular fill eat into the border's rounded end-caps. */
 .hud-live {
   display: inline-flex;
   align-items: stretch;
   flex: 0 0 auto;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   overflow: hidden;
 }
 .hud-live:has(.pill.on) {
   border-color: var(--success);
-  box-shadow: 0 0 calc(8px * var(--glow)) var(--success);
+  box-shadow: 0 0 calc(10px * var(--glow)) color-mix(in srgb, var(--success) 70%, transparent);
 }
 .pill {
   display: inline-flex;
@@ -653,7 +655,7 @@ html:has(.app.has-custom-titlebar) #root {
 .hud-live .pill {
   border: none;
   box-shadow: none;
-  border-radius: 0;
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
   background: var(--bg-surface-elevated);
 }
 .hud-live .pill.on { color: var(--success); }
@@ -669,6 +671,7 @@ html:has(.app.has-custom-titlebar) #root {
   white-space: nowrap;
   color: var(--text-secondary);
   background: var(--bg-surface-elevated);
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
   border-left: 1px solid var(--border);
 }
 .hud-live:has(.pill.on) .hud-buffered {
