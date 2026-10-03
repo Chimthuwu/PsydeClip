@@ -20,3 +20,4 @@ spikes/**/*.wav
 spikes/**/*.log
 spikes/**/*.mid
 desktop.ini
+spikes/**/model/

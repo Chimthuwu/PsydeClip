@@ -568,15 +568,19 @@ Other paths:
 ## 7. What to do next
 
 **Session 2026-10-03 — where things stand, read this first.** Two of the three
-queued items moved. Audio→MIDI got a feasibility spike: **the engine is chosen
-and validated** (`spikes/001-basic-pitch-in-node/`), and the remaining problem
-is *runtime*, not correctness — Stooge decided the order is **measure WebGL
-first, then the background worker**; see the DECIDED block under that heading
-for exactly how to run the measurement. A **marketing website** was added as a
-new NEXT item. The **Android** item had its stated prerequisite (a browser
-port) ruled out, which closes its cheap path and leaves a real decision open.
-Repo hygiene: `Chimthuwu/recordr` is private, already existed, and is fully
-pushed; the stale "no remote" claim in this file is corrected below.
+queued items moved. Audio→MIDI got **two** feasibility spikes and is now
+**unblocked**: the engine is chosen and validated
+(`spikes/001-basic-pitch-in-node/`), and the WebGL question that was gating the
+design is **measured and closed** (`spikes/002-tfjs-backend-bench/` — WebGL is
+slower than CPU *and* its timings are untrustworthy, so the decision is now
+simply: **build the transcription module plus a "transcribe this clip" action,
+running in a `worker_threads` worker on the CPU backend**). Long-buffer
+transcription is a **product** limit, not an engineering one. A **marketing
+website** was added as a new NEXT item. The **Android** item had its stated
+prerequisite (a browser port) ruled out, which closes its cheap path and leaves
+a real decision open. Repo hygiene: `Chimthuwu/recordr` is private, already
+existed, and is fully pushed; the stale "no remote" claim in this file is
+corrected below.
 
 **Through v3.1.0 (2026-09-07) the whole v3 list, the §10 redesign brief, and the
 §11.4 "select & drag out of history" master plan are done** — plus a clip
@@ -651,7 +655,47 @@ Repo status: **`Chimthuwu/recordr` is private and already existed** — this
 project is NOT local-only as previously recorded here, and everything is
 pushed. The only uncommitted file was this `todo.md`.
 
-#### DECIDED 2026-10-03 (Stooge): build order is (c) then (b)
+#### DECIDED 2026-10-03 (Stooge): build order is (c) then (b) — **NOW ANSWERED**
+
+> ### ✅ RESOLVED 2026-10-03 by spike 002: **(c) is measured and fails. Ship (b).**
+>
+> `spikes/002-tfjs-backend-bench/` ran the same three clip lengths through the
+> `webgl` backend in a real Chromium on a **verified real GPU** (`ANGLE (AMD
+> Radeon RX 6600, Direct3D11)` — not software rasterisation). The harness is
+> trustworthy: `cpu` in-browser reproduced spike 001's Node numbers (0.75×/0.76×
+> vs 0.74×/0.75×) with **identical note counts**, so differences are real.
+>
+> **WebGL is not faster, and its numbers cannot be trusted.** Three runs of the
+> *same* input gave **0.38×**, then **1.31×**, then **27.74×**. So:
+>
+> * It can be **~2× slower than CPU** (run 1), not just unhelpful.
+> * A number that *looks* excellent (**27.74×** = 736 ms for 20.4 s of audio)
+>   is almost certainly measuring GPU *submission*, not completion — tfjs WebGL
+>   work is async and isn't properly awaited. Note counts were still correct
+>   (22 / 45), so the output was right while the timing lied. **This is the
+>   real problem: a WebGL number here is uninterpretable in both directions.**
+> * The **39.6 s run killed the browser daemon** (`no close frame received or
+>   sent`, then `WinError 5` on its port file). Not reproduced on shorter runs,
+>   so the cause is **not established** — but a backend that can take down the
+>   process on a 40 s input is disqualifying for an app that must never
+>   interrupt an in-progress recording.
+>
+> **Consequences — this unblocks the feature:**
+>
+> 1. **Ship (b): a `worker_threads` worker, chunked, on the CPU backend.** This
+>    is no longer conditional. Independent confirmation it is required: CPU
+>    inference starved a CDP evaluate for >5 s straight, i.e. it blocks the
+>    renderer main thread. Inference must never run on the UI thread.
+> 2. **Long buffers are a product limit, not an engineering one.** At ~0.75×
+>    realtime either cap transcription length or accept a background job costing
+>    ~0.75× the clip duration and **say so in the UI**. Don't imply 15 minutes is
+>    fast.
+> 3. **Do not revisit `webgl`** without a harness that forces a true GPU sync
+>    (`gl.finish()`, or reading back one output element after inference) so the
+>    timing measures completion.
+> 4. **First shippable slice is unchanged and now unblocked:** the transcription
+>    module plus a "transcribe this clip" action, on 10–60 s material (8–45 s
+>    today — acceptable).
 
 The open "when does transcription run?" question above is **answered**:
 
