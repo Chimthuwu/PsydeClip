@@ -590,7 +590,7 @@ for the running log. Historical-waveform export is functional (drags a real
 DAW-importable WAV); its sample-accuracy could still be tightened (§11.4 Phase 3
 notes).
 
-### → NEXT: audio → MIDI transcription
+### ✅ DONE 2026-10-03 — audio → MIDI transcription shipped
 
 User-decided expansion (2026-10-02). Recordr would listen for melodies and
 chord progressions and write out MIDI alongside the recorded audio. The stated
@@ -654,6 +654,62 @@ in Electron too; and `weightData` must be a real `ArrayBuffer`, not a Node
 Repo status: **`Chimthuwu/recordr` is private and already existed** — this
 project is NOT local-only as previously recorded here, and everything is
 pushed. The only uncommitted file was this `todo.md`.
+
+#### SHIPPED 2026-10-03 — commit `1a8808f`. What actually landed
+
+The §7 headline said "build the transcription module plus a *transcribe this
+clip* action". That framing was **deliberately not followed** — Stooge asked
+whether MIDI should be a toggleable capture button or behave like the rest of
+the app, and the answer was the latter. Save is a pipeline (the app already
+encodes WAV/MP3 on save), so a `.mid` is a property of the *output*, not a mode
+you arm and can forget. **A capture toggle produces silently missing MIDI**,
+which is the exact failure an always-rolling recorder exists to avoid.
+
+* **`src/main/transcribe/engine.ts`** — Basic Pitch on the tfjs `cpu` backend.
+  Owns the three spike traps: resample to 22050 before inference (a raw
+  `Float32Array` is silently assumed to be 22050 and doubles every timestamp),
+  the hand-rolled `IOHandler` (tfjs cannot `fetch` `file://`), and copying
+  `weightData` into a real `ArrayBuffer` (a Node `Buffer` throws a misleading
+  shape error). Raised thresholds (0.5/0.5/11) per spike 001.
+* **`worker.ts` + `pool.ts`** — one worker thread, job bookkeeping, `.mid` path
+  derived from the already-saved audio path.
+* **Wiring** — `transcribe:start` / `transcribe:cancel` / `transcribe:event`
+  channels; `transcribeOnSave` setting (**default OFF** — at ~0.5× realtime a
+  15-min buffer is ~30 CPU-minutes, so the cost must be opted into, not
+  discovered); the hook sits in `App.writeRecording`, the single funnel every
+  save path goes through, so no path can forget it. Audio is written first and
+  immediately; transcription is fire-and-forget after that and can never fail
+  or delay a save. Progress reuses the existing toast lane.
+
+**The bug worth remembering — cancellation cannot use `postMessage`.** The
+worker sits inside one synchronous tfjs inference call for the whole job, so its
+event loop never drains and a cancel message is not read until the job has
+already finished. Measured, not assumed: `cancelTranscription()` returned
+`true`, then the job **ran the full 49.5 s and wrote its `.mid` anyway**. The
+fix is a `SharedArrayBuffer` + `Atomics` flag, which the worker can read
+mid-inference because it needs no event loop at all. Now settles in ~1.8 s and
+writes nothing. `pool.test.ts` asserts the **wall clock**, and was confirmed
+**red against the old implementation** (52.9 s) before being accepted as green
+(4.3 s) — a "settles eventually" assertion would have passed on the broken code.
+
+**Also fixed en route:** `electron-builder`'s `files` listed **no dependencies
+at all** (only `dist`, `package.json`, `koffi`), so the engine would not have
+shipped in a packaged build at all. Added the `@spotify/basic-pitch`,
+`@tensorflow/*` and `@tonejs/midi` trees.
+
+**Verification** — `npm test` (8 checks: real inference, real `.mid`, `MThd`
+header, audio left byte-identical, timed cancel, rate-trap, error paths) and
+`npm run test:electron` (12 checks driving the **real `registerIpc()`** and the
+**shipped preload** inside Electron itself — the only way to catch asar /
+worker-thread / backend-registration differences that plain Node hides). The
+Electron harness lives at `scripts/transcribe-electron-check.js`; keep it, it
+catches a class of bug the unit tests structurally cannot.
+
+**Still open:** thresholds were tuned on synthetic signals, not real music —
+re-tune on actual recordings. No UI affordance for cancelling an in-flight job
+(the IPC path exists and works; nothing surfaces it yet). No packaged
+(`npm run package`) verification — the `files` fix is reasoned, not
+package-and-run proven.
 
 #### DECIDED 2026-10-03 (Stooge): build order is (c) then (b) — **NOW ANSWERED**
 
