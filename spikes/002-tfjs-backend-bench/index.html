@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Spike 002 — tfjs backend comparison (webgl vs cpu)</title>
+  <style>
+    body { background: #0b0e17; color: #c4f4fc; font: 13px/1.6 ui-monospace, monospace; padding: 20px; }
+    .ok { color: #39ff5a; } .bad { color: #ff1024; } .dim { color: #6b7a8f; }
+    h1 { font-size: 15px; letter-spacing: .1em; }
+    table { border-collapse: collapse; margin-top: 10px; }
+    td, th { border: 1px solid #22304a; padding: 3px 10px; text-align: right; }
+    th { color: #8fb4d8; }
+    td:first-child, th:first-child { text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>SPIKE 002 — tfjs BACKEND BENCHMARK</h1>
+  <div id="log">booting…</div>
+  <table id="tbl"></table>
+  <script type="module">
+    const log = (m, cls = '') => {
+      document.getElementById('log').insertAdjacentHTML('beforeend',
+        `<div class="${cls}">${m}</div>`);
+    };
+    window.__DONE = false;
+    window.__RESULT = null;
+
+    // Same synthesis as spikes/001/spike.js so the audio is identical and the
+    // CPU baseline in that README is directly comparable.
+    const SR = 44100, MODEL_SR = 22050;
+    function pluck(freq, dur) {
+      const n = Math.floor(dur * SR), out = new Float32Array(n), H = [1, .5, .28, .14, .07];
+      for (let i = 0; i < n; i++) {
+        let v = 0; const s = i / SR;
+        for (let h = 0; h < H.length; h++) v += H[h] * Math.sin(2 * Math.PI * freq * (h + 1) * s);
+        out[i] = v * Math.min(1, i / (0.01 * SR)) * Math.exp(-3.2 * i / n);
+      }
+      return out;
+    }
+    const m2f = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    const BEAT = .6;
+    const BARS = [
+      { chord: [48, 52, 55], beat: 0, mel: [60, 64, 67] },
+      { chord: [50, 53, 57], beat: 4, mel: [57, 60, 64] },
+      { chord: [53, 57, 60], beat: 8, mel: [60, 62, 65] },
+      { chord: [48, 52, 55], beat: 12, mel: [64, 67, 72] },
+    ];
+    function build(bars) {
+      const total = bars * 4 * BEAT + 1.2;
+      const track = new Float32Array(Math.ceil(total * SR));
+      const mix = (f, st, d, g) => {
+        const p = pluck(f, d), off = Math.floor(st * SR);
+        for (let i = 0; i < p.length; i++) if (off + i < track.length) track[off + i] += p[i] * g;
+      };
+      for (let b = 0; b < bars; b++) {
+        const bar = BARS[b % 4], base = b * 4;
+        for (const c of bar.chord) mix(m2f(c), (base + bar.beat) * BEAT, 4 * BEAT, .16);
+        bar.mel.forEach((m, i) => mix(m2f(m), (base + bar.beat + i * (4 / 3)) * BEAT, (4 / 3) * .95 * BEAT, .55));
+      }
+      let pk = 0; for (const s of track) pk = Math.max(pk, Math.abs(s));
+      for (let i = 0; i < track.length; i++) track[i] = track[i] / pk * .89;
+      return { track, dur: total };
+    }
+    function resample(input, from) {
+      if (from === MODEL_SR) return input;
+      const ratio = from / MODEL_SR, outLen = Math.floor(input.length / ratio);
+      const out = new Float32Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        const pos = i * ratio, i0 = Math.floor(pos), i1 = Math.min(i0 + 1, input.length - 1);
+        out[i] = input[i0] * (1 - (pos - i0)) + input[i1] * (pos - i0);
+      }
+      return out;
+    }
+
+    // WebGL must be requested BEFORE tf.ready(); once a backend is bound it
+    // stays bound for the page's lifetime, so each backend needs a fresh load.
+    const params = new URLSearchParams(location.search);
+    const WANT = params.get('backend') || 'webgl';
+    const LENGTHS = (params.get('bars') || '4,8,16').split(',').map(Number);
+
+    try {
+      const tf = await import('https://esm.sh/@tensorflow/tfjs@3.21.0');
+      window.tf = tf;
+      const bpMod = await import('https://esm.sh/@spotify/basic-pitch@1.0.1');
+      const { BasicPitch, noteFramesToTime, addPitchBendsToNoteEvents, outputToNotesPoly } = bpMod;
+
+      let bound = false;
+      try {
+        bound = await tf.setBackend(WANT);
+      } catch (e) { log(`setBackend(${WANT}) threw: ${e.message}`, 'bad'); }
+      await tf.ready();
+      const backend = tf.getBackend();
+      log(`requested backend: ${WANT} -> actual: ${backend} ${bound ? '(ok)' : '(FELL BACK)'}`, backend === WANT ? 'ok' : 'bad');
+
+      // Prove we are on a real GPU, not SwiftShader/software GL: a software
+      // backend would post a "faster" number that means nothing.
+      let renderer = 'n/a';
+      try {
+        const c = document.createElement('canvas');
+        const gl = c.getContext('webgl2') || c.getContext('webgl');
+        if (gl) {
+          const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+          renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+        }
+      } catch (e) { renderer = 'err ' + e.message; }
+      log(`GL renderer: ${renderer}`);
+      if (/swiftshader|software|llvmpipe|basic render/i.test(renderer)) {
+        log('WARNING: software GL — this number is NOT representative of real hardware.', 'bad');
+      }
+
+      // Load the model via fetch (a real http origin here, unlike node's file://).
+      const t0 = performance.now();
+      const model = await tf.loadGraphModel('/model/model.json');
+      const loadMs = performance.now() - t0;
+      log(`model loaded in ${loadMs.toFixed(0)} ms`);
+
+      const bp = new BasicPitch(model);
+      const rows = [];
+      const tbl = document.getElementById('tbl');
+      tbl.innerHTML = '<tr><th>audio</th><th>wall ms</th><th>ratio</th><th>notes</th></tr>';
+
+      for (const bars of LENGTHS) {
+        const { track, dur } = build(bars);
+        const audio = resample(track, SR);
+        const t = performance.now();
+        const frames = [], onsets = [], contours = [];
+        await bp.evaluateModel(audio,
+          (f, o, c) => { frames.push(...f); onsets.push(...o); contours.push(...c); },
+          () => {});
+        const ms = performance.now() - t;
+        const notes = noteFramesToTime(addPitchBendsToNoteEvents(contours,
+          outputToNotesPoly(frames, onsets, 0.5, 0.5, 11)));
+        const ratio = dur / (ms / 1000);
+        rows.push({ bars, dur: +dur.toFixed(1), ms: Math.round(ms), ratio: +ratio.toFixed(2), notes: notes.length });
+        log(`  ${dur.toFixed(1)}s audio -> ${Math.round(ms)} ms  (${ratio.toFixed(2)}x realtime, ${notes.length} notes)`);
+        const tr = tbl.insertRow();
+        tr.innerHTML = `<td>${dur.toFixed(1)}s</td><td>${Math.round(ms)}</td><td class="${ratio >= 1 ? 'ok' : 'bad'}">${ratio.toFixed(2)}x</td><td>${notes.length}</td>`;
+      }
+
+      window.__RESULT = { backend, renderer, loadMs: Math.round(loadMs), rows };
+      window.__DONE = true;
+      log('SPIKE_002_RESULT=OK', 'ok');
+    } catch (e) {
+      log('SPIKE_002_RESULT=FAIL ' + (e && e.message), 'bad');
+      window.__RESULT = { error: String(e && e.stack || e) };
+      window.__DONE = true;
+    }
+  </script>
+</body>
+</html>

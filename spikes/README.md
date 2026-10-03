@@ -6,6 +6,7 @@ execution output. Delete a spike once it has paid its debt — nothing here ship
 | Spike | Question | Status |
 |-------|----------|--------|
 | `001-basic-pitch-in-node` | Can `@spotify/basic-pitch` transcribe a real audio buffer to a `.mid` in pure Node (no Python, no tfjs-node native rebuild), and how fast / how big is the model? | **PARTIAL** — engine settled, runtime is the blocker |
+| `002-tfjs-backend-bench` | Is the tfjs `webgl` backend fast enough to carry long buffers (the one lever that could fix 001's runtime)? | **INVALIDATED** — slower than CPU *and* untrustworthy run-to-run |
 
 `001/spike.js` and `001/sweep.js` expect to be run from the repo root with
 `npm i @spotify/basic-pitch@1.0.1`; they read the model out of
