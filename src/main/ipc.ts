@@ -1,4 +1,4 @@
-import { app, ipcMain, dialog, BrowserWindow, desktopCapturer, Menu, MenuItemConstructorOptions, nativeImage } from 'electron';
+import { app, ipcMain, dialog, BrowserWindow, desktopCapturer, Menu, MenuItemConstructorOptions, nativeImage, type WebContents } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { ICON_32_DATA_URL } from './icon-assets';
@@ -10,6 +10,7 @@ import {
   IpcChannel,
   LoopbackDevice,
   SaveResult,
+  TranscribeJobState,
   SnapTarget,
   TitleMenuKind,
   UiLayout,
@@ -33,6 +34,12 @@ import {
 } from './popout';
 import { readSettings, writeSettings } from './settings';
 import { saveRecordingFile } from './save';
+import {
+  cancelTranscription,
+  jobState,
+  pruneJobs,
+  startTranscription,
+} from './transcribe/pool';
 import { startClip, appendClip, readClip, abortClip } from './clip';
 import { setClipWindow } from './clip-window';
 import {
@@ -137,6 +144,83 @@ export function registerIpc(ctx: IpcContext) {
         return { ok: false, error: (err as Error).message };
       }
     },
+  );
+
+  // ------- MIDI transcription ----------------------------------------------
+  // Runs in a worker thread so ~0.7x-realtime inference never blocks the main
+  // or renderer thread. The audio file is already on disk by the time the
+  // renderer calls this; nothing here can fail or delay a save.
+
+  /**
+   * Poll a job and push its state to the renderer until it settles.
+   *
+   * A timer rather than a worker callback: the pool deliberately owns job
+   * bookkeeping, and this keeps ipc.ts free of pool internals. 400 ms is
+   * frequent enough to feel live without spamming the IPC bus.
+   */
+  const watchJob = (jobId: string, sender: WebContents) => {
+    const tick = setInterval(() => {
+      const state = jobState(jobId);
+      if (!state) {
+        clearInterval(tick);
+        return;
+      }
+      if (!sender.isDestroyed()) {
+        sender.send(IpcChannel.transcribeEvent, state);
+      }
+      if (state.status !== 'running') {
+        clearInterval(tick);
+        pruneJobs();
+      }
+    }, 400);
+  };
+
+  ipcMain.handle(
+  IpcChannel.transcribeStart,
+  async (
+    e,
+    args: {
+      jobId: string;
+      samples: Float32Array;
+      sampleRate: number;
+      audioPath: string;
+    },
+  ): Promise<TranscribeJobState> => {
+    try {
+      if (!args?.audioPath || !args?.samples?.length) {
+        return {
+          jobId: args?.jobId ?? 'unknown',
+          audioPath: args?.audioPath ?? '',
+          midiPath: '',
+          status: 'error',
+          fraction: 0,
+          error: 'Nothing to transcribe.',
+        };
+      }
+      const state = startTranscription({
+        jobId: args.jobId,
+        samples: args.samples,
+        sampleRate: args.sampleRate,
+        audioPath: args.audioPath,
+      });
+      // Report progress for this job back to the renderer that asked.
+      watchJob(state.jobId, e.sender);
+      return state;
+    } catch (err) {
+      return {
+        jobId: args?.jobId ?? 'unknown',
+        audioPath: args?.audioPath ?? '',
+        midiPath: '',
+        status: 'error',
+        fraction: 0,
+        error: (err as Error).message,
+      };
+    }
+  },
+  );
+
+  ipcMain.handle(IpcChannel.transcribeCancel, (_e, jobId: string): boolean =>
+  cancelTranscription(jobId),
   );
 
   // ------- Dedicated clip recording (streams to a temp file) ----------------

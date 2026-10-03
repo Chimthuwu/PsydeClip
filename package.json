@@ -13,6 +13,8 @@
     "build:renderer": "vite build",
     "build": "npm run build:main && npm run build:renderer",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "test": "npm run build:main && node --test dist/main/transcribe/*.test.js",
+    "test:electron": "npm run build && electron scripts/transcribe-electron-check.js",
     "package": "npm run build && electron-builder",
     "package:dir": "npm run build && electron-builder --dir",
     "start": "cross-env NODE_ENV=production electron ."
@@ -38,7 +40,17 @@
     "files": [
       "dist/**/*",
       "package.json",
-      "node_modules/koffi/**/*"
+      "node_modules/koffi/**/*",
+      "node_modules/@spotify/basic-pitch/**/*",
+      "node_modules/@tensorflow/tfjs/**/*",
+      "node_modules/@tensorflow/tfjs-core/**/*",
+      "node_modules/@tensorflow/tfjs-backend-cpu/**/*",
+      "node_modules/@tensorflow/tfjs-backend-webgl/**/*",
+      "node_modules/@tensorflow/tfjs-converter/**/*",
+      "node_modules/@tensorflow/tfjs-data/**/*",
+      "node_modules/@tensorflow/tfjs-layers/**/*",
+      "node_modules/@tensorflow/tfjs-core/dist/weights/**/*",
+      "node_modules/@tonejs/midi/**/*"
     ],
     "asarUnpack": [
       "**/node_modules/koffi/**"
@@ -67,6 +79,9 @@
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
+    "@spotify/basic-pitch": "^1.0.1",
+    "@tensorflow/tfjs": "^3.21.0",
+    "@tonejs/midi": "^2.0.28",
     "koffi": "^3.1.5"
   }
 }

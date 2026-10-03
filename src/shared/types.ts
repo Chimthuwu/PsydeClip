@@ -147,7 +147,12 @@ export interface AppSettings {
   /** Last selected loopback device id (loopback backend), or null. */
   loopbackDeviceId: string | null;
   /** Rolling vs traditional recording. */
-  recordMode: RecordMode;
+    recordMode: RecordMode;
+    /**
+     * Write a MIDI transcription beside each saved recording. See the note on the
+     * default in DEFAULT_SETTINGS for why this is off by default.
+     */
+    transcribeOnSave: boolean;
   /** Visual theme. */
   theme: Theme;
   /**
@@ -246,7 +251,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   bufferSeconds: 15 * 60,
   bitrateKbps: 96,
   recordingFormat: 'webm',
-  alwaysOnTop: false,
+    alwaysOnTop: false,
+    /**
+     * Write a MIDI transcription beside each saved recording.
+     *
+     * OFF by default deliberately. Transcription runs at ~0.7x realtime on the
+     * pure-JS backend (spikes/002-tfjs-backend-bench/), so a 15-minute buffer
+     * costs ~20 CPU-minutes. Opting in once in Settings is cheap; discovering
+     * that cost by accident is how the feature gets turned off for good. Clips
+     * (10-60s) are comfortably viable when it's on.
+     *
+     * When on, the audio is still written FIRST and immediately — the `.mid`
+     * appears afterwards. Transcription never blocks or fails a save.
+     */
+    transcribeOnSave: false,
   fileNameTemplate: 'recordr_{date}_{time}',
 
   uiLayout: 'full',
@@ -307,6 +325,26 @@ export interface SaveResult {
   error?: string;
 }
 
+/**
+ * State of one MIDI transcription job. Shared between main, preload and the
+ * renderer so progress can be reported over IPC without leaking main-only types.
+ */
+export interface TranscribeJobState {
+  jobId: string;
+  /** The audio file that was already saved. Never modified by transcription. */
+  audioPath: string;
+  /** Where the `.mid` will be written — same folder, same stem, `.mid`. */
+  midiPath: string;
+  status: 'running' | 'done' | 'cancelled' | 'error';
+  /** 0..1 inference progress. */
+  fraction: number;
+  noteCount?: number;
+  elapsedMs?: number;
+  /** Realtime multiple, e.g. 0.66 means inference took longer than the clip. */
+  ratio?: number;
+  error?: string;
+}
+
 /** Channels used on the IPC bus. */
 export const IpcChannel = {
   settingsGet: 'settings:get',
@@ -315,6 +353,14 @@ export const IpcChannel = {
   sourcesPick: 'sources:pick',
   folderPick: 'folder:pick',
   saveRecording: 'recording:save',
+  /**
+   * Queue a MIDI transcription for an already-saved recording. Runs in a
+   * worker thread; the `.mid` is written beside the audio when it finishes.
+   */
+  transcribeStart: 'transcribe:start',
+  transcribeCancel: 'transcribe:cancel',
+  /** Main -> renderer: a transcription job's progress or completion. */
+  transcribeEvent: 'transcribe:event',
   dragExport: 'drag:export',
   recordingEvent: 'recording:event',
   hotkeySet: 'hotkey:set',
