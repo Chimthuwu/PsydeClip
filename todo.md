@@ -575,6 +575,34 @@ for the running log. Historical-waveform export is functional (drags a real
 DAW-importable WAV); its sample-accuracy could still be tightened (§11.4 Phase 3
 notes).
 
+### → NEXT: audio → MIDI transcription
+
+User-decided expansion (2026-10-02). Recordr would listen for melodies and
+chord progressions and write out MIDI alongside the recorded audio. The stated
+precedent is **NeuralNote**, which emits a `.mid` *and* the respective audio
+file.
+
+It fits the existing shape: capture is already rolling and held in RAM, so the
+same buffer can be handed to a transcriber at save time — no second capture
+pass, no re-recording to get a MIDI version of a clip you already saved.
+
+Open questions before building:
+
+* **Engine.** NeuralNote is source-available (AGPL) and is not a drop-in
+  dependency — treat it as the *feature benchmark*, not the engine. The
+  realistic route is transcription-only: Basic Pitch, CREPE, or an
+  Onsets&Frames + pitch tracker producing note events, then quantise.
+  Check the licence of whichever is chosen before it ships inside an MIT app.
+* **This is the first feature needing a heavy runtime dependency** — a Python
+  sidecar or an ONNX model. It changes `electron-builder` config, packaged size
+  and cold start, none of which the current build has to care about.
+* **Output shape.** Quantised piano roll with tempo, or raw note timings?
+  Chords need to survive, so single-note output is not enough on its own.
+
+Related: `Z:\GITHUB\AUDIO · FAZE-RECORDER` is the same project and the actual
+git repo (`Chimthuwu/faez.git`); Recordr has no remote. Settle which one is
+canonical before adding a feature that both would want.
+
 ### → NEXT: an Android version
 
 The user asked for this as the next real project (not "parked" anymore). It is
