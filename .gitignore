@@ -19,3 +19,4 @@ spikes/**/node_modules/
 spikes/**/*.wav
 spikes/**/*.log
 spikes/**/*.mid
+desktop.ini
