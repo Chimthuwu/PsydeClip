@@ -13,3 +13,9 @@ release/
 # Native build artefacts
 native/RecordrLoopback/bin/
 native/RecordrLoopback/obj/
+
+# spike scratch
+spikes/**/node_modules/
+spikes/**/*.wav
+spikes/**/*.log
+spikes/**/*.mid

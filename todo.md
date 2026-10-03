@@ -586,22 +586,59 @@ It fits the existing shape: capture is already rolling and held in RAM, so the
 same buffer can be handed to a transcriber at save time — no second capture
 pass, no re-recording to get a MIDI version of a clip you already saved.
 
-Open questions before building:
+**Spiked 2026-10-03 — engine is SETTLED, read `spikes/001-basic-pitch-in-node/`
+before starting.** Verdict PARTIAL.
 
-* **Engine.** NeuralNote is source-available (AGPL) and is not a drop-in
-  dependency — treat it as the *feature benchmark*, not the engine. The
-  realistic route is transcription-only: Basic Pitch, CREPE, or an
-  Onsets&Frames + pitch tracker producing note events, then quantise.
-  Check the licence of whichever is chosen before it ships inside an MIT app.
-* **This is the first feature needing a heavy runtime dependency** — a Python
-  sidecar or an ONNX model. It changes `electron-builder` config, packaged size
-  and cold start, none of which the current build has to care about.
-* **Output shape.** Quantised piano roll with tempo, or raw note timings?
-  Chords need to survive, so single-note output is not enough on its own.
+**Engine: `@spotify/basic-pitch` (Spotify) + plain `@tensorflow/tfjs`.**
+Resolves the licence question — it is **Apache-2.0, not AGPL**, so it is
+licence-clean inside this MIT app. NeuralNote was never a candidate (AGPL, not
+a drop-in); treat it purely as the feature benchmark. The model (900 KB) ships
+inside the npm package, so there is nothing to fetch on first run, and the whole
+engine is three JS dependencies.
 
-Related: `Z:\GITHUB\AUDIO · FAZE-RECORDER` is the same project and the actual
-git repo (`Chimthuwu/faez.git`); Recordr has no remote. Settle which one is
-canonical before adding a feature that both would want.
+**The "heavy runtime dependency" fear did not materialise** — *except* for the
+fast backend. `npm i @tensorflow/tfjs-node` **fails `node-pre-gyp` on Node 26**,
+so there is no native path; pure-JS `cpu` it is. That keeps `electron-builder`
+packaging, code signing and cold start completely unaffected, and the model
+should ship as an `extraResource`.
+
+Measured on a synthetic 4-bar progression with known ground truth:
+**12/12 melody notes recovered within 50 ms, chords intact** (so chords do
+survive — the requirement flagged below), and the output re-parses as a real
+`.mid`. Note bloat is a tuning matter: the library defaults (0.25/0.25/5) gave
+46 notes for 24 real ones, while **0.5/0.5/11 gave 22**. Ship raised
+thresholds, and re-tune on real music before fixing them.
+
+**THE OPEN PROBLEM IS RUNTIME, not correctness.** `cpu` backend measured
+**~0.75× realtime, scaling linearly** (10.8s→14.7s, 20.4s→27.4s, 39.6s→55.9s).
+So the headline promise — save the last 15 minutes, get a MIDI — would take
+**~20 minutes** of CPU. Not shippable as a blocking step on save. Clips
+(10–60 s) cost 8–45 s and are fine.
+
+Remaining decision, and it is a product one — **when does transcription run?**
+(a) *clip-length only, synchronous* — correct and simple, but leaves the
+signature feature unimplemented; (b) *background `worker_threads` worker,
+chunked* — never blocks the recorder or UI and writes the `.mid` beside the
+audio when it lands, but a 15-min clip still costs ~20 min of one core;
+(c) *tfjs `webgl` backend in the renderer* — the untested lever with the most
+upside, though the renderer is the UI thread so it needs its own worker or an
+offscreen context. **Measure (c) next** — it may dissolve the problem outright.
+Suggested order: transcription module + "transcribe this clip" action first
+(proves the pipeline end to end), then measure WebGL before committing to any
+long-buffer behaviour.
+
+**Three silent-failure traps, all documented in the spike README.** The worst:
+`evaluateModel` **only** checks sample rate on its `AudioBuffer` path, so
+handing it a raw `Float32Array` silently assumes 22050 Hz — feeding 44100 Hz
+doubled every timestamp and dropped the melody match from 12/12 to 1/12 while
+still looking like plausible output. Always resample to 22050 first. (Also:
+tfjs cannot `fetch` a `file://` model, so a hand-rolled `IOHandler` is required
+in Electron too; and `weightData` must be a real `ArrayBuffer`, not a Node
+`Buffer`, or weight decoding throws a misleading shape error.)
+
+Repo status: **`Chimthuwu/recordr` is private and already existed** — this
+project is NOT local-only as previously recorded here, and everything is
+pushed. The only uncommitted file was this `todo.md`.
 
 ### → NEXT: an Android version
 
@@ -620,6 +657,26 @@ The user asked for this as the next real project (not "parked" anymore). It is
   path to Android. A ground-up Kotlin app would reuse only the visualizer maths
   (`lib/visualizer.ts`), the rolling-buffer model, the filename template and the
   settings shape.
+
+  **Verified 2026-10-03** (so this is a measured prerequisite, not a hope):
+  `src/renderer/` contains **zero `electron` imports**, and all **38**
+  capabilities it uses go through `window.api` (64 call sites). So the
+  isolation the plan depends on is real. The work is a browser implementation
+  of that one object, and the split is clean:
+  * **Trivially portable** — settings get/set (localStorage), `platform`,
+    visualizer maths, history model, encode/export, filename template,
+    window-state shims (map `windowControl`/`snapWindow` onto real window
+    APIs or no-ops).
+  * **Electron-only, needs a real browser equivalent** — `pickFolder` (File
+    System Access API), the tray (`setTrayCapturing`), the native context /
+    title menus (`showContextMenu`/`showTitleMenu` → DOM popovers), `popout`
+    (a second `window.open`), the always-on-top clip window, HTML5 drag-out
+    (`startDragExportPrepared` — Safari/Firefox differ), and the WASAPI
+    loopback path (→ `getDisplayMedia({audio:true})`, the desktopCapturer path
+    only, which is what §9 already says).
+  * The dangerous parts are the **native menus** and the **drag-out**, because
+    they were built natively precisely so a 38 px docked window would not clip
+    them. In a browser those must become DOM popovers and lose that guarantee.
 * Scope it before starting: pick the shape (Capacitor-over-webapp vs native
   Kotlin), decide what "capture" means given the opt-out reality, and design the
   equivalent of the tray / pop-out / snap features (a notification-shade control
