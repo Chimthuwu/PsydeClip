@@ -567,6 +567,17 @@ Other paths:
 
 ## 7. What to do next
 
+**Session 2026-10-03 — where things stand, read this first.** Two of the three
+queued items moved. Audio→MIDI got a feasibility spike: **the engine is chosen
+and validated** (`spikes/001-basic-pitch-in-node/`), and the remaining problem
+is *runtime*, not correctness — Stooge decided the order is **measure WebGL
+first, then the background worker**; see the DECIDED block under that heading
+for exactly how to run the measurement. A **marketing website** was added as a
+new NEXT item. The **Android** item had its stated prerequisite (a browser
+port) ruled out, which closes its cheap path and leaves a real decision open.
+Repo hygiene: `Chimthuwu/recordr` is private, already existed, and is fully
+pushed; the stale "no remote" claim in this file is corrected below.
+
 **Through v3.1.0 (2026-09-07) the whole v3 list, the §10 redesign brief, and the
 §11.4 "select & drag out of history" master plan are done** — plus a clip
 recorder + always-on-top clip window, 13 themes, a single-row HUD, rounded
@@ -640,7 +651,89 @@ Repo status: **`Chimthuwu/recordr` is private and already existed** — this
 project is NOT local-only as previously recorded here, and everything is
 pushed. The only uncommitted file was this `todo.md`.
 
+#### DECIDED 2026-10-03 (Stooge): build order is (c) then (b)
+
+The open "when does transcription run?" question above is **answered**:
+
+1. **(c) FIRST — measure the tfjs `webgl` backend.** This is now the immediate
+   next action, and it gates the design rather than following it. Measure
+   WebGL-vs-CPU on real Electron (not just node) before writing the feature.
+   *How:* the pure-JS engine has no native dep, so the same
+   `@spotify/basic-pitch` + tfjs code runs unmodified in a Chromium context
+   (Electron renderer, or a plain browser for a first read). Serve the repo's
+   `spikes/001-basic-pitch-in-node/spike.js` logic as an ES module over a local
+   http server, `import * as tf from '@tensorflow/tfjs'`, call
+   `tf.setBackend('webgl')` before `tf.ready()`, then re-run the SAME three
+   audio lengths (10.8 s / 20.4 s / 39.6 s) and compare against the CPU numbers
+   in `spikes/001-basic-pitch-in-node/README.md` (0.74× / 0.75× / 0.71×).
+   Record the ratio; anything ≥ ~4× realtime makes long buffers viable and
+   changes the answer below. **Watch for:** WebGL in Electron needs
+   `app.disableHardwareAcceleration()` NOT set (leave GPU on), a real GPU is
+   required for a meaningful number (software GL will look like a regression),
+   and the renderer is the UI thread — so even a fast backend must run in a
+   worker / `OffscreenCanvas`, not on the main thread.
+2. **(b) THEN — background `worker_threads` worker, chunked, if WebGL is not
+   fast enough to carry long buffers on its own.** Never blocks the recorder or
+   the UI; the `.mid` is written beside the audio when it lands. Expect to ship
+   this regardless for anything over a few minutes, because even a fast GPU
+   backend should not own the UI thread.
+
+Whichever the WebGL number comes back as, **the first shippable slice is the
+same: the transcription module plus a "transcribe this clip" action**, proving
+the pipeline end to end on 10–60 s material (8–45 s on CPU — acceptable today).
+Long-buffer behaviour is the follow-up, chosen by measurement.
+
+⚠️ **Do not re-run `spikes/001-basic-pitch-in-node/sweep.js` and trust its
+melody-hit counts.** That harness double-counts bar offsets when rebuilding its
+ground truth, so its "extra notes" column is wrong. Its runtime-scaling and
+threshold-*trend* numbers are fine. Re-derive per-threshold counts on a REAL
+music file before fixing shipped defaults — the 12/12 and 46-vs-24 figures come
+from `spike.js`, which builds its signal correctly.
+
+### → NEXT: a marketing website for Recordr
+
+User request 2026-10-03, alongside an explicit **"we won't have a web version"**
+— these are two different things and must not be conflated:
+
+* **NO browser port of the app.** Stooge ruled it out. That decision has a
+  consequence for the Android item below (read its ⚠️).
+* **YES a marketing/sales site**, eventually, to sell the product. This is
+  ordinary landing-page work — hero, what-it-does, the DAW/producer angle,
+  screenshots of the 13 themes, download CTA, licence/price section. It is
+  **not started**, no copy written, no design chosen.
+
+Practical notes for whoever builds it: the app's own strengths are already
+written down here — rolling always-on-memory capture, hotkey save of the last
+N minutes, clip recorder with always-on-top window, DAW-importable WAV drag-out,
+13 themes, spectrogram/oscilloscope/spectrum/history visualizers. The README
+already has a formatted header block worth reusing. Screenshots do not exist
+yet in the repo and will need capturing from a running build. No hosting,
+domain or stack has been chosen.
+
 ### → NEXT: an Android version
+
+> ⚠️ **2026-10-03 — Stooge ruled OUT the browser version** ("we won't have a web
+> version"), which was this item's stated prerequisite. **The cheap path is
+> therefore closed**, and the choice below is now narrower and more expensive
+> than it looked yesterday:
+>
+> * **Capacitor/Tauri over the webapp — DEAD** as the cheap option. It required
+>   a browser implementation of `window.api` first. Without it, a Capacitor
+>   build has no renderer to wrap.
+> * **Still viable: a browser implementation of `window.api` as a build target
+>   nobody ships as a website.** A Capacitor *shell* is a Chromium webview, so
+>   the same `window.api` shim serves Android without producing a public web
+>   version. This is NOT a contradiction of the decision — nothing is published
+>   at a URL. It is, however, most of the work of the browser port, so it should
+>   be a conscious choice rather than a way around the ruling.
+> * **Genuinely alternative: ground-up native Kotlin**, reusing only the
+>   visualizer maths, the rolling-buffer model, the filename template and the
+>   settings shape. More total work, but no webview, no `window.api` shim, and
+>   full access to `AudioPlaybackCapture` + the foreground service.
+>
+> **Nothing is started and this is unresolved.** Do not start Android until this
+> shape is chosen. The verified renderer-isolation facts below still hold and
+> still inform the decision — they are what makes option 2 cheap *if* chosen.
 
 The user asked for this as the next real project (not "parked" anymore). It is
 **big and does not reuse the recording core** — read §9 first:
