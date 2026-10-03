@@ -8,6 +8,7 @@ import { FormatPicker } from './components/FormatPicker';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToastStack } from './components/ToastStack';
 import { encodeFromBlob, encodeFromPcm } from './lib/encode';
+import { transcribeSavedRecording } from './lib/transcribe';
 import { useSettings } from './hooks/useSettings';
 import { useCapture } from './hooks/useCapture';
 import { useRecorderEvents } from './hooks/useRecorderEvents';
@@ -52,8 +53,23 @@ export default function App() {
   const emitToast = (kind: 'saved' | 'error', message: string) =>
     window.dispatchEvent(new CustomEvent('recordr:local-toast', { detail: { kind, message } }));
 
-  /** Write already-encoded bytes and surface a toast. */
-  async function writeRecording(bytes: Uint8Array, ext: string, durationSec: number): Promise<boolean> {
+  /**
+   * Write already-encoded bytes and surface a toast.
+   *
+   * This is the single funnel every save path goes through (rolling export,
+   * clip, traditional stop), so MIDI transcription hooks in HERE rather than at
+   * each call site: one place to reason about, and no path can forget it.
+   *
+   * `bytes` is optional-but-needed for transcription: when we have the decoded
+   * mono PCM already (rolling export path) pass `samples` instead and skip the
+   * redundant decode.
+   */
+  async function writeRecording(
+    bytes: Uint8Array,
+    ext: string,
+    durationSec: number,
+    pcm?: { samples: Float32Array; sampleRate: number },
+  ): Promise<boolean> {
     const res = await window.api.saveRecording({
       folder: settings.saveFolder,
       bytes,
@@ -66,6 +82,14 @@ export default function App() {
         'saved',
         `Saved ${(res.bytes! / 1024).toFixed(1)} KB (${durationSec.toFixed(1)}s)\n${(res.path ?? '').split(/[\\/]/).pop()}`,
       );
+      // Fire-and-forget AFTER the success toast: the audio is on disk and the
+      // recording is complete. Nothing below can undo that.
+      if (settings.transcribeOnSave && res.path) {
+        void transcribeSavedRecording(
+          { audioPath: res.path, ...(pcm ?? { bytes }) },
+          { emitToast },
+        );
+      }
     } else {
       emitToast('error', res.error ?? 'Save failed');
     }

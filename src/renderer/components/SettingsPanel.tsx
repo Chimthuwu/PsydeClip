@@ -366,6 +366,28 @@ export function SettingsPanel({
         </section>
 
         <section>
+          <label>MIDI transcription</label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.transcribeOnSave}
+              onChange={(e) => applyNow({ transcribeOnSave: e.target.checked })}
+            />
+            <span>
+              <strong>Write a .mid beside each recording</strong>
+              <em>
+                Detects notes and chords and saves them as a MIDI file with the
+                same name as the audio. Your audio is always saved first — the
+                MIDI appears a little later, and a failure never affects the
+                recording. It runs in the background at roughly the clip's own
+                length, so it suits short clips; a 15-minute buffer can take
+                about 20 minutes.
+              </em>
+            </span>
+          </label>
+        </section>
+
+        <section>
           <label>Visualizer</label>
           <div className="chip-row">
             {VISUALIZERS.map((v) => {

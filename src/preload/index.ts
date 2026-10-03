@@ -8,6 +8,7 @@ import {
   LoopbackEvent,
   RecorderEvent,
   SaveResult,
+  TranscribeJobState,
   SnapTarget,
   TitleMenuKind,
   UiLayout,
@@ -35,8 +36,31 @@ const api = {
     return ipcRenderer.invoke(IpcChannel.saveRecording, args);
   },
   startDragExport(args: { bytes: Uint8Array; deviceName?: string }): void {
-    ipcRenderer.send(IpcChannel.dragExport, args);
-  },
+      ipcRenderer.send(IpcChannel.dragExport, args);
+    },
+    /**
+     * Queue a MIDI transcription for a recording that is ALREADY saved. The
+     * audio file is never re-read or re-written; the `.mid` is written beside it
+     * once the worker finishes. Returns the initial job state.
+     */
+    startTranscription(args: {
+      jobId: string;
+      samples: Float32Array;
+      sampleRate: number;
+      audioPath: string;
+    }): Promise<TranscribeJobState> {
+      return ipcRenderer.invoke(IpcChannel.transcribeStart, args);
+    },
+    /** Ask a running transcription to stop. */
+    cancelTranscription(jobId: string): Promise<boolean> {
+      return ipcRenderer.invoke(IpcChannel.transcribeCancel, jobId);
+    },
+    /** Subscribe to progress/completion for one job. Returns an unsubscribe fn. */
+    onTranscription(cb: (state: TranscribeJobState) => void): () => void {
+      const wrap = (_e: unknown, state: TranscribeJobState) => cb(state);
+      ipcRenderer.on(IpcChannel.transcribeEvent, wrap);
+      return () => ipcRenderer.removeListener(IpcChannel.transcribeEvent, wrap);
+    },
   prepareDragFile(args: { bytes: Uint8Array; ext?: string }): void {
     ipcRenderer.send(IpcChannel.dragPrepare, args);
   },
