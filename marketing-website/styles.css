@@ -1,0 +1,246 @@
+/* Recordr marketing site — one stylesheet, no build step, no dependencies.
+   Palette follows the app's own default theme ("Modern neon": #7df9ff on near
+   black navy) so the site and the product look like the same thing. */
+
+:root {
+  --bg: #05070f;
+  --bg-2: #0a0e1c;
+  --surface: rgba(255, 255, 255, 0.04);
+  --line: rgba(125, 249, 255, 0.16);
+  --line-soft: rgba(255, 255, 255, 0.08);
+  --text: #e8ecf6;
+  --muted: #98a3bd;
+  --accent: #7df9ff;
+  --accent-2: #ff5ce1;
+  --ok: #58f5a8;
+  --radius: 14px;
+  --max: 1080px;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(900px 500px at 15% -10%, rgba(125, 249, 255, 0.10), transparent 70%),
+    radial-gradient(700px 500px at 90% 5%, rgba(255, 92, 225, 0.09), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  font: 16px/1.65 "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 22px; }
+
+/* Header ---------------------------------------------------------------- */
+
+.site-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+  background: rgba(5, 7, 15, 0.78);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.site-head .wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 58px;
+}
+
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: 0.2px; }
+.brand .dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 12px var(--ok);
+}
+.brand span { color: var(--text); }
+
+.site-head nav { margin-left: auto; display: flex; gap: 18px; font-size: 14px; }
+.site-head nav a { color: var(--muted); }
+.site-head nav a:hover { color: var(--text); text-decoration: none; }
+@media (max-width: 620px) { .site-head nav { display: none; } }
+
+/* Hero ------------------------------------------------------------------ */
+
+.hero { padding: 64px 0 12px; }
+.hero h1 {
+  margin: 0 0 10px;
+  font-size: clamp(34px, 6vw, 54px);
+  line-height: 1.08;
+  letter-spacing: -0.5px;
+}
+.hero h1 em { font-style: normal; color: var(--accent); }
+.lede { font-size: clamp(17px, 2.2vw, 20px); color: var(--text); max-width: 46ch; }
+.lede strong { color: var(--accent); font-weight: 600; }
+.sub { color: var(--muted); max-width: 60ch; }
+
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 26px 0 10px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(125, 249, 255, 0.20), rgba(125, 249, 255, 0.08));
+  color: #04121a;
+  font-weight: 700;
+  font-size: 15px;
+}
+.btn:hover { text-decoration: none; filter: brightness(1.08); }
+.btn.ghost { background: transparent; color: var(--text); border-color: var(--line-soft); }
+.btn.ghost:hover { border-color: var(--line); }
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  border: 1px solid rgba(255, 92, 225, 0.35);
+  border-radius: 999px;
+  padding: 3px 11px;
+  margin-bottom: 16px;
+}
+
+.note {
+  font-size: 13px;
+  color: var(--muted);
+  border-left: 2px solid var(--line);
+  padding-left: 12px;
+  margin: 22px 0 0;
+  max-width: 62ch;
+}
+
+/* Screenshot slots ------------------------------------------------------ */
+
+.shot {
+  position: relative;
+  margin: 30px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-2);
+  aspect-ratio: 16 / 9;
+}
+.shot img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot .fallback {
+  position: absolute; inset: 0; z-index: 0;
+  display: grid; place-items: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 14px;
+  background:
+    radial-gradient(60% 80% at 20% 10%, rgba(125, 249, 255, 0.12), transparent 70%),
+    radial-gradient(60% 80% at 85% 90%, rgba(255, 92, 225, 0.12), transparent 70%),
+    var(--bg-2);
+}
+
+/* Sections -------------------------------------------------------------- */
+
+section { padding: 54px 0; border-top: 1px solid var(--line-soft); }
+section > .wrap > h2 { font-size: clamp(23px, 3.4vw, 31px); margin: 0 0 6px; letter-spacing: -0.3px; }
+section > .wrap > p.kicker { color: var(--muted); margin: 0 0 26px; max-width: 62ch; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+.card h3 { margin: 0 0 8px; font-size: 17px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.card .ico { font-size: 20px; display: block; margin-bottom: 10px; }
+
+.steps { counter-reset: step; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.step { position: relative; padding-left: 44px; }
+.step::before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute; left: 0; top: 2px;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 13px; font-weight: 700;
+}
+.step h3 { margin: 0 0 6px; font-size: 16px; }
+.step p { margin: 0; color: var(--muted); font-size: 15px; }
+
+/* Feature list ---------------------------------------------------------- */
+
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
+.feature { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 18px 20px; }
+.feature h3 { margin: 0 0 6px; font-size: 16px; }
+.feature p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+/* Theme gallery --------------------------------------------------------- */
+
+.themes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.theme-card { margin: 0; }
+.theme-shot {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-2);
+}
+.theme-shot img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Stand-in until the real screenshots land (see README): a canvas of the
+   theme's own accent colour, drawn from the same swatch list the app's theme
+   menu uses (src/shared/types.ts THEMES). */
+.theme-swatch {
+  position: absolute; inset: 0; z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.72)),
+    radial-gradient(70% 90% at 25% 15%, var(--sw), transparent 72%),
+    radial-gradient(60% 80% at 85% 95%, var(--sw), transparent 75%),
+    var(--bg-2);
+  opacity: 0.85;
+}
+.theme-swatch::after {
+  content: "";
+  position: absolute; left: 8%; right: 8%; top: 52%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--sw), transparent);
+  box-shadow: 0 0 16px var(--sw);
+}
+.theme-card figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+.theme-card figcaption b { color: var(--text); font-weight: 600; }
+
+/* Licence / price ------------------------------------------------------- */
+
+.licence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.licence-grid .card { background: linear-gradient(180deg, rgba(125, 249, 255, 0.07), rgba(255, 255, 255, 0.02)); }
+.placeholder {
+  border: 1px dashed rgba(255, 92, 225, 0.5);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.placeholder b { color: var(--accent-2); }
+
+/* Footer ---------------------------------------------------------------- */
+
+.site-foot {
+  border-top: 1px solid var(--line-soft);
+  padding: 30px 0 46px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.site-foot .wrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.site-foot a { color: var(--muted); }
+.site-foot .spacer { margin-left: auto; }

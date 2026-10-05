@@ -1,109 +1,239 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recordr - System Audio Recorder for Windows</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        header {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-            color: white;
-            padding: 40px 20px;
-            text-align: center;
-            border-radius: 10px;
-            margin-bottom: 30px;
-        }
-        .hero {
-            background: #f8f9fa;
-            padding: 40px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-        }
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .feature {
-            background: white;
-            border: 1px solid #eee;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .cta {
-            background: #2575fc;
-            color: white;
-            padding: 20px;
-            text-align: center;
-            border-radius: 10px;
-            margin: 30px 0;
-        }
-        .cta-button {
-            background: #ff6b6b;
-            color: white;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        footer {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-            border-top: 1px solid #eee;
-            margin-top: 40px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recordr — always-on system audio recorder for Windows</title>
+<meta name="description" content="Recordr keeps the last 15 minutes of your system audio in memory. Hit a hotkey when something good happens, or drag a slice of the past straight into your DAW.">
+<meta name="theme-color" content="#05070f">
+<meta property="og:title" content="Recordr — always-on system audio recorder for Windows">
+<meta property="og:description" content="Always recording in memory. Save the last 15 minutes when something good happens — or drag it into your DAW as a WAV.">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <header>
-        <h1>Recordr</h1>
-        <p>A Rolling Sampler-style system audio recorder for Windows</p>
-    </header>
-    
-    <section class="hero">
-        <h2>Always quietly recording in memory</h2>
-        <p>Press a hotkey to save the last 15 minutes (or however long you buffered) to disk.</p>
-    </section>
-    
-    <section class="features">
+
+<header class="site-head">
+  <div class="wrap">
+    <span class="brand"><span class="dot" aria-hidden="true"></span><span>Recordr</span></span>
+    <nav>
+      <a href="#what">What it does</a>
+      <a href="#producers">For producers</a>
+      <a href="#features">Features</a>
+      <a href="#themes">Themes</a>
+      <a href="#licence">Licence</a>
+      <a href="#download">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <div class="wrap hero">
+    <span class="badge">Windows 10 / 11 · work in progress</span>
+    <h1>Always recording <em>in memory</em>.</h1>
+    <p class="lede">Something great just played and you weren't recording? <strong>Save the last 15 minutes</strong> with one hotkey.</p>
+    <p class="sub">Recordr runs a rolling buffer of your system audio — no microphone, no re-recording, no "I wish I'd hit record". It captures the output of a specific device through WASAPI loopback, keeps it in RAM, and writes a file only when you ask. Everything stays on your machine.</p>
+
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/Chimthuwu/recordr/releases/latest">Download for Windows</a>
+      <a class="btn ghost" href="https://github.com/Chimthuwu/recordr">View the source</a>
+    </div>
+
+    <p class="note">Pre-alpha. The rolling buffer, the WASAPI loopback capture, the visualizers and the tray are all real and working; expect rough edges elsewhere, and expect to build from source until the first tagged release lands.</p>
+
+    <!-- Screenshot slot: scripts/theme-shots.mjs writes main-modern.png here. -->
+    <figure class="shot">
+      <img src="assets/themes/main-modern.png" alt="The Recordr dashboard in its default Modern neon theme" onerror="this.remove()">
+      <div class="fallback">Screenshot pending — run <code>node scripts/theme-shots.mjs</code> against a running build (see README).</div>
+    </figure>
+  </div>
+
+  <section id="what">
+    <div class="wrap">
+      <h2>What it does</h2>
+      <p class="kicker">A recorder that assumes the interesting moment has already happened.</p>
+
+      <div class="steps">
+        <div class="step">
+          <h3>Pick a device, not a mic</h3>
+          <p>Recordr captures your <b>output</b>: the speakers, the headset, a virtual cable. The WASAPI loopback backend grabs one output device at a time, so a browser tab, a game and a synth can be captured separately without the room, the fans or the neighbours.</p>
+        </div>
+        <div class="step">
+          <h3>It buffers continuously</h3>
+          <p>The rolling buffer holds 1 minute up to 1 hour in memory (15 minutes by default). It never resets — it slides, so every moment has its own grace period from the second it played.</p>
+        </div>
+        <div class="step">
+          <h3>You save after the fact</h3>
+          <p>Press <b>Alt+R</b> for a short clip, or hit Save to write the whole buffered window to disk. Traditional record-on/record-off mode is there too if you'd rather work that way.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="producers">
+    <div class="wrap">
+      <h2>For producers</h2>
+      <p class="kicker">Reference material, happy accidents and "what was that preset?" — without a second machine.</p>
+
+      <div class="cols">
+        <div class="card">
+          <h3>Drag the past into your DAW</h3>
+          <p>The history view is a real timeline. Drag a selection out of it and it lands in Explorer as a <b>WAV any DAW imports</b> — Bitwig, FL Studio, Ableton. Slices are cut to the sample, not to the nearest frame.</p>
+        </div>
+        <div class="card">
+          <h3>Per-device loopback capture</h3>
+          <p>A browser, a plugin, a game, a call — pick the output device and record just that, clean, at the source. No mic in the loop, no re-performing the part you liked.</p>
+        </div>
+        <div class="card">
+          <h3>MIDI out of it, if you want</h3>
+          <p>Optional melody and chord transcription writes a <code>.mid</code> next to the audio, on a background worker so a save is never blocked. Off by default — it costs CPU time proportional to the clip.</p>
+        </div>
+        <div class="card">
+          <h3>A strip above your session</h3>
+          <p>Dock Recordr across the top of the monitor and it can reserve the desktop space so nothing hides behind it — the same trick the taskbar uses. It's always-on-top, and it shrinks down to a couple of rows when you want it out of the way.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>Features</h2>
+      <p class="kicker">Everything here runs locally. No account, no upload, no analytics.</p>
+
+      <div class="features">
         <div class="feature">
-            <h3>Rolling Buffer Technology</h3>
-            <p>Never lose audio from the past N minutes with our always-on rolling buffer that continuously captures system audio.</p>
+          <h3>Rolling buffer, 1 min → 1 hr</h3>
+          <p>Configurable in one click from the title bar or the right-click menu; the HUD shows how much of the window is held.</p>
         </div>
         <div class="feature">
-            <h3>Hotkey Save</h3>
-            <p>Instantly save buffered audio to disk with a customizable hotkey (Shift+Alt+R by default).</p>
+          <h3>Four visualizers</h3>
+          <p>Oscilloscope, spectrum bars, a scrolling spectrogram, and the rolling <b>history</b> view you select and drag from. Split them side by side.</p>
         </div>
         <div class="feature">
-            <h3>Multiple Formats</h3>
-            <p>Save recordings as WebM, WAV, or MP3 with configurable bitrate and quality settings.</p>
+          <h3>12 themes</h3>
+          <p>Modern neon, classic green, cyberpunk, synthwave, monochrome, kawaii, aqua, sakura, lime, blood red, nocturnal, black ice.</p>
         </div>
         <div class="feature">
-            <h3>Visualizer</h3>
-            <p>Real-time audio visualization with oscilloscope, spectrum, and spectrogram views.</p>
+          <h3>WebM / WAV / MP3</h3>
+          <p>Opus-in-WebM by default (small, widely supported), or encode to WAV/MP3 on save at a bitrate you choose.</p>
         </div>
-    </section>
-    
-    <section class="cta">
-        <h2>Download Recordr</h2>
-        <p>Experience the future of system audio recording on Windows</p>
-        <button class="cta-button">Download Now</button>
-    </section>
-    
-    <footer>
-        <p>&copy; 2026 Recordr. All rights reserved.</p>
-    </footer>
+        <div class="feature">
+          <h3>Clip recorder</h3>
+          <p>A dedicated record button — and a hotkey — that streams a short clip straight to disk with its own always-on-top timer window.</p>
+        </div>
+        <div class="feature">
+          <h3>Two capture backends</h3>
+          <p>WASAPI loopback for a specific output device, or Chromium's own screen/window picker when you want to follow a window.</p>
+        </div>
+        <div class="feature">
+          <h3>Filename templates</h3>
+          <p>Build the name you want from tokens — date, time, device, mode, counter — with clickable chips in Settings.</p>
+        </div>
+        <div class="feature">
+          <h3>Tray that tells the truth</h3>
+          <p>Live timer in the title, record state on the icon, recent saves one right-click away, and a recovery item for the desktop work area.</p>
+        </div>
+        <div class="feature">
+          <h3>Always on top, single instance</h3>
+          <p>Pinned above your DAW on any monitor, and a second launch focuses the running app instead of opening a duplicate.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="themes">
+    <div class="wrap">
+      <h2>12 themes, one recorder</h2>
+      <p class="kicker">Colour is a preference, not a feature you should pay for. Shots below are captured from a running build.</p>
+
+      <!-- One card per theme, in the same order as THEMES in src/shared/types.ts.
+           The swatch colour is that theme's accent; it stands in until the real
+           screenshot exists, and the <img> removes itself if the file is absent. -->
+      <div class="themes">
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#7df9ff"><img src="assets/themes/main-modern.png" alt="Recordr in the Modern neon theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Modern neon</b> — the default</figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#00ff00"><img src="assets/themes/main-classic.png" alt="Recordr in the Classic green theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Classic green</b> — CRT</figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#fcee0a"><img src="assets/themes/main-cyberpunk.png" alt="Recordr in the Cyberpunk theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Cyberpunk</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#ff7700"><img src="assets/themes/main-synthwave.png" alt="Recordr in the Synthwave theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Synthwave</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#ffffff"><img src="assets/themes/main-monochrome.png" alt="Recordr in the Monochrome theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Monochrome</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#ff8fc7"><img src="assets/themes/main-kawaii.png" alt="Recordr in the Hyper kawaii theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Hyper kawaii ✿</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#2dd4bf"><img src="assets/themes/main-aqua.png" alt="Recordr in the Aqua theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Aqua</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#d8a0d8"><img src="assets/themes/main-sakura.png" alt="Recordr in the Sakura theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Sakura</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#39ff5a"><img src="assets/themes/main-lime.png" alt="Recordr in the Lime green theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Lime green</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#ff1024"><img src="assets/themes/main-blood-red.png" alt="Recordr in the Blood red theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Blood red</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#6a8dff"><img src="assets/themes/main-nocturnal.png" alt="Recordr in the Nocturnal theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Nocturnal</b></figcaption></figure>
+        <figure class="theme-card"><div class="theme-shot" style="--sw:#7fe3f5"><img src="assets/themes/main-black-ice.png" alt="Recordr in the Black ice theme" loading="lazy" onerror="this.remove()"><div class="theme-swatch" aria-hidden="true"></div></div><figcaption><b>Black ice</b></figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <h2>Download</h2>
+      <p class="kicker">Windows 10 or 11, 64-bit. One installer, no runtime to install first.</p>
+
+      <div class="cols">
+        <div class="card">
+          <h3>Installer</h3>
+          <p>An NSIS <code>Recordr Setup</code> build, around 74 MB. It ships the WASAPI loopback helper with it, so there's no .NET SDK to install.</p>
+        </div>
+        <div class="card">
+          <h3>From source</h3>
+          <p>Node 18+, then <code>npm install</code> and <code>npm run dev</code>. <code>npm run package</code> builds the installer.</p>
+        </div>
+        <div class="card">
+          <h3>Requirements</h3>
+          <p>System-audio capture needs Windows; the app itself is Electron 30 with a small .NET 8 helper for the per-device loopback path.</p>
+        </div>
+      </div>
+
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/Chimthuwu/recordr/releases/latest">Get the latest build</a>
+        <a class="btn ghost" href="https://github.com/Chimthuwu/recordr#readme">Read the docs</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="licence">
+    <div class="wrap">
+      <h2>Licence &amp; price</h2>
+      <p class="kicker">What it costs, and what you're allowed to do with it.</p>
+
+      <div class="licence-grid">
+        <div class="card">
+          <h3>Source</h3>
+          <p>Recordr is a one-developer desktop app. The repository is the product: issues, source and release notes all live there.</p>
+          <p style="margin-top:10px"><a href="https://github.com/Chimthuwu/recordr">github.com/Chimthuwu/recordr</a></p>
+        </div>
+        <div class="card">
+          <h3>Your audio</h3>
+          <p>Recordings are written to the folder you choose and never leave your machine. There is no account, no telemetry, and no cloud component in the app.</p>
+        </div>
+        <div class="card">
+          <h3>Price</h3>
+          <!-- OWNER TODO: this section is deliberately a placeholder. The licence
+               file is missing from the repo (README says MIT) and no price has
+               been decided. Fill both in before the site is published, or delete
+               this card. -->
+          <div class="placeholder">
+            <b>Not decided yet.</b> This site isn't published and pricing hasn't been set. Until it is, treat the source as the only way to get Recordr.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <span>Recordr — a Rolling Sampler-style system audio recorder for Windows.</span>
+    <span class="spacer"></span>
+    <a href="https://github.com/Chimthuwu/recordr/releases">Releases</a>
+    <a href="https://github.com/Chimthuwu/recordr/issues">Issues</a>
+  </div>
+</footer>
+
 </body>
 </html>

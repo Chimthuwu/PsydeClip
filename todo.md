@@ -7,8 +7,9 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [!] History phase 5 right-click "Save selection" menu item: needs a UI decision (intercept before the global quick menu vs add to it)
 - [!] Deprecate Pop-out mode (docked mode works; remove the pop-out code to simplify) (section 11)
 - [x] Ultra-compact docked mode: the docked strip's floor is no longer pinned at 100px — it can be dragged down to 52px (title bar + one tight HUD row; the board is dropped at ≤96px, never clipped). New CSS height tiers at 190/150/96 in `styles.css`; `DOCK_MIN_HEIGHT`/`DOCK_STRIP_HEIGHT` in `window-controls.ts`. (2026-10-06, typecheck + build pass; not eyeballed at 52px — a true ~32px strip needs the transport moved into the title bar, still open)
-- [ ] Marketing website: hero, what-it-does, DAW/producer angle, theme screenshots, download CTA, licence/price section (section 7, NEXT)
-- [ ] Capture screenshots of the 12 themes from a running build for the site and README
+- [x] Marketing website: built as a static page in `marketing-website/` (hero, what-it-does, producer/DAW angle, features, 12-theme gallery, download CTA, licence/price placeholder) — no build step, no dependencies; `marketing-website/README.md` lists what's still missing. Theme screenshots are still pending (next item), the gallery falls back to each theme's accent colour. (2026-10-06, structure checked against `THEMES`; not viewed in a browser)
+- [ ] Capture screenshots of the 12 themes from a running build for the site and README — `scripts/theme-shots.mjs` now covers all 12 and writes straight to `marketing-website/assets/themes/`, but it has not been run (needs a live build + a human to pick the frames)
+- [!] Publish the marketing site: hosting + domain, price, and the licence (README says MIT but there is no `LICENSE` file and no `license` field in `package.json`) are all undecided — and the download links need a tagged release plus a public repo (section 7)
 - [!] Layered / blended visualizers (e.g. oscilloscope over history at reduced opacity): DRAFT, needs the pairs, UX option and time-base decisions first (section 11)
 - [!] Android version: browser port was ruled out, so choose between a `window.api` shim under a Capacitor shell and a ground-up native Kotlin app (section 7, NEXT)
 
@@ -815,16 +816,42 @@ User request 2026-10-03, alongside an explicit **"we won't have a web version"**
   consequence for the Android item below (read its ⚠️).
 * **YES a marketing/sales site**, eventually, to sell the product. This is
   ordinary landing-page work — hero, what-it-does, the DAW/producer angle,
-  screenshots of the 13 themes, download CTA, licence/price section. It is
-  **not started**, no copy written, no design chosen.
+  screenshots of the themes, download CTA, licence/price section.
 
-Practical notes for whoever builds it: the app's own strengths are already
-written down here — rolling always-on-memory capture, hotkey save of the last
-N minutes, clip recorder with always-on-top window, DAW-importable WAV drag-out,
-13 themes, spectrogram/oscilloscope/spectrum/history visualizers. The README
-already has a formatted header block worth reusing. Screenshots do not exist
-yet in the repo and will need capturing from a running build. No hosting,
-domain or stack has been chosen.
+**LANDED 2026-10-06 — a first cut is built, in `marketing-website/`.** Static
+and dependency-free on purpose (no stack was ever chosen, and a static page is
+the only free option that needs no decision to start): `index.html` +
+`styles.css`, palette taken from the app's own default theme so the site and the
+product look like the same thing. Sections: hero (with the pre-alpha warning),
+what-it-does, **for producers** (drag-out WAV into a DAW, per-device loopback,
+optional MIDI, the docked strip), features, the theme gallery, download, and a
+licence/price block. `marketing-website/README.md` carries the open items.
+
+* **The theme count in this file was wrong — it is 12, not 13.** `THEMES` in
+  `src/shared/types.ts` is the source of truth and lists 12 (`dark-lime` was
+  deleted and became `black-ice`). The site's gallery is generated from that
+  list, and the 12 cards were checked against it (names *and* swatch colours)
+  programmatically.
+* **Screenshots are still the gap.** `scripts/theme-shots.mjs` now covers all 12
+  themes (was 3) and defaults to writing `main-<theme>.png` into
+  `marketing-website/assets/themes/`, which is where the site's `<img>` tags
+  point; its pop-out pass is non-fatal now, since the pop-out is slated for
+  removal and the site doesn't need it. **It has not been run** — it drives a
+  live dev instance and switches the theme 12 times. Until it runs, each theme
+  card falls back to a canvas of that theme's accent colour, so the page never
+  shows a broken image.
+* **Not publishable yet, and none of it is a code problem:** no hosting or
+  domain; no price (the price card is a deliberate placeholder with an
+  `OWNER TODO` in the markup); **no `LICENSE` file in the repo and no `license`
+  field in `package.json`**, so the page deliberately states no licence even
+  though the README says MIT; and the download links point at a `releases/latest`
+  that doesn't exist yet on a private repo.
+* The site's copy is written from the code, not from the README — the README is
+  stale in places (two themes / three visualizers / the old `Shift+Alt+R`
+  hotkey). Worth a pass of its own.
+* Remaining work, in order: run the screenshot capture → add `LICENSE` +
+  `license` field and decide the price → decide hosting (GitHub Pages needs the
+  repo public or a paid plan) → cut a tagged release → re-read the copy.
 
 ### → NEXT: an Android version
 
