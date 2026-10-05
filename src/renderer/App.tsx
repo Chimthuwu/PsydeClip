@@ -361,6 +361,20 @@ export default function App() {
     window.api.showContextMenu();
   }, []);
 
+  // `s` saves the History selection (RS parity). Ignored while typing, with
+  // modifiers held, or when there's no selection to save.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 's' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      if ((e.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      if (!selectionRef.current) return;
+      e.preventDefault();
+      void performSave();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   // Mirror our local capturing state into the tray so its title, overlay
   // badge, tooltip and elapsed-time ticker stay in sync.
   useEffect(() => {
