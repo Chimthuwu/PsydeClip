@@ -1,3 +1,17 @@
+# Recordr - OPEN TASKS (checklist index, 2026-10-06)
+
+This file is a notes-style log. The checklist below is the quick index of what is still open; details live in the sections it points to. `[!]` = needs a decision or a human check first.
+
+- [ ] Make History drag-out WAV slices sample-accurate (`export-engine.ts` decode-vs-`newestSec` mapping, section 11.4 phase 3); add phase 5 (right-click "save selection" + shortcut)
+- [ ] Deprecate Pop-out mode (docked mode works; remove the pop-out code to simplify) (section 11)
+- [ ] Ultra-compact docked mode: let the docked window shrink further vertically instead of using a pop-out (section 11)
+- [ ] Marketing website: hero, what-it-does, DAW/producer angle, theme screenshots, download CTA, licence/price section (section 7, NEXT)
+- [ ] Capture screenshots of the 13 themes from a running build for the site and README
+- [!] Layered / blended visualizers (e.g. oscilloscope over history at reduced opacity): DRAFT, needs the pairs, UX option and time-base decisions first (section 11)
+- [!] Android version: browser port was ruled out, so choose between a `window.api` shim under a Capacitor shell and a ground-up native Kotlin app (section 7, NEXT)
+
+---
+
 # Recordr — Project Handoff
 
 > **Last updated:** 2026-08-17 (Phase 10 — v3.0.0)
