@@ -1,18 +1,41 @@
 /**
- * Capture screenshots of the cyberpunk / synthwave / kawaii themes from the
- * Recordr dev instance (CDP). Refuses to shoot unless the page is Recordr.
+ * Capture screenshots of every theme from the Recordr dev instance (CDP).
+ * Refuses to shoot unless the page is Recordr.
+ *
+ * Writes to `marketing-website/assets/themes/` by default, which is where the
+ * marketing site's `<img>` tags point (`main-<theme>.png`), so one run fills in
+ * the site's theme gallery and gives the README something to show.
  *
  * Usage: node scripts/theme-shots.mjs [port] [outDir]
  * Requires: `npm run dev:renderer` and
  *   `NODE_ENV=development electron . --remote-debugging-port=<port>`
  */
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const port = process.argv[2] ?? '9223';
-const outDir = process.argv[3] ?? path.join(os.tmpdir(), 'recordr-theme-shots');
-const themes = ['cyberpunk', 'synthwave', 'kawaii'];
+const here = path.dirname(fileURLToPath(import.meta.url));
+const outDir = process.argv[3] ?? path.join(here, '..', 'marketing-website', 'assets', 'themes');
+/**
+ * Mirrors THEMES in src/shared/types.ts — the one list the Settings panel and
+ * the right-click quick menu read from. Keep it in step with that (12 themes as
+ * of 2026-10-06; "dark-lime" was deleted and became "black-ice").
+ */
+const themes = [
+  'modern',
+  'classic',
+  'cyberpunk',
+  'synthwave',
+  'monochrome',
+  'kawaii',
+  'aqua',
+  'sakura',
+  'lime',
+  'blood-red',
+  'nocturnal',
+  'black-ice',
+];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function getTarget() {
@@ -99,35 +122,51 @@ async function main() {
     shots.push(file);
   }
 
-  // Pop-out (drag strip + board) per theme.
-  await evalJs(cdp, `window.api.togglePopout(true).then(() => true)`);
-  await sleep(1500);
-  let pop = null;
-  for (let i = 0; i < 20 && !pop; i++) {
-    const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-    pop = list.find((t) => t.type === 'page' && t.url.includes('#popout'));
-    if (!pop) await sleep(300);
+  // Pop-out (drag strip + board) per theme. Non-fatal on purpose: the pop-out
+  // is slated for removal (todo §11) and the marketing site only needs the
+  // main-window shots, so a pop-out that won't open must not throw away a run
+  // that has already written them.
+  let pcdp = null;
+  try {
+    await evalJs(cdp, `window.api.togglePopout(true).then(() => true)`);
+    await sleep(1500);
+    let pop = null;
+    for (let i = 0; i < 20 && !pop; i++) {
+      const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+      pop = list.find((t) => t.type === 'page' && t.url.includes('#popout'));
+      if (!pop) await sleep(300);
+    }
+    if (!pop) throw new Error('pop-out did not open');
+    pcdp = await connect(pop.webSocketDebuggerUrl);
+    await pcdp.send('Page.enable');
+    await pcdp.send('Runtime.enable');
+    const pg = await evalJs(pcdp, `({ ok: !!document.querySelector('.popout'), phaser: !!document.querySelector('#phaser-container') })`);
+    if (!pg.ok || pg.phaser) throw new Error('pop-out is not Recordr');
+    for (const theme of themes) {
+      await setTheme(theme);
+      await sleep(900);
+      const file = path.join(outDir, `popout-${theme}.png`);
+      const shot = await pcdp.send('Page.captureScreenshot', { format: 'png' });
+      fs.writeFileSync(file, Buffer.from(shot.data, 'base64'));
+      shots.push(file);
+    }
+  } catch (e) {
+    console.warn(`pop-out shots skipped: ${e.message || e}`);
+  } finally {
+    pcdp?.close();
+    try {
+      await evalJs(cdp, `window.api.togglePopout(false).then(() => true)`);
+    } catch {
+      /* the window may already be gone */
+    }
+    cdp.close();
   }
-  if (!pop) throw new Error('pop-out did not open');
-  const pcdp = await connect(pop.webSocketDebuggerUrl);
-  await pcdp.send('Page.enable');
-  await pcdp.send('Runtime.enable');
-  const pg = await evalJs(pcdp, `({ ok: !!document.querySelector('.popout'), phaser: !!document.querySelector('#phaser-container') })`);
-  if (!pg.ok || pg.phaser) throw new Error('pop-out is not Recordr — aborting');
-  for (const theme of themes) {
-    await setTheme(theme);
-    await sleep(900);
-    const file = path.join(outDir, `popout-${theme}.png`);
-    const shot = await pcdp.send('Page.captureScreenshot', { format: 'png' });
-    fs.writeFileSync(file, Buffer.from(shot.data, 'base64'));
-    shots.push(file);
-  }
-  pcdp.close();
-  await evalJs(cdp, `window.api.togglePopout(false).then(() => true)`);
-  cdp.close();
 
-  console.log('Wrote:');
-  for (const f of shots) console.log(`  ${f} (${fs.statSync(f).size} bytes)`);
+  const expected = themes.map((t) => path.join(outDir, `main-${t}.png`));
+  const missing = expected.filter((f) => !fs.existsSync(f));
+  console.log(`Wrote ${shots.length} shot(s) to ${outDir}:`);
+  for (const f of shots) console.log(`  ${path.basename(f)} (${fs.statSync(f).size} bytes)`);
+  if (missing.length) console.log(`MISSING main-window shots: ${missing.map((f) => path.basename(f)).join(', ')}`);
 }
 
 main().catch((e) => {
