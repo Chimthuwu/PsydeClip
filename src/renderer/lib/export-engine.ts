@@ -11,6 +11,8 @@ let decodeCache: {
   recorder: RecorderHandle | null;
   channels: Int16Array[];
   sampleRate: number;
+  /** historyModel.newestSec when the snapshot was taken: the decoded buffer's end sits here. */
+  anchorSec: number | null;
 } | null = null;
 
 export function invalidateExportCache() {
@@ -43,12 +45,23 @@ export async function exportSelection(
   if (decodeCache?.recorder !== recorder) {
     decodeCache = null;
   }
+  // The buffer keeps growing after a decode. A selection reaching past the
+  // cached end (or any selection without an anchor to map from) needs a fresh decode.
+  if (
+    decodeCache &&
+    bounds &&
+    historyModel &&
+    (decodeCache.anchorSec === null || bounds[1] > decodeCache.anchorSec + 0.05)
+  ) {
+    decodeCache = null;
+  }
 
   if (decodeCache) {
     channels = decodeCache.channels;
     sampleRate = decodeCache.sampleRate;
   } else {
     const blob = await recorder.snapshotBuffer(); // Entire buffer
+    const anchorSec = historyModel ? historyModel.newestSec : null;
     if (blob.size === 0) {
       return { bytes: new Uint8Array(), ext: 'wav', durationSec: 0 };
     }
@@ -80,8 +93,10 @@ export async function exportSelection(
       recorder,
       channels,
       sampleRate,
+      anchorSec,
     };
   }
+  const anchorSec = decodeCache.anchorSec;
 
   // 3 & 4. Slice in PCM frames
   const totalFrames = channels[0].length;
@@ -90,17 +105,17 @@ export async function exportSelection(
   let startFrame = 0;
   let endFrame = totalFrames;
 
-  if (bounds && historyModel) {
+  if (bounds && historyModel && anchorSec !== null) {
     // The decoded WebM buffer represents the actual chunks we recorded.
     // The historyModel peak track has `historyModel.durationSec`.
     // The decoded duration and history duration are usually very close, 
-    // but the end of the decoded buffer corresponds to `newestSec`.
+    // but the end of the decoded buffer corresponds to `newestSec` as of the snapshot (`anchorSec`).
     // We map the absolute seconds back from the end.
     const [startSec, endSec] = bounds;
     
     // Time from the end of the buffer:
-    const fromEndStart = Math.max(0, historyModel.newestSec - startSec);
-    const fromEndEnd = Math.max(0, historyModel.newestSec - endSec);
+    const fromEndStart = Math.max(0, anchorSec - startSec);
+    const fromEndEnd = Math.max(0, anchorSec - endSec);
 
     // Corresponding time in the decoded buffer:
     const startDecoded = Math.max(0, decodedDuration - fromEndStart);
