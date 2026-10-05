@@ -2,7 +2,8 @@
 
 This file is a notes-style log. The checklist below is the quick index of what is still open; details live in the sections it points to. `[!]` = needs a decision or a human check first.
 
-- [ ] Make History drag-out WAV slices sample-accurate (`export-engine.ts` decode-vs-`newestSec` mapping, section 11.4 phase 3); add phase 5 (right-click "save selection" + shortcut)
+- [x] Make History drag-out WAV slices sample-accurate: decode cache now anchors on `newestSec` at snapshot time and re-decodes when a selection reaches past it (2026-10-06, typecheck only, not verified by ear)
+- [ ] History phase 5: right-click "save selection" + `s` shortcut (section 11.4)
 - [ ] Deprecate Pop-out mode (docked mode works; remove the pop-out code to simplify) (section 11)
 - [ ] Ultra-compact docked mode: let the docked window shrink further vertically instead of using a pop-out (section 11)
 - [ ] Marketing website: hero, what-it-does, DAW/producer angle, theme screenshots, download CTA, licence/price section (section 7, NEXT)
