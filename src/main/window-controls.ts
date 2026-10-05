@@ -20,6 +20,31 @@ import { readSettings } from './settings';
 /** How close (px) a dragged edge has to get before it snaps. */
 const MAGNET_PX = 14;
 
+/**
+ * Height (CSS px) a window lands at when it is docked to the top of a monitor.
+ * A full-width strip that still shows the title bar, the HUD row and a slice of
+ * the visualizer — the shape the docked mode is known for, so it stays the
+ * default landing height.
+ */
+const DOCK_STRIP_HEIGHT = 100;
+
+/**
+ * How thin a docked strip is allowed to get, and the reason this is not simply
+ * `LAYOUT_MIN_SIZE.full.height`.
+ *
+ * The strip used to be pinned at 100px, which left the owner dragging a
+ * full-width window that could not go any thinner. The CSS height tiers in
+ * `styles.css` (max-height 190 / 150 / 96) shed the HUD's extras, then the
+ * board, as the strip narrows — so at this floor what is left is the title bar
+ * (26px) plus one tight HUD row carrying the LIVE pill, the buffer readout and
+ * the transport. Nothing is clipped: the board is `display: none` rather than
+ * squeezed to zero.
+ *
+ * Keep in step with those breakpoints — this is the floor they were written
+ * for. Going below it needs the transport rendered inside the title bar.
+ */
+const DOCK_MIN_HEIGHT = 52;
+
 /** Remembered height so leaving `bar` layout restores the previous size. */
 let restoreHeight: number | null = null;
 /** Height before a temporary expansion (see `tempExpand`). */
@@ -70,8 +95,8 @@ export function snapWindow(win: BrowserWindow | null, target: SnapTarget) {
   // window itself (the shell decides the exact rect), so there's nothing more
   // to do on this path.
   if (target === 'top' && readSettings().dockReservesSpace) {
-    win.setMinimumSize(LAYOUT_MIN_SIZE.compact.width, 100);
-    if (registerAppBar(win, 100)) return;
+    win.setMinimumSize(LAYOUT_MIN_SIZE.compact.width, DOCK_MIN_HEIGHT);
+    if (registerAppBar(win, DOCK_STRIP_HEIGHT)) return;
     // Fell through: not Windows, or the shell refused. Plain snap below.
   } else if (appBarOwner() === win) {
     // Moving somewhere else means we're no longer a top strip — give the
@@ -87,9 +112,11 @@ export function snapWindow(win: BrowserWindow | null, target: SnapTarget) {
   switch (target) {
     case 'top':
       // The user wants a thin strip when docked to the top, so we must drop
-      // the layout's minHeight constraint first.
-      win.setMinimumSize(LAYOUT_MIN_SIZE.compact.width, 100);
-      win.setBounds({ x: wa.x, y: wa.y, width: wa.width, height: 100 });
+      // the layout's minHeight constraint first — all the way down to
+      // DOCK_MIN_HEIGHT, which is what makes the strip shaveable to a couple of
+      // rows instead of stopping at the old 100px wall.
+      win.setMinimumSize(LAYOUT_MIN_SIZE.compact.width, DOCK_MIN_HEIGHT);
+      win.setBounds({ x: wa.x, y: wa.y, width: wa.width, height: DOCK_STRIP_HEIGHT });
       break;
     case 'bottom':
       win.setBounds({ x: wa.x, y: wa.y + wa.height - b.height, width: wa.width, height: b.height });

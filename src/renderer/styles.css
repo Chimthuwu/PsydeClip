@@ -2106,6 +2106,69 @@ small {
   }
 }
 
+/* Ultra-compact docked strip — below the range the tiers above were written
+   for. A strip docked across the top of a monitor is *wide*, so no width
+   breakpoint fires to help it; only height can. The window floor for a docked
+   strip is DOCK_MIN_HEIGHT (52px) in src/main/window-controls.ts, which is the
+   title bar plus one tight HUD row — as thin as the strip goes while the LIVE
+   pill and the transport stay reachable. Keep the two in step. */
+
+@media (max-height: 190px) {
+  /* The hotkey hint and the "device is silent" note are the last two things in
+     the row that can go without losing a control. */
+  .hud-hint,
+  .hud-quiet {
+    display: none;
+  }
+  .hud {
+    padding: 2px 8px;
+    gap: 6px;
+  }
+  .board {
+    min-height: 24px;
+    margin: 2px;
+  }
+}
+
+@media (max-height: 150px) {
+  /* The buffer readout goes before the LIVE pill does — recording state is the
+     one thing a strip this thin still has to answer at a glance. */
+  .hud-buffered {
+    display: none;
+  }
+  .pill {
+    padding: 2px 7px;
+    font-size: 11px;
+  }
+  .hud-actions button,
+  .hud-actions button.primary.big {
+    padding: 3px 9px;
+    font-size: 11px;
+  }
+  .board {
+    min-height: 14px;
+    margin: 1px;
+  }
+}
+
+/* Board gone: the strip is the title bar plus a single HUD row. The canvas is
+   clamped to 1×1 by VisualizerBoard's fit() at this point, so hiding it costs
+   nothing but the clipping — and display:none means the HUD row is never
+   pushed out of the window. */
+@media (max-height: 96px) {
+  .board {
+    display: none;
+  }
+  .hud {
+    padding: 1px 8px;
+    gap: 5px;
+  }
+  .hud-actions button,
+  .hud-actions button.primary.big {
+    padding: 2px 8px;
+  }
+}
+
 /* Custom title bar --------------------------------------------------------
    26px against the OS bar's ~32, and it carries the controls that matter for
    a window docked to an edge. The strip itself is the drag region; every
