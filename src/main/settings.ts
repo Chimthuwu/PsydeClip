@@ -45,6 +45,12 @@ export function readSettings(): AppSettings {
       if (p.hotkey === 'Shift+Alt+R') p.hotkey = 'Alt+R';
       // 'dark-lime' theme was renamed to 'black-ice' (and restyled).
       if (p.theme === 'dark-lime') p.theme = 'black-ice';
+    } else if (parsed !== undefined && !Array.isArray(parsed)) {
+      // Not a JSON object (e.g. the file holds a bare literal). Fall through to
+      // the defaults rather than merging garbage in; the catch below never sees
+      // it because JSON.parse already succeeded.
+      console.error(`Settings file at ${settingsPath()} is not a JSON object; using defaults.`);
+      return { ...DEFAULT_SETTINGS };
     }
     return { ...DEFAULT_SETTINGS, ...parsed };
   } catch (err: any) {
