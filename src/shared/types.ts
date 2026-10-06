@@ -325,6 +325,15 @@ export interface SaveResult {
   error?: string;
 }
 
+/** One transcribed note; the shape the piano-roll lane draws (and FAZE can import). */
+export interface TranscribedNote {
+  pitch: number;
+  startSec: number;
+  durationSec: number;
+  /** 0..1 */
+  velocity: number;
+}
+
 /**
  * State of one MIDI transcription job. Shared between main, preload and the
  * renderer so progress can be reported over IPC without leaking main-only types.
@@ -339,6 +348,8 @@ export interface TranscribeJobState {
   /** 0..1 inference progress. */
   fraction: number;
   noteCount?: number;
+  /** The transcribed notes (seconds from the start of the audio). Set when done. */
+  notes?: TranscribedNote[];
   elapsedMs?: number;
   /** Realtime multiple, e.g. 0.66 means inference took longer than the clip. */
   ratio?: number;

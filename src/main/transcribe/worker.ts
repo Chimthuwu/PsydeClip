@@ -20,12 +20,14 @@
  */
 
 import fs from 'node:fs';
+import type { TranscribedNote } from '../../shared/types';
 import { parentPort, workerData } from 'node:worker_threads';
 import {
   CancelledError,
   MODEL_SR,
   notesToMidiBytes,
   resampleToModelRate,
+  toTranscribedNotes,
   transcribe,
   type Thresholds,
 } from './engine';
@@ -60,6 +62,7 @@ export type WorkerResponse =
       type: 'done';
       id: string;
       noteCount: number;
+      notes: TranscribedNote[];
       elapsedMs: number;
       ratio: number;
       outPath: string;
@@ -129,6 +132,7 @@ async function run(req: TranscribeRequest): Promise<void> {
       type: 'done',
       id,
       noteCount: res.notes.length,
+      notes: toTranscribedNotes(res.notes),
       elapsedMs: res.elapsedMs,
       ratio: res.ratio,
       outPath: req.outPath,

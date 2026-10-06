@@ -23,6 +23,7 @@
  */
 
 import fs from 'node:fs';
+import type { TranscribedNote } from '../../shared/types';
 import path from 'node:path';
 import { Midi } from '@tonejs/midi';
 import {
@@ -241,6 +242,16 @@ export async function transcribe(
     ratio: samples.length / MODEL_SR / (elapsedMs / 1000),
     sampleRate: MODEL_SR,
   };
+}
+
+/** Plain note list (seconds, velocity 0..1) for the renderer's piano roll. */
+export function toTranscribedNotes(notes: NoteEvent[]): TranscribedNote[] {
+  return notes.map((n) => ({
+    pitch: n.pitchMidi,
+    startSec: n.startTimeSeconds,
+    durationSec: n.durationSeconds,
+    velocity: Math.max(0, Math.min(1, n.amplitude ?? 1)),
+  }));
 }
 
 /** Serialise note events to a Standard MIDI File at `bpm`. */
