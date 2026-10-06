@@ -3,7 +3,7 @@
 # 🎙️ Recordr
 
 **A Rolling Sampler–style system audio recorder for Windows.**  
-Always quietly recording in memory — press a hotkey to save the last 15 minutes (or however long you buffered) to disk.
+Always quietly recording in memory — press **Save** to write the last 15 minutes (or however long you buffered) to disk.
 
 [![platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/Chimthuwu/recordr)
 [![electron](https://img.shields.io/badge/Electron-30-47848F?logo=electron&logoColor=white)](https://www.electronjs.org)
@@ -36,7 +36,7 @@ Always quietly recording in memory — press a hotkey to save the last 15 minute
 
 | Feature | Description |
 |---|---|
-| 🔁 **Rolling buffer** | Continuously captures the last 1 min → 1 hr to RAM; press the hotkey any time to save that slice to a `.webm`/Opus file |
+| 🔁 **Rolling buffer** | Continuously captures the last 1 min → 1 hr to RAM; **Save** writes that slice to disk as a `.webm`/Opus file (or WAV / MP3) |
 | ⏺️ **Traditional mode** | The same app, but the hotkey toggles record on/off and auto-saves on stop, like a normal recorder |
 | 🎬 **Clip recorder** | The record button (and the hotkey) cuts a short clip straight to disk, independent of the rolling buffer — no whole-session re-encode |
 | 🎼 **Optional MIDI** | Turn on *Transcribe on save* and every recording also gets a `.mid` beside it (Basic Pitch, CPU) |
@@ -102,7 +102,7 @@ flowchart LR
   Worklet ==> Analyser
   Worklet ==> Recorder
   Analyser -. frames .-> Recorder
-  Recorder == hotkey snapshot ==> Save
+  Recorder == save snapshot ==> Save
   Save ==> Tray
   Hotkey --> Renderer
   Settings <--> Save
