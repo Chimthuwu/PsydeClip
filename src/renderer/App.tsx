@@ -9,6 +9,14 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { ToastStack } from './components/ToastStack';
 import { encodeFromBlob, encodeFromPcm } from './lib/encode';
 import { transcribeSavedRecording } from './lib/transcribe';
+import {
+  getNoteLayer,
+  putNoteLayer,
+  rangeLabel,
+  selectionKey,
+  clearNoteLayers,
+  type NoteLayer,
+} from './lib/note-store';
 import { useSettings } from './hooks/useSettings';
 import { useCapture } from './hooks/useCapture';
 import { useRecorderEvents } from './hooks/useRecorderEvents';
@@ -302,6 +310,93 @@ export default function App() {
     }
   }, [cs.recorder, cs.historyModel, settings.recordingFormat, settings.bitrateKbps]);
 
+  // The notes the piano-roll lane is currently drawing, in ABSOLUTE session
+  // seconds (todo.md §MIDI-1 Phase A). Null = no lane.
+  const [noteLayer, setNoteLayer] = useState<NoteLayer | null>(null);
+  const noteBusyRef = useRef(false);
+
+  /**
+   * Transcribe the current History selection and show its notes in the
+   * piano-roll lane (`m`, or the ♪ button on the selection).
+   *
+   * Notes-only: there is no saved audio file for a `.mid` to sit beside, and
+   * the note list is what the lane draws. Basic Pitch costs roughly the clip's
+   * own length, so results are cached per selection — re-selecting a range you
+   * already transcribed is instant, and pressing `m` again on the same range
+   * puts the lane away.
+   */
+  const transcribeSelection = useCallback(async () => {
+    const sel = selectionRef.current;
+    if (!cs.recorder || !cs.historyModel) {
+      emitToast('error', 'Start a capture first — there is nothing buffered to transcribe.');
+      return;
+    }
+    if (!sel || sel[1] - sel[0] <= 0) {
+      emitToast('error', 'Select a range in History first (drag across the waveform).');
+      return;
+    }
+
+    const key = selectionKey(sel);
+    const cached = getNoteLayer(key);
+    if (cached) {
+      // Same range again → toggle the lane off (the cache keeps the notes).
+      setNoteLayer((cur) => (cur === cached ? null : cached));
+      return;
+    }
+    if (noteBusyRef.current) {
+      emitToast('error', 'Already transcribing — one job at a time.');
+      return;
+    }
+
+    noteBusyRef.current = true;
+    try {
+      const { selectionToMono } = await import('./lib/export-engine');
+      const mono = await selectionToMono(cs.recorder, cs.historyModel, sel);
+      if (!mono || !mono.samples.length) {
+        emitToast('error', 'Nothing captured in that range yet — try a wider selection.');
+        return;
+      }
+      const label = rangeLabel(mono.startSec, mono.durationSec);
+      await transcribeSavedRecording(
+        {
+          audioPath: '',
+          samples: mono.samples,
+          sampleRate: mono.sampleRate,
+          notesOnly: true,
+        },
+        {
+          emitToast,
+          onSettled: (state) => {
+            if (state.status !== 'done') return;
+            if (!state.notes?.length) {
+              emitToast('error', `No notes found in ${label}.`);
+              return;
+            }
+            const layer: NoteLayer = {
+              startSec: mono.startSec,
+              durationSec: mono.durationSec,
+              notes: state.notes,
+              label,
+            };
+            putNoteLayer(key, layer);
+            setNoteLayer(layer);
+          },
+        },
+      );
+    } catch (e: any) {
+      emitToast('error', `Transcribe failed: ${e?.message ?? e}`);
+    } finally {
+      noteBusyRef.current = false;
+    }
+  }, [cs.recorder, cs.historyModel]);
+
+  // Session seconds are only meaningful within one recording session, so a new
+  // recorder (a restart) invalidates every cached layer.
+  useEffect(() => {
+    clearNoteLayers();
+    setNoteLayer(null);
+  }, [cs.recorder]);
+
   // Bridge local-toast events into the same toast array as 'recording:event'.
   const [toasts, setToasts] = useState<{ id: number; kind: 'saved' | 'error'; message: string }[]>([]);
   useEffect(() => {
@@ -370,6 +465,21 @@ export default function App() {
       if (!selectionRef.current) return;
       e.preventDefault();
       void performSave();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // `m` transcribes the History selection to MIDI and shows it in the
+  // piano-roll lane (§MIDI-1 Phase A). Same guards as `s`: not while typing,
+  // not with modifiers held, and nothing to do without a selection.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'm' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      if ((e.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      if (!selectionRef.current) return;
+      e.preventDefault();
+      void transcribeSelection();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -771,8 +881,12 @@ export default function App() {
                        mosaic. Other panes are read-only overviews. */
                     interactive={m === 'history' || m === 'spectrogram'}
                     dragReady={m === 'history' || m === 'spectrogram' ? dragReady : undefined}
+                    pianoRoll={m === 'history' && settings.showMidiLane ? noteLayer : null}
                     onSelectionChange={
                       m === 'history' || m === 'spectrogram' ? handleSelectionChange : undefined
+                    }
+                    onTranscribeSelection={
+                      m === 'history' && settings.showMidiLane ? transcribeSelection : undefined
                     }
                     onDragNotReady={() =>
                       emitToast('error', 'Snippet still preparing — give it a second, then drag.')
@@ -809,6 +923,8 @@ export default function App() {
                 gain={settings.vizGain}
                 historyModel={cs.historyModel}
                 dragReady={dragReady}
+                pianoRoll={settings.showMidiLane ? noteLayer : null}
+                onTranscribeSelection={settings.showMidiLane ? transcribeSelection : undefined}
                 onSelectionChange={handleSelectionChange}
                 onDragNotReady={() =>
                   emitToast('error', 'Snippet still preparing — give it a second, then drag.')

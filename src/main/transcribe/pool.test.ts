@@ -105,6 +105,44 @@ test('a real job transcribes and writes a .mid beside the audio', async () => {
   pruneJobs();
 });
 
+test('a notes-only job returns notes and writes nothing to disk', async () => {
+  // The piano-roll lane transcribes a *selection* out of the rolling buffer:
+  // there is no saved audio file, and the note list is the whole result. If
+  // this path ever wrote a .mid it would litter the folder with files named
+  // after an empty path.
+  const dir = tmpDir();
+  const jobId = 'job-notes-only';
+  const initial = startTranscription({
+    jobId,
+    samples: buildSignal(3),
+    sampleRate: SR,
+    audioPath: '',
+    notesOnly: true,
+  });
+
+  assert.equal(initial.status, 'running');
+  assert.equal(initial.midiPath, '', 'a notes-only job has no .mid path');
+
+  const state = await new Promise<NonNullable<ReturnType<typeof jobState>>>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timed out waiting for job')), 180000);
+    const tick = setInterval(() => {
+      const s = jobState(jobId);
+      if (s && s.status !== 'running') {
+        clearInterval(tick);
+        clearTimeout(timer);
+        resolve(s);
+      }
+    }, 100);
+  });
+
+  assert.equal(state.status, 'done', `job failed: ${state.error}`);
+  assert.ok((state.notes?.length ?? 0) > 0, 'expected the note list on the event');
+  assert.equal(state.notes?.length, state.noteCount);
+  assert.equal(state.midiPath, '');
+  assert.deepEqual(fs.readdirSync(dir), [], 'nothing may be written for a notes-only job');
+  pruneJobs();
+});
+
 test('cancelling a running job actually stops it', async () => {
   const dir = tmpDir();
   const audioPath = path.join(dir, 'cancel.wav');
