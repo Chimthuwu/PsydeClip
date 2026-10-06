@@ -63,9 +63,8 @@ it switches the theme 12 times, so don't run it while you're using it.
    elsewhere).
 3. **Price** — not decided, so the price card is a deliberate placeholder in
    `index.html` (there's an `OWNER TODO` comment on it). Nothing is published.
-4. **Licence** — the README says MIT, but there is **no `LICENSE` file in the
-   repo**, and `package.json` has no `license` field. The page deliberately does
-   not state a licence. Add the file (and the field) before advertising terms.
+4. **Licence** — MIT (`LICENSE` file and `license` field in `package.json` added
+   2026-10-06). The page does not state it yet; add a line if wanted.
 5. **Download links** point at
    `github.com/Chimthuwu/recordr/releases/latest`. There is no tagged release
    yet, and the repo is private, so those links only work for someone with

@@ -4,6 +4,7 @@
   "description": "Rolling Sampler-style audio recorder with oscilloscope/spectrogram visualizers",
   "main": "dist/main/index.js",
   "author": "Serge",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "concurrently -k -n vite,electron -c cyan,magenta \"npm:dev:renderer\" \"npm:dev:electron\"",
