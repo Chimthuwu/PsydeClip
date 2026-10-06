@@ -184,10 +184,12 @@ export function registerIpc(ctx: IpcContext) {
       samples: Float32Array;
       sampleRate: number;
       audioPath: string;
+      /** Transcribe for the note list only — no `.mid` is written. */
+      notesOnly?: boolean;
     },
   ): Promise<TranscribeJobState> => {
     try {
-      if (!args?.audioPath || !args?.samples?.length) {
+      if (!args?.samples?.length || (!args?.audioPath && !args?.notesOnly)) {
         return {
           jobId: args?.jobId ?? 'unknown',
           audioPath: args?.audioPath ?? '',
@@ -201,7 +203,8 @@ export function registerIpc(ctx: IpcContext) {
         jobId: args.jobId,
         samples: args.samples,
         sampleRate: args.sampleRate,
-        audioPath: args.audioPath,
+        audioPath: args.audioPath ?? '',
+        notesOnly: args.notesOnly,
       });
       // Report progress for this job back to the renderer that asked.
       watchJob(state.jobId, e.sender);

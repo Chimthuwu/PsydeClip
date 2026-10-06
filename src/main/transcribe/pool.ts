@@ -27,6 +27,13 @@ export interface StartJobInput {
   sampleRate: number;
   /** Full path of the audio file already written to disk. */
   audioPath: string;
+  /**
+   * Notes-only job: no `.mid` is written and `audioPath` may be empty. Used by
+   * the piano-roll lane, which transcribes a *selection* out of the rolling
+   * buffer — there is no saved audio file for a `.mid` to sit beside, and the
+   * note list is the whole point (todo.md §MIDI-1 Phase A).
+   */
+  notesOnly?: boolean;
   thresholds?: { onset: number; frame: number; minimumNoteLength: number };
 }
 
@@ -158,7 +165,8 @@ export function startTranscription(input: StartJobInput): TranscribeJobState {
   const state: TranscribeJobState = {
     jobId: input.jobId,
     audioPath: input.audioPath,
-    midiPath: midiPathFor(input.audioPath),
+    // '' means "no file" — the worker skips the write when outPath is empty.
+    midiPath: input.notesOnly ? '' : midiPathFor(input.audioPath),
     status: 'running',
     fraction: 0,
   };

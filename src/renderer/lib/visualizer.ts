@@ -1,4 +1,5 @@
 import type { Theme, VisualizerMode } from '../../shared/types';
+import { isSharp, type PianoRollLayout } from '../../shared/piano-roll';
 import { HistoryModel } from './history-model';
 
 /**
@@ -929,4 +930,85 @@ function drawHistory(
       if (x < width - 34) ctx.fillText(formatRulerTime(t, step), x + 3, plotH + rulerH / 2);
     }
   }
+}
+
+/**
+ * Draw the MIDI piano-roll lane (todo.md §MIDI-1, Phase A) into its own canvas.
+ *
+ * The lane deliberately shares the History waveform's time axis: `layout` comes
+ * from `layoutPianoRoll` with the same resolved viewport the waveform was drawn
+ * with, so a note bar sits exactly over the audio it was transcribed from, at
+ * any zoom or pan — no second coordinate system to keep in sync.
+ *
+ * Sizes are in device pixels, matching the backing store of the canvas the
+ * caller passes (the board is DPR-aware, and a scaled 2D context would blur
+ * every note edge).
+ */
+export function drawPianoRollLane(
+  ctx: CanvasRenderingContext2D,
+  layout: PianoRollLayout,
+  theme: Theme,
+  opts: { label?: string; emptyText?: string } = {},
+): void {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  if (w <= 0 || h <= 0) return;
+
+  const p = palette(theme);
+  drawBackground(ctx, w, h, theme);
+
+  const laneH = layout.laneHeight;
+  // Sharp-key lanes shaded, so the grid reads as a piano roll and not stripes.
+  // Skipped when the lanes are too short to carry a shading difference.
+  if (laneH >= 3) {
+    ctx.fillStyle = p.grid;
+    for (let pitch = layout.lowPitch; pitch <= layout.highPitch; pitch++) {
+      if (!isSharp(pitch)) continue;
+      ctx.fillRect(0, (layout.highPitch - pitch) * laneH, w, laneH);
+    }
+  }
+
+  // Octave (C) rules, the one landmark that makes a pitch range readable.
+  ctx.strokeStyle = p.gridStrong;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let pitch = layout.lowPitch; pitch <= layout.highPitch; pitch++) {
+    if (((pitch % 12) + 12) % 12 !== 0) continue;
+    const y = Math.round((layout.highPitch - pitch) * laneH) + 0.5;
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+  }
+  ctx.stroke();
+
+  // Notes. Velocity → alpha, so dynamics are visible without a legend.
+  const inset = laneH >= 4 ? 1 : 0;
+  const radius = Math.min(3, Math.max(0, (laneH - inset * 2) / 2));
+  const canRound = typeof (ctx as { roundRect?: unknown }).roundRect === 'function';
+  for (const r of layout.rects) {
+    ctx.globalAlpha = 0.35 + 0.65 * r.velocity;
+    ctx.fillStyle = p.wave;
+    const y = r.y + inset;
+    const barH = Math.max(1, r.h - inset * 2);
+    if (canRound && radius > 0) {
+      ctx.beginPath();
+      ctx.roundRect(r.x, y, r.w, barH, radius);
+      ctx.fill();
+    } else {
+      ctx.fillRect(r.x, y, r.w, barH);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Caption: which range this is (and how much of it is in view), or why the
+  // lane is empty. Drawn last so a note can never sit on top of it.
+  const text = layout.rects.length
+    ? `${opts.label ? `${opts.label} · ` : ''}${layout.rects.length} note${layout.rects.length === 1 ? '' : 's'}`
+    : opts.emptyText ?? 'No notes in view';
+  ctx.font = '10px ui-monospace, Consolas, monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = p.gridStrong;
+  ctx.globalAlpha = 0.9;
+  ctx.fillText(text, 4, 3);
+  ctx.globalAlpha = 1;
 }

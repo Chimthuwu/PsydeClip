@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { AnalyserLike, drawVisualizer, SPECTRO_VISIBLE_SEC } from '../lib/visualizer';
+import { AnalyserLike, drawVisualizer, drawPianoRollLane, SPECTRO_VISIBLE_SEC } from '../lib/visualizer';
 import { Theme, VisualizerMode } from '../../shared/types';
+import { layoutPianoRoll } from '../../shared/piano-roll';
+import type { NoteLayer } from '../lib/note-store';
 
 import { HistoryModel, ViewportState } from '../lib/history-model';
+
+/** Height of the MIDI piano-roll lane, in CSS px. */
+const MIDI_LANE_H = 54;
+/**
+ * Below this board height the lane is dropped rather than squeezing the
+ * waveform — a docked strip is ~100px tall and the waveform is the hero.
+ */
+const MIDI_LANE_MIN_BOARD_H = 140;
 
 /**
  * Safe stand-in for the draw path when only the history mode is active and no
@@ -43,6 +53,14 @@ interface Props {
   gain?: number;
   /** True once App has a temp file ready for the current selection. */
   dragReady?: boolean;
+  /**
+   * Transcribed notes to draw under the History waveform (todo.md §MIDI-1
+   * Phase A). Absolute session seconds, so the lane shares the waveform's
+   * viewport exactly. Null/absent = no lane.
+   */
+  pianoRoll?: NoteLayer | null;
+  /** Shown as a ♪ affordance on the selection; absent = no button. */
+  onTranscribeSelection?: () => void;
   onSelectionChange?: (sel: [number, number] | null) => void;
   onDragExport?: (sel: [number, number]) => void;
   /** Called when the user tries to drag before the snippet is prepared. */
@@ -67,10 +85,17 @@ function timelineView(
   return model.effectiveViewport(viewport);
 }
 
-export function VisualizerBoard({ analyser, mode, theme, className, idleText, historyModel, isPopout = false, interactive = true, gain = 1, dragReady = true, onSelectionChange, onDragExport, onDragNotReady }: Props) {
+export function VisualizerBoard({ analyser, mode, theme, className, idleText, historyModel, isPopout = false, interactive = true, gain = 1, dragReady = true, pianoRoll = null, onTranscribeSelection, onSelectionChange, onDragExport, onDragNotReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const laneRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
+
+  // Room for the lane: only shown while the board is tall enough to give the
+  // waveform its majority. Tracked as state (not a ref) because it changes the
+  // rendered tree; only transitions re-render.
+  const [laneRoom, setLaneRoom] = useState(false);
+  const laneOn = !!pianoRoll && laneRoom && mode === 'history';
 
   // Selection is stored as ABSOLUTE session seconds (D1) — never fractions of
   // the buffer — so it survives zooming, panning and the ring wrapping, and
@@ -93,6 +118,8 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
   modeRef.current = mode;
   const interactiveRef = useRef(interactive);
   interactiveRef.current = interactive;
+  const pianoRollRef = useRef(pianoRoll);
+  pianoRollRef.current = pianoRoll;
 
   // History and the (time-based) spectrogram both carry a real time axis, so
   // both get the highlight + drag-out selection layer. Only history is
@@ -309,6 +336,19 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
       // blank every time this runs.
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
+
+      // The lane gets its own backing store at the same DPR, so note edges
+      // land on whole device pixels instead of being resampled.
+      const lane = laneRef.current;
+      if (lane) {
+        const lw = Math.max(1, Math.floor(rect.width * dpr));
+        const lh = Math.max(1, Math.floor(MIDI_LANE_H * dpr));
+        if (lane.width !== lw) lane.width = lw;
+        if (lane.height !== lh) lane.height = lh;
+      }
+      // Dropped on a short board (a docked strip): the waveform keeps its room.
+      const room = rect.height >= MIDI_LANE_MIN_BOARD_H;
+      setLaneRoom((prev) => (prev === room ? prev : room));
     };
     fit();
     // The canvas box changes for reasons other than a window resize — the
@@ -316,6 +356,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
     // breakpoint firing — so observe the element itself, not just `window`.
     const ro = new ResizeObserver(fit);
     ro.observe(canvas);
+    if (laneRef.current) ro.observe(laneRef.current);
     window.addEventListener('resize', fit);
 
     const draw = () => {
@@ -359,6 +400,24 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
           selEl.style.left = `${c0 * 100}%`;
           selEl.style.width = `${Math.max(0, c1 - c0) * 100}%`;
         }
+
+        // The MIDI lane, drawn from the SAME resolved viewport as the waveform
+        // above it — that is what keeps a note bar over its own audio at every
+        // zoom and pan. Layout maths live in src/shared/piano-roll.ts.
+        const lane = laneRef.current;
+        const layer = pianoRollRef.current;
+        if (lane && laneOn && layer && v) {
+          const lctx = lane.getContext('2d');
+          if (lctx) {
+            const layout = layoutPianoRoll(layer.notes, {
+              startSec: v[0],
+              endSec: v[1],
+              width: lane.width,
+              height: lane.height,
+            });
+            drawPianoRollLane(lctx, layout, theme, { label: layer.label });
+          }
+        }
       } else {
         // Idle screen: pulsing placeholder.
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -399,8 +458,9 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
     };
     // NB: historyModel and selection are deliberately NOT deps — the loop reads
     // them from refs. In the pop-out historyModel changes ~5×/s and restarting
-    // the loop that often flickered every pane.
-  }, [analyser, mode, theme, idleText, interactive, isPopout, gain]);
+    // the loop that often flickered every pane. `laneOn` IS a dep: it adds or
+    // removes a canvas, which has to be measured before it can be drawn into.
+  }, [analyser, mode, theme, idleText, interactive, isPopout, gain, laneOn]);
 
   // Initial overlay geometry at render; the rAF loop keeps it exact between
   // renders as the view slides or zooms.

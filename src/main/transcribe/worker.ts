@@ -124,9 +124,12 @@ async function run(req: TranscribeRequest): Promise<void> {
     }
 
     // Write the .mid beside the audio file the caller already saved. The audio
-    // is never touched: if this fails, the recording is still intact.
-    const bytes = notesToMidiBytes(res.notes);
-    await fs.promises.writeFile(req.outPath, bytes);
+    // is never touched: if this fails, the recording is still intact. An empty
+    // outPath means a notes-only job (the piano-roll lane) — nothing to write.
+    if (req.outPath) {
+      const bytes = notesToMidiBytes(res.notes);
+      await fs.promises.writeFile(req.outPath, bytes);
+    }
 
     post({
       type: 'done',
