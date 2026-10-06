@@ -386,6 +386,22 @@ export function SettingsPanel({
               </em>
             </span>
           </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.showMidiLane}
+              onChange={(e) => applyNow({ showMidiLane: e.target.checked })}
+            />
+            <span>
+              <strong>Show the MIDI piano-roll lane</strong>
+              <em>
+                A strip under the History waveform drawing the transcribed
+                notes on the same time axis. Select a range in History and press
+                <b> m </b> (or the ♪ on the selection) to transcribe it and see
+                the melody. Nothing is drawn until you transcribe something.
+              </em>
+            </span>
+          </label>
         </section>
 
         <section>

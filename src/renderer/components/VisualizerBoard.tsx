@@ -156,7 +156,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
     }
 
     // Ignore down events on the selection background itself so native drag works
-    if (target.classList.contains('history-selection') || target.classList.contains('history-selection-border') || target.classList.contains('history-duration')) return;
+    if (target.classList.contains('history-selection') || target.classList.contains('history-selection-border') || target.classList.contains('history-duration') || target.classList.contains('history-transcribe')) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
@@ -477,7 +477,19 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
 
   return (
     <div ref={wrapRef} className={className} style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+      <canvas
+        ref={canvasRef}
+        style={{
+          display: 'block',
+          width: '100%',
+          height: laneOn ? `calc(100% - ${MIDI_LANE_H}px)` : '100%',
+        }}
+      />
+      {laneOn && (
+        <div className="piano-roll-lane" style={{ height: `${MIDI_LANE_H}px` }}>
+          <canvas ref={laneRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+        </div>
+      )}
       {isTimeline && historyModel && interactive && (
         <div
           className={`history-interaction-layer${mode === 'spectrogram' ? ' is-spectro' : ''}`}
@@ -501,6 +513,21 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
               <div className="history-duration">
                 {(selection[1] - selection[0]).toFixed(2)}s
               </div>
+              {onTranscribeSelection && (
+                <button
+                  type="button"
+                  className="history-transcribe"
+                  title="Transcribe this range to MIDI and show the notes (m)"
+                  aria-label="Transcribe this range to MIDI"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTranscribeSelection();
+                  }}
+                >
+                  ♪
+                </button>
+              )}
               <div className="history-handle left" />
               <div className="history-handle right" />
             </div>

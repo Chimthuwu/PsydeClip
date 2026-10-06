@@ -2851,6 +2851,52 @@ small {
   outline: none;
 }
 
+/* MIDI piano-roll lane (todo.md §MIDI-1 Phase A) -------------------------- */
+/* A strip under the History waveform sharing its time axis. The board canvas
+   above it is shortened by exactly the lane's height (VisualizerBoard sets the
+   inline height), so the two never overlap and the note bars line up with the
+   audio they came from. */
+.piano-roll-lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+  overflow: hidden;
+  /* Gestures belong to the interaction layer above, which covers this strip
+     too — dragging here selects a range, exactly like dragging the waveform. */
+  pointer-events: none;
+  z-index: 4;
+}
+
+.history-transcribe {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  cursor: pointer;
+  /* The selection overlay is pointer-events: none, so the button has to opt
+     back in — otherwise it is decoration. */
+  pointer-events: auto;
+  z-index: 12;
+}
+.history-transcribe:hover {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
+
 .history-duration {
   position: absolute;
   bottom: 8px;

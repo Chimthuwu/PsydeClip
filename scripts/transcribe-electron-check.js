@@ -139,6 +139,32 @@ async function main() {
   // The user's audio must survive transcription untouched.
   check('the saved audio was never modified', fs.readFileSync(audioPath, 'utf8') === before);
 
+  // ---- Notes-only: the piano-roll lane's path (no audio file, no .mid) -----
+  // The lane transcribes a range out of the rolling buffer, so it has no saved
+  // audio for a .mid to sit beside. It must still run the real worker and come
+  // back with the note list — and must not write anything anywhere.
+  const ndir = fs.mkdtempSync(path.join(os.tmpdir(), 'recordr-electron-notes-'));
+  const n = await startJob('', 3, { notesOnly: true });
+  check('notes-only job accepted without an audio path', n !== null, n && n.status);
+  if (n) {
+    check('notes-only job carries no .mid path', n.midiPath === '', JSON.stringify(n.midiPath));
+    const nf = await waitForSettle(n.jobId, 300000);
+    check('notes-only job settles', !!nf && nf.status !== 'running', nf ? nf.status : 'timeout');
+    if (nf && nf.status === 'done') {
+      const notes = nf.notes || [];
+      check(
+        'notes-only job returns the note list',
+        notes.length > 0 && notes.length === nf.noteCount,
+        `${notes.length} notes`,
+      );
+      check(
+        'notes-only job writes nothing to disk',
+        fs.readdirSync(ndir).length === 0,
+        fs.readdirSync(ndir).join(',') || 'empty',
+      );
+    }
+  }
+
   // ---- Negative case: cancellation, same real handler ----
   const cdir = fs.mkdtempSync(path.join(os.tmpdir(), 'recordr-electron-cancel-'));
   const caudio = path.join(cdir, 'cancel.wav');
@@ -164,7 +190,7 @@ async function main() {
  * its event stream. Samples cross the boundary as a real Array (rebuilt as
  * Float32Array in-page) so the structured clone is genuinely tested.
  */
-async function startJob(audioPath, sec) {
+async function startJob(audioPath, sec, opts = {}) {
   const samples = Array.from(buildSignal(sec));
   const jobId = `electron-check-${Math.random().toString(36).slice(2, 8)}`;
   return win.webContents.executeJavaScript(`
@@ -180,6 +206,7 @@ async function startJob(audioPath, sec) {
         samples: raw,
         sampleRate: ${SR},
         audioPath: ${JSON.stringify(audioPath)},
+        notesOnly: ${opts.notesOnly ? 'true' : 'false'},
       });
     })()
   `);
