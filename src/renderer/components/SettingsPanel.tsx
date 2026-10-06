@@ -85,6 +85,7 @@ const RECORD_MODES: { value: RecordMode; label: string; help: string }[] = [
 ];
 
 const HOTKEY_PRESETS = [
+  'Alt+R',
   'Shift+Alt+R',
   'Ctrl+Shift+R',
   'F9',
@@ -261,7 +262,7 @@ export function SettingsPanel({
             type="text"
             value={draft.hotkey}
             onChange={onAccel}
-            placeholder="Shift+Alt+R"
+            placeholder="Alt+R"
           />
           <div className="preset-row">
             {HOTKEY_PRESETS.map((p) => (

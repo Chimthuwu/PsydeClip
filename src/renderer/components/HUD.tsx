@@ -61,7 +61,7 @@ export function HUD({
               className={`hud-buffered${bufferFull ? ' is-full' : ''}`}
               title={
                 bufferFull
-                  ? `Rolling — the last ${mmss(settings.bufferSeconds)} of audio is always kept and slides forward; older audio rolls off. Save or hit the hotkey to keep a chunk.`
+                  ? `Rolling — the last ${mmss(settings.bufferSeconds)} of audio is always kept and slides forward; older audio rolls off. Save keeps a chunk; the hotkey records a clip.`
                   : `Building the rolling buffer — ${mmss(bufferedSeconds)} of ${mmss(settings.bufferSeconds)} held.`
               }
             >
