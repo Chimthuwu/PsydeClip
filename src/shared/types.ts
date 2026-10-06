@@ -176,6 +176,12 @@ export interface AppSettings {
    * visualizers more.
    */
   vizGain: number;
+  /**
+   * Draw the MIDI piano-roll lane under the History waveform (todo.md §MIDI-1
+   * Phase A). On by default: the lane only appears once a transcription has
+   * produced notes, so it costs nothing until it has something to show.
+   */
+  showMidiLane: boolean;
   /** Buffer length in seconds, applies to rolling mode. */
   bufferSeconds: number;
   /** Opus bitrate kbps. Also the target bitrate when saving as MP3 (clamped to 128–320). */
@@ -248,6 +254,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Everything except the primary mode starts hidden → a single board.
   vizHidden: ['spectrum', 'spectrogram', 'history'],
   vizGain: 1,
+  showMidiLane: true,
   bufferSeconds: 15 * 60,
   bitrateKbps: 96,
   recordingFormat: 'webm',

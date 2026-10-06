@@ -48,6 +48,8 @@ const api = {
       samples: Float32Array;
       sampleRate: number;
       audioPath: string;
+      /** Transcribe for the note list only — no `.mid` is written. */
+      notesOnly?: boolean;
     }): Promise<TranscribeJobState> {
       return ipcRenderer.invoke(IpcChannel.transcribeStart, args);
     },

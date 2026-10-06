@@ -33,12 +33,15 @@ export type TranscribeSource =
  * @param audioPath Full path of the audio file that was just written.
  * @param source    Decoded mono PCM when we already have it (rolling export),
  *                  otherwise the encoded bytes, which are decoded here.
+ * @param notesOnly Skip the `.mid` and return only the note list — what the
+ *                  piano-roll lane wants for a range of the rolling buffer,
+ *                  which has no saved audio file for a `.mid` to sit beside.
  */
 export async function transcribeSavedRecording(
-  args: TranscribeSource & { audioPath: string },
+  args: TranscribeSource & { audioPath: string; notesOnly?: boolean },
   deps: { emitToast: EmitToast; onSettled?: (state: TranscribeJobState) => void },
 ): Promise<string | null> {
-  const { audioPath } = args;
+  const { audioPath, notesOnly } = args;
     const { emitToast } = deps;
     const jobId = `midi-${Date.now().toString(36)}-${++jobCounter}`;
 
@@ -71,6 +74,7 @@ export async function transcribeSavedRecording(
       samples,
       sampleRate,
       audioPath,
+      notesOnly,
     });
 
     if (initial.status === 'error') {
@@ -101,10 +105,15 @@ export async function transcribeSavedRecording(
       if (state.status === 'done') {
         // Be honest about cost: a long buffer takes longer than its own duration.
         const secs = ((state.elapsedMs ?? 0) / 1000).toFixed(1);
-        emitToast(
-          'saved',
-          `MIDI saved (${state.noteCount ?? 0} notes, ${secs}s)\n${name}`,
-        );
+        if (notesOnly) {
+          // Nothing was written to disk — the caller renders the notes.
+          emitToast('saved', `Transcribed ${state.noteCount ?? 0} notes (${secs}s)`);
+        } else {
+          emitToast(
+            'saved',
+            `MIDI saved (${state.noteCount ?? 0} notes, ${secs}s)\n${name}`,
+          );
+        }
       } else if (state.status === 'cancelled') {
         emitToast('error', 'Transcription cancelled.');
       } else {
