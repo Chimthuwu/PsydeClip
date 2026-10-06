@@ -52,7 +52,11 @@
       "node_modules/@tensorflow/tfjs-data/**/*",
       "node_modules/@tensorflow/tfjs-layers/**/*",
       "node_modules/@tensorflow/tfjs-core/dist/weights/**/*",
-      "node_modules/@tonejs/midi/**/*"
+      "node_modules/@tonejs/midi/**/*",
+      "!**/*.map",
+      "!**/*.ts",
+      "!**/*.tsbuildinfo",
+      "!**/dist/miniprogram/**"
     ],
     "asarUnpack": [
       "**/node_modules/koffi/**"
