@@ -14,6 +14,64 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [!] Layered / blended visualizers (e.g. oscilloscope over history at reduced opacity): DRAFT, needs the pairs, UX option and time-base decisions first (section 11)
 - [!] Android version: browser port was ruled out, so choose between a `window.api` shim under a Capacitor shell and a ground-up native Kotlin app (section 7, NEXT)
 
+- [!] **Audio->MIDI is built in the SOURCE but has never been used in the real app, and no installer contains it** — and there is **no MIDI grid/visualizer** to see the melody (Stooge, 2026-10-07). Verification gap + UI plan in "§MIDI-1" directly below this checklist
+- [ ] **MIDI piano-roll visualizer** (a 5th board mode / lane under the History waveform): phase A = show a finished transcription over a selection; phase B = live melody display while capturing (needs a light real-time pitch tracker — Basic Pitch cannot keep up live). §MIDI-1
+
+---
+
+## §MIDI-1. Audio -> MIDI: what is actually verified, and the piano-roll visualizer plan (2026-10-07, Claude for Stooge — NO code changed)
+
+Stooge: "we haven't tested it though? Is it built? I need the UI to have a MIDI grid / visualizer that gives us a visual representation of the melody being captured."
+
+### Status — measured today, not recalled
+| Question | Answer |
+|---|---|
+| Is the code built? | **Yes in `dist/`**: `dist/main/transcribe/{engine,worker,pool}.js` exist (compiled 2026-10-04; `dist/main` rebuilt 2026-10-06). `npm run build` output is not a release. |
+| Is it in an installer / unpacked build? | **No.** Newest installer is `Recordr Setup 3.1.0.exe` (2026-09-07), **before** the 2026-10-04 commit `1a8808f`. `release/win-unpacked/resources/app.asar` (2026-09-07) contains **0** `basic-pitch` files. Nobody has run a packaged build with this feature. |
+| Do the automated tests pass? | **Yes — I re-ran them: `node --test dist/main/transcribe/*.test.js` = 8/8 pass, 0 fail (18 s).** Real inference on a 9.6 s clip -> 32 notes, 330 B `.mid`, 0.59x realtime; real job beside the audio -> 12 notes, `take.mid`; cancel stops the job in ~0.26 s / ~2.9 s. Includes the Electron-less pool test. |
+| Was it tested with the UI / by hand / by ear? | **No evidence of it.** The todo records unit tests (`npm test`) and an Electron IPC harness (`npm run test:electron`, 12 checks); I did **not** re-run `test:electron` today. Nothing records a human saving a clip with **Settings -> Transcribe on save** ON and opening the `.mid` in a DAW. The tests use a short synthetic/test melody, not real music (chords, drums, bleed). |
+| Is the setting reachable? | Yes: `transcribeOnSave` (default **OFF**), `SettingsPanel.tsx:374`, hook in `App.tsx:87`. Progress shows as toasts only. |
+| Does any UI show the MIDI? | **No.** `grep` finds no piano roll / note display anywhere in `src/renderer`. The feature writes a `.mid` beside the audio and says so in a toast; you only ever see the result in another program. |
+
+**To close the verification gap (do first, ~30 min):** (1) `npm run package:dir`, check `app.asar`/unpacked has `@spotify/basic-pitch` + `@tensorflow/*` + `@tonejs/midi` (the `files` fix is *claimed* in this file; confirm it in the artefact) and that the worker thread starts from the packaged exe; (2) run the packaged `Recordr.exe`, enable Transcribe on save, save a 15 s clip of a real melody and of a chord progression, open the `.mid` in a DAW / piano roll; (3) record what it gets right and wrong (octave errors, missed/phantom notes, timing offset) — that is the real accuracy baseline the UI below will expose.
+
+### The UI: a MIDI piano-roll visualizer
+**Where it fits.** The board has four modes (oscilloscope / spectrum / spectrogram / **history**, `VisualizerBoard.tsx`; the history viewport/zoom/selection model is `lib/history-model.ts`). Recommendation: **a new lane drawn under (or over, at reduced opacity) the History waveform that shares its time axis and zoom**, plus a "Notes" toggle — NOT a separate 5th screen. Reuses the existing pan/zoom/selection, so a selected region and its notes are always aligned. (There is already an open `[!]` for layered visualizers — this is its first concrete use; decide the opacity/lane UX there.)
+
+**What it draws:** piano-roll grid — horizontal lanes = MIDI pitches (auto-ranged to the notes present, +/- 2 semitones, labelled C-notes), vertical = time (same scale as the waveform); each note = a rounded bar, **colour/opacity = velocity**, sharps shaded; optional faint bar-lines when a BPM is known (the `.mid` has no tempo today — decide: assume 120 / detect / none). Hover = note name + start + length; click = audition (Alt-click already previews audio — add a sine/triangle preview of the note); selection region highlights the notes inside it.
+
+**Data source — two phases, because the engine cannot run live:**
+- **Measured constraint:** Basic Pitch on tfjs `cpu` runs at **~0.46-0.59x realtime (slower than realtime)** — a 9.6 s clip took 16.2 s. WebGL was measured and rejected (spike 002). So it **cannot** produce a live display of what is being captured right now; it can only annotate audio that already exists.
+- **Phase A — "show me the notes" for a selection (build first; uses what exists):** in History, select a region -> "Transcribe selection" (right-click / key `m`) -> the existing worker runs on that slice -> notes come back **as data over the existing `transcribe:event` channel** (today it only writes a file; extend the event to carry the note list `{pitch, startSec, durationSec, velocity}` — `@tonejs/midi` already holds them) -> the piano roll renders them over the selection; "Save .mid" / drag-out of the MIDI file beside the WAV drag-out (same `startDrag` pattern, `ipc.ts:242-294`). Also render the notes after a normal Save with transcribe-on-save ON (toast "Transcribing... -> View notes"). Cache notes per clip so scrubbing doesn't re-run.
+- **Phase B — live melody while capturing (the "being captured" request):** needs a **lightweight real-time pitch tracker** that runs on the analyser/AudioWorklet feed that already drives the visualizers: monophonic = YIN / McLeod-pitch (cheap, ~1 ms per frame, great for a lead/vocal/bass); polyphonic (chords) = a **chromagram / constant-Q peak picker** — far less accurate than Basic Pitch, shown as "live preview" (dim) and **replaced by the Basic Pitch result** once the clip is saved/transcribed. Appends a pitch-per-frame trail onto the right edge of the roll, scrolling with the live waveform. Needs: onset/segmentation (note on/off from pitch stability + level gate), a confidence floor, octave-jump suppression. Cost to measure: must stay well under the visualizers' frame budget (the pop-out already streams analyser frames at 30 fps over IPC — the tracker should run where the audio is, in the renderer/worklet, not over IPC).
+- **Phase C (later):** continuous background transcription of the *whole* rolling buffer in chunks (only viable on a faster backend: WASM-SIMD tfjs or ONNX runtime — **re-measure**, don't assume), so the History lane is always populated.
+
+**Implementation sketch (Phase A):** `src/renderer/lib/note-store.ts` (clip-keyed note cache), `components/PianoRollLane.tsx` (canvas, takes `ViewportState` from `history-model.ts`, draws in the board's rAF loop, DPR-aware), extend `TranscribeEvent`/`engine.ts` to return `notes[]`, board toggle + setting `showMidiLane` in `SettingsPanel` (default on once Phase A lands). Theming: use the existing `--waveform` / theme tokens so all 12 themes work; velocity -> alpha.
+
+**Verification plan:** (a) unit test that the event's note list equals the parsed `.mid` (round trip through `@tonejs/midi`); (b) a canvas-draw test with a fixed note list at 3 zoom levels (no NaN/negative widths, pitch range auto-fit, notes outside the viewport culled); (c) manual: the packaged exe, a real melody, compare the roll to what you hear — this is where octave errors will show; (d) Phase B: feed a synthetic sine sweep + a known melody WAV into the tracker and assert note on/off times within ~50 ms and pitch within +/-50 cents; measure CPU with the visualizers running.
+
+### Candidate libraries / references for the piano roll (Stooge's list, 2026-10-07 — READMEs fetched for the first five; the rest judged by URL only)
+| Resource | What it is (from its README) | Fit for us |
+|---|---|---|
+| `dpren/react-piano-roll` | React wrapper over **Pixi.js** (WebGL/canvas); MIT; 27 stars, 68 commits; **display-only** (no editing), playhead/zoom/scroll, notes as `[transportTime, note, duration]`, colour by pitch class | Closest to the need on paper, but time is **bars:beats transport time, not seconds**, and it owns its own scroll/zoom/playhead — we need the lane to **share the History waveform's viewport** (`history-model.ts`) and to scroll live. Adds Pixi (~hundreds of KB) and a second WebGL context for one strip. Use as a **design reference** (pitch-class colours, grid), not a dependency |
+| `mjhasbach/pixi-piano-roll` | The Pixi library underneath the above; MIT; 59 commits; piano-key colour follows intersecting notes; BPM/zoom/resolution | Same verdict; the "keys light up in the note's colour" idea is nice for the live view |
+| Magenta.js visualizers (`PianoRollSVG/Canvas`, `Waterfall`) | Render a `NoteSequence`; SVG version styleable by CSS (`.active`, `--midi-velocity`); canvas version **redraws everything every step, slow for long sequences** | Good **data-model reference** (a NoteSequence is `{pitch, startTime, endTime, velocity}` — seconds, which matches us). Don't depend on it: `@magenta/music` drags in TensorFlow.js, and we already ship tfjs for Basic Pitch |
+| `sykesjd/piano-roll` | Experimental MIDI-to-animated-roll viewer synced to MP3; **no licence stated**, "still in progress" | Reference only; **do not copy code** (no licence) |
+| `googlecreativelab/chrome-music-lab` `pianoroll/midi` | Archived (Apr 2026); just Mutopia MIDI->JSON files, **not a renderer** | Useless as a library; the Mutopia files could be test fixtures, but check their licence first |
+| `pianoroll/midiroll` (R), `PlaySK-Piano-Roll-Reader` (Python), `menezmic21` blog, kevin-chau gist, the Bing search link | Not fetched. By name: midiroll is an R package, PlaySK reads paper piano-roll scans in Python | Not applicable to a TS/Electron renderer; the blog/gist may have a useful canvas snippet — skim before writing our own |
+
+**Recommendation: write our own canvas lane (~200-300 lines), don't add a library.** Our hard requirements (seconds-based time axis shared with the History viewport; live scrolling right edge; theme tokens; velocity->alpha; culling to the visible window; DPR-aware) are exactly the things these libraries bake in differently, and each pulls in Pixi/TF/another event loop. A note rectangle fill loop on a 2D canvas is cheap — the existing board already draws the waveform that way. Borrow ideas: pitch-class colouring and lit piano keys from the Pixi libs, `{pitch,startTime,endTime,velocity}` data shape from Magenta's NoteSequence (use seconds; convert with `@tonejs/midi`, already a dependency). Re-check only if we later want **editing** (drag/resize notes): then evaluate `react-piano-roll`'s successors or a purpose-built editor.
+
+### Open questions for Stooge
+1. Phase A first (notes over a selection / after save), then live Phase B — OK? Or is live the part you care about most (then Phase B leads and Basic Pitch stays post-hoc)?
+2. Lane UX: separate strip under the waveform (recommended) or an overlay at reduced opacity?
+3. Should the live preview be monophonic-only (accurate, simple) or attempt chords (inaccurate, flashy)?
+4. Tempo: assume 120 BPM, detect, or leave the roll unquantised (time only)?
+5. Want a drag-out `.mid` next to the existing WAV drag-out?
+
+### Cross-repo (FAZE synth, see its `todo.md` §166/§167)
+A transcribed note list is exactly what the FAZE **sequencer pitch lane** and a **sampler slice -> pattern** feature would consume; keep the note JSON shape (`pitch, startSec, durationSec, velocity`) stable and document it so FAZE can import `.mid` files later.
+
 ---
 
 # Recordr — Project Handoff
