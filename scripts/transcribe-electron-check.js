@@ -13,6 +13,7 @@
  * code too. Only the audio device is absent; nothing else is stubbed.
  *
  * Run: npx electron scripts/transcribe-electron-check.js
+ * Packaged: npm run test:packaged   (same checks against release/win-unpacked)
  */
 
 const { app, BrowserWindow } = require('electron');
@@ -22,7 +23,22 @@ const path = require('node:path');
 
 const SR = 44100;
 const ROOT = path.join(__dirname, '..');
-const DIST = path.join(ROOT, 'dist');
+
+/**
+ * Which build to drive.
+ *
+ * Default: the repo's own `dist/`. Set `RECORDR_APP_DIR` to an unpacked
+ * electron-builder output (`release/win-unpacked`) to run the SAME checks
+ * against the packaged artefact instead — the only way to prove the engine's
+ * dependency tree and the worker thread actually load from inside `app.asar`,
+ * which is a different code path from the repo (see the 2026-10-03 `files` bug:
+ * no dependencies were listed at all, so the model would simply be absent).
+ */
+const APP_ROOT = process.env.RECORDR_APP_DIR
+  ? path.resolve(process.env.RECORDR_APP_DIR, 'resources', 'app.asar')
+  : ROOT;
+const DIST = path.join(APP_ROOT, 'dist');
+const APP_LABEL = process.env.RECORDR_APP_DIR ? 'the packaged asar' : 'the repo dist/';
 
 /** A plucked A-major triad — real pitch content for the model to find. */
 function buildSignal(sec = 3) {
@@ -52,6 +68,28 @@ function check(name, ok, detail) {
 let win;
 
 async function main() {
+  console.log(`  (driving ${APP_LABEL}: ${DIST})`);
+
+  // The engine's dependency tree has to be present in whatever we are driving.
+  // The model (900 KB) ships inside @spotify/basic-pitch, so a missing package
+  // is a silently missing feature, not a crash.
+  for (const dep of ['@spotify/basic-pitch', '@tensorflow/tfjs', '@tonejs/midi']) {
+    let ok = true;
+    let detail = '';
+    let pkg = '';
+    try {
+      pkg = require.resolve(`${dep}/package.json`, { paths: [APP_ROOT] });
+    } catch (err) {
+      ok = false;
+      detail = err.message;
+    }
+    check(`${dep} resolves from ${APP_LABEL}`, ok, detail);
+    if (ok && dep === '@spotify/basic-pitch') {
+      const model = path.join(path.dirname(pkg), 'model', 'model.json');
+      check('the vendored model ships with it', fs.existsSync(model), model);
+    }
+  }
+
   // The REAL main-process handlers, from the directory that ships. Requiring
   // the module is not enough — handlers only exist once registerIpc() has run,
   // so call it with the same context shape src/main/index.ts uses.
