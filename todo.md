@@ -29,7 +29,7 @@ Stooge: "we haven't tested it though? Is it built? I need the UI to have a MIDI 
 |---|---|
 | Is the code built? | **Yes in `dist/`**: `dist/main/transcribe/{engine,worker,pool}.js` exist (compiled 2026-10-04; `dist/main` rebuilt 2026-10-06). `npm run build` output is not a release. |
 | Is it in an installer / unpacked build? | **Yes now — verified 2026-10-07.** The newest installer is still `Recordr Setup 3.1.0.exe` (2026-09-07), but `release/win-unpacked/` was rebuilt on 2026-10-07 and its `app.asar` contains `@spotify/basic-pitch` + the vendored model + `@tensorflow/*` + `@tonejs/midi`; `npm run test:packaged` drives that asar directly and passes 21/21. A **tagged/installed** release still needs cutting (§7). |
-| Do the automated tests pass? | **Yes — re-run 2026-10-07: `npm test` 13/13** (8 transcribe checks + 4 piano-roll layout checks + the new notes-only job check), plus **`npm run test:electron` 22/22** and **`npm run test:packaged` 21/21** against the real asar. Real inference on a 9.6 s clip -> 32 notes, 330 B `.mid`, ~0.6-0.7x realtime; cancel stops the job in ~2 s. |
+| Do the automated tests pass? | **Yes — re-run 2026-10-07: `npm test` 13/13** (8 transcribe checks + 4 piano-roll layout checks + the new notes-only job check), plus **`npm run test:electron` 22/22** and **`npm run test:packaged` 22/22** against the real asar. Real inference on a 9.6 s clip -> 32 notes, 330 B `.mid`, ~0.6-0.7x realtime; cancel stops the job in ~2 s. |
 | Was it tested with the UI / by hand / by ear? | **The pipeline yes, by ear no.** 2026-10-07: the packaged asar runs real inference and writes a real `.mid`; the piano-roll lane draws transcriptions of a selection in the app. Still nobody has **listened**: nothing records a human saving a clip with **Settings -> Transcribe on save** ON and opening the `.mid` in a DAW, and the tests use a short synthetic melody, not real music (chords, drums, bleed). That is §MIDI-1 steps 2-3 and it needs the owner. |
 | Is the setting reachable? | Yes: `transcribeOnSave` (default **OFF**) and `showMidiLane` (default **ON**), both in Settings → MIDI transcription. Progress shows as toasts. |
 | Does any UI show the MIDI? | **Yes since 2026-10-07** — the piano-roll lane under the History waveform (`showMidiLane`), fed by "Transcribe selection" (`m` / the ♪ on a selection). Before that: no, you only ever saw the result in another program. |
@@ -1760,7 +1760,9 @@ findings below are concrete and bounded; promote one by moving it into an open s
       Done when: `build.files` excludes those and a freshly built `release/win-unpacked` still passes `npm run test:packaged`
       (the harness runs real inference from inside the asar, so it is the proof that nothing needed was pruned).
       **DONE 2026-10-07** — `!**/*.map`, `!**/*.ts`, `!**/*.tsbuildinfo`, `!**/dist/miniprogram/**` added to `build.files`;
-      app.asar **278 MB → 85 MB** (−69 %) and `npm run test:packaged` 21/21 on the rebuilt artefact.
+      app.asar **278.4 MB → 77.9 MB** (−72 %; `release/win-unpacked` 522 → 331 MB), the asar now holds 0 `.map` / `.ts` /
+      `tsbuildinfo` / `miniprogram` entries while the engine + model + `tfjs-backend-cpu` are all still there, and
+      `npm run test:packaged` is **22/22** on the rebuilt artefact (real inference from inside the pruned asar).
 - [ ] **Renderer-pure modules have nowhere to be tested** [P2] [tests] [size:M]
       Why: `npm test` is `node --test dist/main/transcribe/*.test.js`, so nothing under `src/renderer/lib/` can be tested at
       all — not the `HistoryModel` zoom/pan/clamp math (verified by hand numerically, per §11.4 Phase 2), not `note-store`'s
