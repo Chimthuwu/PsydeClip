@@ -28,13 +28,13 @@ Stooge: "we haven't tested it though? Is it built? I need the UI to have a MIDI 
 | Question | Answer |
 |---|---|
 | Is the code built? | **Yes in `dist/`**: `dist/main/transcribe/{engine,worker,pool}.js` exist (compiled 2026-10-04; `dist/main` rebuilt 2026-10-06). `npm run build` output is not a release. |
-| Is it in an installer / unpacked build? | **No.** Newest installer is `Recordr Setup 3.1.0.exe` (2026-09-07), **before** the 2026-10-04 commit `1a8808f`. `release/win-unpacked/resources/app.asar` (2026-09-07) contains **0** `basic-pitch` files. Nobody has run a packaged build with this feature. |
-| Do the automated tests pass? | **Yes — I re-ran them: `node --test dist/main/transcribe/*.test.js` = 8/8 pass, 0 fail (18 s).** Real inference on a 9.6 s clip -> 32 notes, 330 B `.mid`, 0.59x realtime; real job beside the audio -> 12 notes, `take.mid`; cancel stops the job in ~0.26 s / ~2.9 s. Includes the Electron-less pool test. |
-| Was it tested with the UI / by hand / by ear? | **No evidence of it.** The todo records unit tests (`npm test`) and an Electron IPC harness (`npm run test:electron`, 12 checks); I did **not** re-run `test:electron` today. Nothing records a human saving a clip with **Settings -> Transcribe on save** ON and opening the `.mid` in a DAW. The tests use a short synthetic/test melody, not real music (chords, drums, bleed). |
-| Is the setting reachable? | Yes: `transcribeOnSave` (default **OFF**), `SettingsPanel.tsx:374`, hook in `App.tsx:87`. Progress shows as toasts only. |
-| Does any UI show the MIDI? | **No.** `grep` finds no piano roll / note display anywhere in `src/renderer`. The feature writes a `.mid` beside the audio and says so in a toast; you only ever see the result in another program. |
+| Is it in an installer / unpacked build? | **Yes now — verified 2026-10-07.** The newest installer is still `Recordr Setup 3.1.0.exe` (2026-09-07), but `release/win-unpacked/` was rebuilt on 2026-10-07 and its `app.asar` contains `@spotify/basic-pitch` + the vendored model + `@tensorflow/*` + `@tonejs/midi`; `npm run test:packaged` drives that asar directly and passes 21/21. A **tagged/installed** release still needs cutting (§7). |
+| Do the automated tests pass? | **Yes — re-run 2026-10-07: `npm test` 13/13** (8 transcribe checks + 4 piano-roll layout checks + the new notes-only job check), plus **`npm run test:electron` 22/22** and **`npm run test:packaged` 21/21** against the real asar. Real inference on a 9.6 s clip -> 32 notes, 330 B `.mid`, ~0.6-0.7x realtime; cancel stops the job in ~2 s. |
+| Was it tested with the UI / by hand / by ear? | **The pipeline yes, by ear no.** 2026-10-07: the packaged asar runs real inference and writes a real `.mid`; the piano-roll lane draws transcriptions of a selection in the app. Still nobody has **listened**: nothing records a human saving a clip with **Settings -> Transcribe on save** ON and opening the `.mid` in a DAW, and the tests use a short synthetic melody, not real music (chords, drums, bleed). That is §MIDI-1 steps 2-3 and it needs the owner. |
+| Is the setting reachable? | Yes: `transcribeOnSave` (default **OFF**) and `showMidiLane` (default **ON**), both in Settings → MIDI transcription. Progress shows as toasts. |
+| Does any UI show the MIDI? | **Yes since 2026-10-07** — the piano-roll lane under the History waveform (`showMidiLane`), fed by "Transcribe selection" (`m` / the ♪ on a selection). Before that: no, you only ever saw the result in another program. |
 
-**To close the verification gap (do first, ~30 min):** (1) `npm run package:dir`, check `app.asar`/unpacked has `@spotify/basic-pitch` + `@tensorflow/*` + `@tonejs/midi` (the `files` fix is *claimed* in this file; confirm it in the artefact) and that the worker thread starts from the packaged exe; (2) run the packaged `Recordr.exe`, enable Transcribe on save, save a 15 s clip of a real melody and of a chord progression, open the `.mid` in a DAW / piano roll; (3) record what it gets right and wrong (octave errors, missed/phantom notes, timing offset) — that is the real accuracy baseline the UI below will expose.
+**To close the verification gap (do first, ~30 min):** (1) ✅ **DONE 2026-10-07** — `npm run package:dir` rebuilt `release/win-unpacked`; its `app.asar` has `@spotify/basic-pitch` (+ the vendored `model/model.json`), `@tensorflow/*` and `@tonejs/midi`, and the worker thread runs real inference from inside it (`npm run test:packaged`, 21/21). (2) run the packaged `Recordr.exe`, enable Transcribe on save, save a 15 s clip of a real melody and of a chord progression, open the `.mid` in a DAW / piano roll — **still open, needs the owner** (real music, a capture device and ears); (3) record what it gets right and wrong (octave errors, missed/phantom notes, timing offset) — that is the real accuracy baseline the UI below exposes, and the piano-roll lane now makes it visible in-app.
 
 ### The UI: a MIDI piano-roll visualizer
 **Where it fits.** The board has four modes (oscilloscope / spectrum / spectrogram / **history**, `VisualizerBoard.tsx`; the history viewport/zoom/selection model is `lib/history-model.ts`). Recommendation: **a new lane drawn under (or over, at reduced opacity) the History waveform that shares its time axis and zoom**, plus a "Notes" toggle — NOT a separate 5th screen. Reuses the existing pan/zoom/selection, so a selected region and its notes are always aligned. (There is already an open `[!]` for layered visualizers — this is its first concrete use; decide the opacity/lane UX there.)
@@ -625,15 +625,18 @@ keys.
 }
 ```
 
-> ⚠️ **Never hand-edit this file from PowerShell.** `readSettings()` wraps the
-> whole read in a bare `try/catch` that falls back to `DEFAULT_SETTINGS` on any
-> parse failure — **silently**, with no log line. PS 5.1's `Out-File -Encoding
-> utf8` and `Set-Content` both emit a **UTF-8 BOM**, `JSON.parse` chokes on it,
-> and the user's saveFolder / backend / device / buffer all quietly revert to
-> defaults on next launch. This has actually happened. Use Node
-> (`fs.writeFileSync`, which writes no BOM) or just change it in the app's
-> Settings modal. Making `readSettings()` strip a leading `﻿` and log the
-> failure would be a cheap, worthwhile hardening.
+> ⚠️ **Still prefer not to hand-edit this file from PowerShell.** PS 5.1's
+> `Out-File -Encoding utf8` and `Set-Content` both emit a **UTF-8 BOM**, which
+> `JSON.parse` chokes on — and the user's saveFolder / backend / device / buffer
+> would then quietly revert to defaults on next launch. This has actually
+> happened. Use Node (`fs.writeFileSync`, which writes no BOM) or just change it
+> in the app's Settings modal.
+>
+> **The BOM hazard itself is handled now** (2026-10-06, `28a322e`):
+> `readSettings()` strips a leading U+FEFF before parsing and logs a
+> `console.error` naming the file when the parse still fails, instead of
+> reverting in silence. So a corrupt file is recoverable and visible in the log —
+> but the settings still revert, so keep using Node or the Settings modal.
 
 Other paths:
 
@@ -776,17 +779,22 @@ shipped in a packaged build at all. Added the `@spotify/basic-pitch`,
 
 **Verification** — `npm test` (8 checks: real inference, real `.mid`, `MThd`
 header, audio left byte-identical, timed cancel, rate-trap, error paths) and
-`npm run test:electron` (12 checks driving the **real `registerIpc()`** and the
+`npm run test:electron` (22 checks driving the **real `registerIpc()`** and the
 **shipped preload** inside Electron itself — the only way to catch asar /
 worker-thread / backend-registration differences that plain Node hides). The
 Electron harness lives at `scripts/transcribe-electron-check.js`; keep it, it
-catches a class of bug the unit tests structurally cannot.
+catches a class of bug the unit tests structurally cannot. Point it at an
+unpacked build (`npm run test:packaged`) and it drives the **real `app.asar`**
+instead, which is the packaged-build proof below.
 
 **Still open:** thresholds were tuned on synthetic signals, not real music —
 re-tune on actual recordings. No UI affordance for cancelling an in-flight job
-(the IPC path exists and works; nothing surfaces it yet). No packaged
-(`npm run package`) verification — the `files` fix is reasoned, not
-package-and-run proven.
+(the IPC path exists and works; nothing surfaces it yet). **Packaged
+verification: DONE 2026-10-07** — `npm run package:dir` + `npm run test:packaged`
+= 21/21 against the real asar (engine + model resolve from inside it, the worker
+thread runs real inference, a `.mid` lands on disk, audio untouched, notes-only
+writes nothing, cancel stops the job). The one thing left is the listening test,
+which needs a human: real music, a DAW, and ears — §MIDI-1 steps 2-3.
 
 #### DECIDED 2026-10-03 (Stooge): build order is (c) then (b) — **NOW ANSWERED**
 
@@ -983,8 +991,10 @@ Not scheduled, in rough priority order:
 * **A browser version.** (user-requested, not started.) See §9 — feasible for
   the desktopCapturer path only (`getDisplayMedia({audio:true})`), File System
   Access API replaces the folder picker. Prerequisite for the Android version.
-* **Harden `readSettings()`** against a BOM / malformed file: strip a leading
-  `﻿`, and log rather than silently reverting to defaults (see §6).
+* ~~**Harden `readSettings()`** against a BOM / malformed file~~ — **DONE
+  2026-10-06 (`28a322e`)**: a leading U+FEFF is stripped before parsing and a
+  parse failure logs a `console.error` naming the file, instead of reverting to
+  defaults in silence (see §6).
 * **Bug #5** — the cosmetic single-instance lock-file warning. Low value.
 * **Mic capture via WASAPI?** Optional; user asked for output-side only so
   don't introduce unless they ask.
@@ -1734,6 +1744,56 @@ turn; the user has said repeatedly this feature is phased.**
 * **Pop-out theme stuck on "modern" after docking — FIXED (2026-09-06)** (user: *"when i hit the dock to top button it seems to sometimes go back to the modern theme"*): `PopoutApp` computed `theme = state.theme ?? settings.theme`, but `state.theme` is `DEFAULT_STATE.theme` (`'modern'`, always truthy) until the first `viz:frame` lands — and docking opens a fresh pop-out, so there's a window where no frame has arrived. Now just `theme = settings.theme` (kept correct by `useSettings`'s `settings:changed` mirror). NB: the main window's ⤒ / "Dock to top" still *opens the pop-out* rather than docking the main window itself — see the "Ultra-compact Docked Mode" bullet above for the real fix the user wants.
 * **Format-picker popover text clipped (done 2026-09-06)** (user screenshot: "We…" / "WA…" / "M…"): `.dd-popover.dd-popover-tight` now `left:auto; min-width:200px; width:max-content; max-width:260px` so it grows leftward off the narrow "MP3 ▾" trigger instead of collapsing to its width.
 * **Theme atmosphere pass — cyberpunk / synthwave / kawaii — REVERTED (2026-09-04)**: the original (done) entry read: visual deepening of the three personality themes only; `modern`, `classic`, `monochrome` untouched. Cyberpunk & synthwave previously had *zero* component-level CSS (pure token/canvas swaps on generic chrome); a new **THEME ATMOSPHERE PASS** block at the very end of `styles.css` gives them real material treatment: lit-glass HUD/sidebar gradients, gradient-clipped title-bar text, neon board framing + capture-ring shadows, luminous chips/`.on` states, gradient primary buttons, glassy modals/popovers, tinted hover states, and tinted hover-only pane tags — covering both `.app.theme-*` and `.popout.theme-*`. Kawaii deepened its candy-glass: richer 4-radial window background, gradient-clipped title text, layered pastel board glow, pink-gradient `.on` chips, light pane tags, and the pop-out now uses `var(--bg-gradient)` instead of flat `#fff0f7`. Canvas side (`fillThemeBackground` in `src/renderer/lib/visualizer.ts`) got brighter multi-stop bases and stronger/extra signature glows for all three (cyberpunk adds a magenta + centre-yellow glow; synthwave a magenta centre; kawaii gains soft pink/lavender/mint radials on a vertical pastel base). Colour/gradient/glow only, no layout or markup changes; all other themes' canvases identical. Follow-up (same day): cyberpunk & synthwave **spectrogram ramps brightened** (signature hues preserved — magenta→yellow→cyan / purple→pink→orange — but each stop now climbs hotter toward near-white peaks), and the **oscilloscope got a signature two-pass neon glow** (`drawOscilloscope`): a wide soft halo in the secondary hue (cyan under cyberpunk's yellow trace, hot-pink under synthwave's orange) painted first, then the bright core on top with its tight 12px glow. Three first-pass contrast regressions were corrected by the numbers (agent can't see pixels): kawaii `.on` chips went from white-on-pastel to dark plum `#6b2d56` on a deeper pastel gradient, kawaii title text deepened (mint/pale-pink end too light at 10px), synthwave primary buttons switched white → dark `#1d0a33` text. Next step for a future pass: have the user eyeball the three themes in `npm run dev` at full/docked sizes and iterate — the first pass was done blind (no visual check available to the agent), and a dev run needs the running packaged `Recordr.exe` closed first (single-instance lock). **⚠ Rolled back the same day** (user: “revert the themes back”, after a live dev review): the whole pass above *and* the follow-up ramp-brightening / oscilloscope-halo / contrast fixes were removed — cyberpunk, synthwave and kawaii are back to their pre-pass appearance, in both windows and on canvas. Exactly what was restored: (1) `styles.css` — the appended `THEME ATMOSPHERE PASS` block deleted; the only theme-scoped addition left in the file is `.app.theme-kawaii .tb-ctl:hover` (belongs to the title-bar knobs feature, kept). (2) `visualizer.ts` — `fillThemeBackground` (multi-stop bases + radial signature glows, exported for the idle placeholder) reverted to the original private `drawBackground` flat gradients (cyberpunk `#1a0524→#0f0518`, synthwave `#2b1055→#140c28`, kawaii `#fff8fc→#ffeaf5→#f2e6ff`); cyberpunk/synthwave `RAMPS` restored to their original stops; the two-pass neon halo in `drawOscilloscope` removed (shadow/line-width logic back to original; the `gain` sensitivity plumbing predates the pass and was kept); cyberpunk/synthwave gradient spectrum bars removed (fall through to `p.bar` again). (3) `VisualizerBoard.tsx` — idle placeholder paints its original local gradient again instead of `fillThemeBackground`. Typecheck green. Lesson: theme work must be reviewed by the user's eyes in `npm run dev`; do small slices, not whole-theme blind passes.
+
+## Inbox (agent-proposed)
+
+Discovery pass 2026-10-07 (nitesesh worker; lenses: packaging/dependency weight, tests, docs, security, performance).
+Security came back clean: `contextIsolation: true` + `nodeIntegration: false` on all three windows (main / pop-out / clip),
+a real CSP in `index.html`, no `webSecurity: false`, and `sandbox: false` is the deliberate, documented exception. The
+findings below are concrete and bounded; promote one by moving it into an open section.
+
+- [x] **181 MB of source maps ship in the installer** [P1] [packaging] [size:S]
+      Why: `node_modules/@tensorflow/**` is 258 MB on disk — **181.7 MB of that is `.map` source maps** (73 files), plus
+      4.4 MB `tsconfig.tsbuildinfo`, 2.3 MB `.ts`/`.d.ts`, and a 16.2 MB `dist/miniprogram` (WeChat) build. None of it is
+      ever read at runtime, and `build.files` globs the whole package trees, so `app.asar` is **278 MB** — the artefact is
+      ~4× bigger than it needs to be, which the user pays for in installer size, disk and upload time.
+      Done when: `build.files` excludes those and a freshly built `release/win-unpacked` still passes `npm run test:packaged`
+      (the harness runs real inference from inside the asar, so it is the proof that nothing needed was pruned).
+      **DONE 2026-10-07** — `!**/*.map`, `!**/*.ts`, `!**/*.tsbuildinfo`, `!**/dist/miniprogram/**` added to `build.files`;
+      app.asar **278 MB → 85 MB** (−69 %) and `npm run test:packaged` 21/21 on the rebuilt artefact.
+- [ ] **Renderer-pure modules have nowhere to be tested** [P2] [tests] [size:M]
+      Why: `npm test` is `node --test dist/main/transcribe/*.test.js`, so nothing under `src/renderer/lib/` can be tested at
+      all — not the `HistoryModel` zoom/pan/clamp math (verified by hand numerically, per §11.4 Phase 2), not `note-store`'s
+      LRU, not `export-engine`'s slice maths. The one shared-module test that exists only runs because it was filed under
+      `src/main/transcribe/` (`piano-roll.test.ts`), which is the workaround this item removes.
+      Done when: a second test target (own tsconfig + glob) covers `src/shared/**` and the DOM-free renderer libs
+      (`history-model` only needs `performance.now()`, which node has) and `npm test` runs both.
+      Hints: keep the existing `tsconfig.main.json` build; add `tsconfig.test.json` including `src/shared` + `src/renderer/lib`
+      with `dom` in `lib` for the type-check only.
+- [x] **§6 and §7 still describe the BOM hardening as open — it landed already** [P2] [docs] [size:S]
+      Why: §6 warns "Never hand-edit this file from PowerShell … Making `readSettings()` strip a leading BOM and log the
+      failure would be a cheap, worthwhile hardening", and §7's not-scheduled list still carries "Harden `readSettings()`
+      against a BOM / malformed file". Both were true when written, but `src/main/settings.ts` already strips a leading
+      U+FEFF **and** logs a parse failure with the file path (commit `28a322e`, 2026-10-06) — so the docs now warn about a
+      hazard that is handled, and list a finished job as pending. A stale warning is worse than none: it hides the fact that
+      a corrupt file no longer silently reverts settings.
+      Done when: both places say what the code actually does, and the not-scheduled entry is closed.
+      **DONE 2026-10-07** — §6's warning now states the BOM is stripped and a parse failure is logged (and why the
+      `error`-level line matters); §7's entry is marked done with the commit.
+- [x] **§7's "no packaged verification" claim is now false** [P2] [docs] [size:S]
+      Why: §7 says "No packaged (`npm run package`) verification — the `files` fix is reasoned, not package-and-run proven",
+      and elsewhere cites `npm run test:electron` as "12 checks". Both are stale as of this run.
+      Done when: those paragraphs match what the repo actually does now.
+      **DONE 2026-10-07** — §7's "Still open" paragraph updated (packaged verification done, `test:packaged` documented,
+      check count corrected, and the real remaining gap — the listening test — named).
+- [ ] **Decoding the rolling buffer blocks the renderer** [P3] [performance] [size:M]
+      Why: `export-engine.ts` `decodedPcm()` converts the whole decoded buffer to Int16 with a per-sample clamp loop — for a
+      15-minute stereo buffer that is ~80 M iterations on the UI thread (~100-300 ms of jank), paid on the first drag-out and
+      now on the first `m` too. `decodeAudioData` itself is async, but the conversion is not.
+      Done when: the conversion is chunked across frames (or moved into a worker with a transferable buffer) and a 15-minute
+      buffer no longer produces a visible stall.
+      Hints: measure first with `performance.now()` around the loop in a dev build; the cache means it is once per session,
+      so this is polish, not a bug.
 
 ## Decisions made (review me)
 - MIDI piano-roll: Phase A first, separate strip, no tempo grid, no .mid drag-out yet (checkpoint `1f2a46a`)
