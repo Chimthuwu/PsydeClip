@@ -55,6 +55,15 @@ import {
 let preparedDragFilePath: string | null = null;
 
 /**
+ * The renderer's current History/spectrogram selection, in absolute session
+ * seconds — reported over `selection:changed` because the renderer owns the
+ * peak track and the recorder. Main only needs it to label and offer
+ * "Save selection" in the native quick menu, which has to be built here (a
+ * docked 52px window would clip any in-DOM menu).
+ */
+let lastSelection: [number, number] | null = null;
+
+/**
  * Windows aborts `webContents.startDrag()` when the icon is missing or empty —
  * historically we passed a 1×1 transparent PNG, which some Windows builds still
  * treat as empty and drop the drag on the floor. Use the real app icon (a
@@ -413,6 +422,13 @@ export function registerIpc(ctx: IpcContext) {
    * monitor. It's also why the output-device picker no longer has to occupy a
    * permanent row in the UI.
    */
+  ipcMain.on(IpcChannel.selectionChanged, (_e, sel: [number, number] | null): void => {
+    lastSelection =
+      Array.isArray(sel) && sel.length === 2 && Number.isFinite(sel[0]) && Number.isFinite(sel[1]) && sel[1] > sel[0]
+        ? [sel[0], sel[1]]
+        : null;
+  });
+
   ipcMain.handle(IpcChannel.contextMenu, async (e): Promise<void> => {
     const win = BrowserWindow.fromWebContents(e.sender) ?? ctx.getWindow();
     if (!win || win.isDestroyed()) return;
@@ -481,7 +497,29 @@ export function registerIpc(ctx: IpcContext) {
       };
     };
 
+    // "Save selection" leads the menu when there is one: it is the action the
+    // user is most likely to want after dragging a range out of the waveform,
+    // and it is the only way to save a crop from a docked/pop-out window.
+    // Added to the existing quick menu rather than intercepting right-click
+    // with a second menu — one menu, and the "Save as" submenu below already
+    // governs which format it writes (todo.md index, History phase 5).
+    const selItems: MenuItemConstructorOptions[] = lastSelection
+      ? [
+          {
+            label: `Save selection (${(lastSelection[1] - lastSelection[0]).toFixed(2)}s)`,
+            click: () => {
+              const main = ctx.getWindow();
+              if (main && !main.isDestroyed()) {
+                main.webContents.send(IpcChannel.requestSaveSelection);
+              }
+            },
+          },
+          { type: 'separator' },
+        ]
+      : [];
+
     const template: MenuItemConstructorOptions[] = [
+      ...selItems,
       { label: s.captureBackend === 'loopback' ? 'Output device' : 'Capture source', enabled: false },
       ...deviceItems,
       { type: 'separator' },

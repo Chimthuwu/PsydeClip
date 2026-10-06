@@ -134,6 +134,22 @@ async function main() {
   check('shipped preload exposes startTranscription', hasApi);
   if (!hasApi) return 1;
 
+  // The quick menu's "Save selection" plumbing: the renderer reports the
+  // selection, main builds the native item from it and asks the main window to
+  // save. Only the bridge surface can be asserted without a real click on a
+  // native menu — a stale preload bundle is the failure this catches.
+  const selApi = await win.webContents.executeJavaScript(`
+    (() => {
+      const has = typeof window.api.selectionChanged === 'function'
+        && typeof window.api.onRequestSaveSelection === 'function';
+      if (has) {
+        window.api.selectionChanged([1.5, 4.25]);
+        window.api.selectionChanged(null);
+      }
+      return has;
+    })()`);
+  check('shipped preload exposes the selection → quick-menu bridge', selApi);
+
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'recordr-electron-midi-'));
   const audioPath = path.join(dir, 'electron-take.wav');
   fs.writeFileSync(audioPath, 'placeholder audio, must not be modified');

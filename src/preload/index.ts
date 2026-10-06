@@ -158,6 +158,19 @@ const api = {
   showContextMenu(): void {
     void ipcRenderer.invoke(IpcChannel.contextMenu);
   },
+  /**
+   * Report the current selection (absolute session seconds, null = none) so
+   * main's native quick menu can offer to save exactly that range.
+   */
+  selectionChanged(sel: [number, number] | null): void {
+    ipcRenderer.send(IpcChannel.selectionChanged, sel);
+  },
+  /** The user chose "Save selection" in the quick menu. Returns an unsubscribe fn. */
+  onRequestSaveSelection(handler: () => void): () => void {
+    const listener = () => handler();
+    ipcRenderer.on(IpcChannel.requestSaveSelection, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.requestSaveSelection, listener);
+  },
   /** Pop the native menu for one of the title-bar knobs (format / gain / buffer). */
   showTitleMenu(kind: TitleMenuKind): void {
     void ipcRenderer.invoke(IpcChannel.titleMenu, { kind });

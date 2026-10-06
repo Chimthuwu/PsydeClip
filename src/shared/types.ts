@@ -379,6 +379,15 @@ export const IpcChannel = {
   transcribeCancel: 'transcribe:cancel',
   /** Main -> renderer: a transcription job's progress or completion. */
   transcribeEvent: 'transcribe:event',
+  /**
+   * Renderer → main: the current History/spectrogram selection, as absolute
+   * session seconds (null when there is none). Main keeps the latest value so
+   * the native quick menu can offer "Save selection" from either window —
+   * including the pop-out while the main window is hidden.
+   */
+  selectionChanged: 'selection:changed',
+  /** Main → renderer: the user picked "Save selection" in the quick menu. */
+  requestSaveSelection: 'recording:request-save-selection',
   dragExport: 'drag:export',
   recordingEvent: 'recording:event',
   hotkeySet: 'hotkey:set',

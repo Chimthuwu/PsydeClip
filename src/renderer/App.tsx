@@ -199,6 +199,24 @@ export default function App() {
   }
 
   /**
+   * Save exactly the current selection — the quick menu's "Save selection"
+   * item and the `s` key.
+   *
+   * Deliberately distinct from performSave() (the HUD's manual save, which
+   * saves the whole rolling window unless History happens to be the only
+   * visible board): a menu item that says "Save selection" has to mean it, and
+   * a selection can now come from the spectrogram or a mosaic pane too.
+   */
+  async function saveSelection() {
+    const sel = selectionRef.current;
+    if (!sel) {
+      emitToast('error', 'Nothing selected — drag across the waveform first.');
+      return;
+    }
+    await saveCurrent(sel);
+  }
+
+  /**
    * Dedicated record button: press once to start an isolated clip recording
    * (only the clip's own seconds accumulate, nothing from the rolling buffer),
    * press again to stop — asking whether to keep (save) or discard it. Works
@@ -287,6 +305,9 @@ export default function App() {
 
   const handleSelectionChange = useCallback(async (sel: [number, number] | null) => {
     selectionRef.current = sel;
+    // Tell main, so the native quick menu can offer "Save selection (Ns)" from
+    // either window — including the pop-out, where the main window is hidden.
+    window.api.selectionChanged(sel);
     const seq = ++dragSeqRef.current;
     setDragReady(false);
     if (!sel || !cs.recorder || !cs.historyModel) return;
@@ -464,10 +485,21 @@ export default function App() {
       if ((e.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
       if (!selectionRef.current) return;
       e.preventDefault();
-      void performSave();
+      void saveSelection();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // The quick menu's "Save selection" item. Main builds that menu (a docked
+  // 52px window would clip an in-DOM one) from the selection the renderer
+  // reports, and sends this back when it is chosen. No dep array, like the key
+  // handlers above: saveSelection closes over the current settings/recorder.
+  useEffect(() => {
+    const unsub = window.api.onRequestSaveSelection(() => {
+      void saveSelection();
+    });
+    return unsub;
   });
 
   // `m` transcribes the History selection to MIDI and shows it in the
