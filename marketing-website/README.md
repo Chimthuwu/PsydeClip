@@ -7,7 +7,7 @@ step, no dependencies, no tracking. Open `index.html` in a browser to see it.
 marketing-website/
 ├── index.html        # the whole page
 ├── styles.css        # one stylesheet, palette copied from the app's default theme
-└── assets/themes/    # main-<theme>.png — written by scripts/theme-shots.mjs (not committed yet)
+└── assets/themes/    # committed: main-<theme>.png ×12 + popout-<theme>.png ×12 (scripts/theme-shots.mjs)
 ```
 
 ## What's on the page
@@ -28,13 +28,13 @@ marketing-website/
 
 ## Screenshots
 
-`assets/themes/main-<theme>.png` does not exist yet. Until it does, each theme
-card falls back to a canvas of that theme's own accent colour (the `--sw` custom
-property on each card, taken from the app's theme list), so the page never shows
-a broken image. The `<img>` tags remove themselves when the file is missing
-(`onerror`), and the hero has a labelled placeholder.
+All 24 frames are committed: `main-<theme>.png` ×12 for the hero and the gallery,
+plus `popout-<theme>.png` ×12 (the pop-out is slated for removal, so the page
+doesn't use those). Each card also carries its theme's accent colour as the `--sw`
+custom property, so if an image ever goes missing the card falls back to a canvas
+of that colour and the `<img>` removes itself (`onerror`).
 
-To fill them in, with the app running in dev mode:
+To re-shoot them, with the app running in dev mode:
 
 ```bash
 # terminal 1
@@ -52,8 +52,11 @@ it switches the theme 12 times, so don't run it while you're using it.
 
 ## Open items before this can go live
 
-1. **Screenshots** — the capture above has not been run (it needs a live build
-   and someone to look at the frames). Nothing in `assets/` is committed.
+1. **Screenshots** — captured and committed (24 PNGs via
+   `scripts/theme-shots.mjs`). Still open: a human *pick the frames* pass. Three
+   were spot-checked (modern, kawaii, black-ice) and the shots include the live
+   recording state, because the app was capturing during the shoot. A re-shoot
+   after picking is cheap — the script is deterministic.
 2. **Hosting and a domain** — undecided. The cheapest option that fits a static
    page is GitHub Pages, but Pages on a private repo needs a paid plan, so it
    also needs a decision about making the repo public (or hosting the file
@@ -67,8 +70,7 @@ it switches the theme 12 times, so don't run it while you're using it.
    `github.com/Chimthuwu/recordr/releases/latest`. There is no tagged release
    yet, and the repo is private, so those links only work for someone with
    access.
-6. **Copy** — the features list is written from the code and the README, so it
-   should be checked by whoever owns the product voice. The README itself is
-   stale in places (it still says two themes / three visualizers, and the old
-   `Shift+Alt+R` hotkey); the site uses the current values from
-   `src/shared/types.ts` instead.
+6. **Copy** — the features list is written from the code, so it should still be
+   checked by whoever owns the product voice. (The main README's own staleness
+   was corrected on 2026-10-06 — repo owner, hotkey behaviour, file map, formats,
+   fixed Known-issues entries — so the two now agree.)
