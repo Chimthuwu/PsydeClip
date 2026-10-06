@@ -12,10 +12,10 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [x] Capture screenshots of the 12 themes from a running build for the site and README — done 2026-10-06 by the nitesesh worker: `theme-shots.mjs` run against a live dev instance (vite + `electron . --remote-debugging-port=9223`), 24 PNGs committed (`main-<theme>.png` ×12 + `popout-<theme>.png` ×12, ~1.6 MB) in `marketing-website/assets/themes/`. Three frames eyeballed (modern, kawaii, black-ice): UI renders correctly in each. The human "pick the frames" pass is still open — the shots are usable as-is, a re-shoot after picking is cheap (the script is deterministic).
 - [!] Publish the marketing site: hosting + domain and price are undecided (the licence is decided: MIT, `LICENSE` + `license` field added 2026-10-06) — and the download links need a tagged release plus a public repo (section 7)
 - [!] Layered / blended visualizers (e.g. oscilloscope over history at reduced opacity): DRAFT, needs the pairs, UX option and time-base decisions first (section 11)
-- [!] Android version: browser port was ruled out, so choose between a `window.api` shim under a Capacitor shell and a ground-up native Kotlin app (section 7, NEXT)
 
 - [!] **Audio->MIDI is built in the SOURCE but has never been used in the real app, and no installer contains it** — and there is **no MIDI grid/visualizer** to see the melody (Stooge, 2026-10-07). Verification gap + UI plan in "§MIDI-1" directly below this checklist
 - [~] **MIDI piano-roll visualizer** (2026-10-07 nitesesh: note data now rides `TranscribeJobState.notes`, pure layout `src/shared/piano-roll.ts` + tests done; STILL TODO: `PianoRollLane` canvas in VisualizerBoard sharing the History viewport, note cache, `showMidiLane` setting, 'Transcribe selection' key `m`) (a 5th board mode / lane under the History waveform): phase A = show a finished transcription over a selection; phase B = live melody display while capturing (needs a light real-time pitch tracker — Basic Pitch cannot keep up live). §MIDI-1
+- [ ] **Android version — DO THIS LAST, literally the final item on the list: only after Audio->MIDI is verified in a real packaged build AND the MIDI piano-roll grid is finished** (Stooge, 2026-10-07). Browser port was ruled out; Hermes workers: pick the shape yourself with a `DECISION:` commit (default: `window.api` shim under a Capacitor shell) and build it (section 7, NEXT)
 
 ---
 
@@ -934,8 +934,7 @@ licence/price block. `marketing-website/README.md` carries the open items.
 >   settings shape. More total work, but no webview, no `window.api` shim, and
 >   full access to `AudioPlaybackCapture` + the foreground service.
 >
-> **Nothing is started and this is unresolved.** Do not start Android until this
-> shape is chosen. The verified renderer-isolation facts below still hold and
+> **Nothing is started.** Hermes workers: build Android LAST, only after Audio->MIDI is verified and the piano-roll grid is done; choose the shape yourself (DECISION commit; default = Capacitor shell with a `window.api` shim). The verified renderer-isolation facts below still hold and
 > still inform the decision — they are what makes option 2 cheap *if* chosen.
 
 The user asked for this as the next real project (not "parked" anymore). It is
