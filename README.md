@@ -13,7 +13,7 @@ Always quietly recording in memory — press **Save** to write the last 15 minut
 [![naudio](https://img.shields.io/badge/NAudio-WASAPI-9933CC?logo=.net&logoColor=white)](https://github.com/naudio/NAudio)
 [![webm](https://img.shields.io/badge/codec-WebM%20%2F%20Opus-16213A)](https://www.opus-codec.org)
 [![status](https://img.shields.io/badge/status-WIP%20%2F%20pre--alpha-yellow)](https://github.com/Chimthuwu/recordr/issues)
-[![license](https://img.shields.io/badge/license-TBD-lightgrey)](#license)
+[![license](https://img.shields.io/badge/license-MIT-green)](#license)
 
 *The dashboard, the spectrogram, and the source picker. The tray icon overlays a red REC dot while capturing (Windows).*
 </div>
@@ -331,7 +331,7 @@ The helper lives at `loopback-build/recordr-loopback.exe`. Smoke-test it on its 
 
 ## 🧾 License
 
-**Not finalised.** There is no `LICENSE` file in this repository and `package.json` has no `license` field, so for now treat the code as all-rights-reserved. The badge above is aspirational — check back before redistributing anything.
+MIT — see [`LICENSE`](LICENSE). Copyright (c) 2026 Chimthuwu.
 
 ---
 
