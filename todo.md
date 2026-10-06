@@ -8,6 +8,7 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [!] Deprecate Pop-out mode (docked mode works; remove the pop-out code to simplify) (section 11)
 - [x] Ultra-compact docked mode: the docked strip's floor is no longer pinned at 100px — it can be dragged down to 52px (title bar + one tight HUD row; the board is dropped at ≤96px, never clipped). New CSS height tiers at 190/150/96 in `styles.css`; `DOCK_MIN_HEIGHT`/`DOCK_STRIP_HEIGHT` in `window-controls.ts`. (2026-10-06, typecheck + build pass; not eyeballed at 52px — a true ~32px strip needs the transport moved into the title bar, still open)
 - [x] Marketing website: built as a static page in `marketing-website/` (hero, what-it-does, producer/DAW angle, features, 12-theme gallery, download CTA, licence/price placeholder) — no build step, no dependencies; `marketing-website/README.md` lists what's still missing. Theme screenshots are still pending (next item), the gallery falls back to each theme's accent colour. (2026-10-06, structure checked against `THEMES`; not viewed in a browser)
+- [x] README accuracy pass (2026-10-06): wrong repo owner in the badges + clone URL (`Serge/recordr` → `Chimthuwu/recordr`), the stale `Shift+Alt+R` quick-start step and the "hotkey snapshots the rolling buffer" flow (the hotkey records a *clip* now; Save drains the buffer), the file map ("three visualizers", a `docs/` dir that does not exist, a 1-of-6 `scripts/` list), two Known-issues entries for bugs that are already fixed (Bug #1 renderer crash, Bug #2 dropdown), two done Roadmap boxes, and the MIT licence claim (there is no `LICENSE` file). Also fixed the HUD buffer tooltip and the Settings hotkey preset/placeholder that still advertised `Shift+Alt+R`. typecheck + build pass; every claim re-checked against `src/shared/types.ts`, `package.json`, `scripts/` and `git remote -v`.
 - [x] Capture screenshots of the 12 themes from a running build for the site and README — done 2026-10-06 by the nitesesh worker: `theme-shots.mjs` run against a live dev instance (vite + `electron . --remote-debugging-port=9223`), 24 PNGs committed (`main-<theme>.png` ×12 + `popout-<theme>.png` ×12, ~1.6 MB) in `marketing-website/assets/themes/`. Three frames eyeballed (modern, kawaii, black-ice): UI renders correctly in each. The human "pick the frames" pass is still open — the shots are usable as-is, a re-shoot after picking is cheap (the script is deterministic).
 - [!] Publish the marketing site: hosting + domain, price, and the licence (README says MIT but there is no `LICENSE` file and no `license` field in `package.json`) are all undecided — and the download links need a tagged release plus a public repo (section 7)
 - [!] Layered / blended visualizers (e.g. oscilloscope over history at reduced opacity): DRAFT, needs the pairs, UX option and time-base decisions first (section 11)
@@ -846,9 +847,10 @@ licence/price block. `marketing-website/README.md` carries the open items.
   field in `package.json`**, so the page deliberately states no licence even
   though the README says MIT; and the download links point at a `releases/latest`
   that doesn't exist yet on a private repo.
-* The site's copy is written from the code, not from the README — the README is
-  stale in places (two themes / three visualizers / the old `Shift+Alt+R`
-  hotkey). Worth a pass of its own.
+* The site's copy is written from the code, not from the README. The README's
+  own accuracy pass landed 2026-10-06 (see the checklist index at the top): repo
+  owner, the hotkey's real behaviour, the file map, the fixed Known-issues
+  entries and the unbacked MIT claim are all corrected.
 * Remaining work, in order: run the screenshot capture → add `LICENSE` +
   `license` field and decide the price → decide hosting (GitHub Pages needs the
   repo public or a paid plan) → cut a tagged release → re-read the copy.

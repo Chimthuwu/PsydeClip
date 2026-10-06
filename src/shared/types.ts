@@ -136,7 +136,7 @@ export interface LoopbackDevice {
 
 /** Persisted user settings. */
 export interface AppSettings {
-  /** Global hotkey, e.g. "Shift+Alt+R". */
+  /** Global hotkey, e.g. "Alt+R". */
   hotkey: string;
   /** Absolute path to a folder where recordings are written. */
   saveFolder: string;

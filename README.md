@@ -5,15 +5,15 @@
 **A Rolling Sampler–style system audio recorder for Windows.**  
 Always quietly recording in memory — press a hotkey to save the last 15 minutes (or however long you buffered) to disk.
 
-[![platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/Serge/recordr)
+[![platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/Chimthuwu/recordr)
 [![electron](https://img.shields.io/badge/Electron-30-47848F?logo=electron&logoColor=white)](https://www.electronjs.org)
 [![react](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![typescript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
 [![naudio](https://img.shields.io/badge/NAudio-WASAPI-9933CC?logo=.net&logoColor=white)](https://github.com/naudio/NAudio)
 [![webm](https://img.shields.io/badge/codec-WebM%20%2F%20Opus-16213A)](https://www.opus-codec.org)
-[![status](https://img.shields.io/badge/status-WIP%20%2F%20pre--alpha-yellow)](https://github.com/Serge/recordr/issues)
-[![license](https://img.shields.io/badge/license-MIT-22cc88)](#license)
+[![status](https://img.shields.io/badge/status-WIP%20%2F%20pre--alpha-yellow)](https://github.com/Chimthuwu/recordr/issues)
+[![license](https://img.shields.io/badge/license-TBD-lightgrey)](#license)
 
 *The dashboard, the spectrogram, and the source picker. The tray icon overlays a red REC dot while capturing (Windows).*
 </div>
@@ -25,8 +25,8 @@ Always quietly recording in memory — press a hotkey to save the last 15 minute
 > This repository is being actively built. The first prototype works, but it isn't polished yet.  
 > If you pulled it down between 2026-08-10 and 2026-08-20 you should expect:
 > - A handful of rough edges in the renderer (see [Known issues](#-known-issues))
-> - Packaging requires admin privilege on Windows for the `winCodeSign` archive
-> - The WASAPI helper builds on first run (~430 MB .NET SDK + ~700 KB NAudio output)
+> - Packaging works on the dev box; on a clean machine the `winCodeSign` archive may still need admin to extract
+> - The WASAPI helper ships prebuilt in `loopback-build/`; only rebuilding it needs the ~430 MB .NET SDK
 >
 > Everything below *does* run end-to-end: the rolling buffer saves real audio, the WASAPI helper captures real per-speaker output, the visualizer renders real FFT data, and the tray icon shows real state.
 
@@ -38,6 +38,8 @@ Always quietly recording in memory — press a hotkey to save the last 15 minute
 |---|---|
 | 🔁 **Rolling buffer** | Continuously captures the last 1 min → 1 hr to RAM; press the hotkey any time to save that slice to a `.webm`/Opus file |
 | ⏺️ **Traditional mode** | The same app, but the hotkey toggles record on/off and auto-saves on stop, like a normal recorder |
+| 🎬 **Clip recorder** | The record button (and the hotkey) cuts a short clip straight to disk, independent of the rolling buffer — no whole-session re-encode |
+| 🎼 **Optional MIDI** | Turn on *Transcribe on save* and every recording also gets a `.mid` beside it (Basic Pitch, CPU) |
 | 🎛️ **Two capture backends** | `desktop` (Chromium screen/window picker) *or* `loopback` (true per-output WASAPI from the speakers / headphones / VoiceMeeter) |
 | 🌈 **Four visualizers** | Oscilloscope / spectrum bars / scrolling spectrogram / the historical waveform you can scrub, select and drag out as a WAV |
 | 🎨 **Twelve themes** | Modern neon-magenta on dark navy, Classic green-on-black CRT, Cyberpunk, Synthwave, Monochrome, Kawaii, Aqua, Sakura, Lime, Blood red, Nocturnal, Black ice |
@@ -46,7 +48,7 @@ Always quietly recording in memory — press a hotkey to save the last 15 minute
 | 📌 **Always-on-top** | One click — window stays above your DAW even in fullscreen |
 | 🔒 **Single instance** | Second launch focuses the running app instead of opening a duplicate |
 | ⌨️ **Hotkeys** | `Alt+R` saves a short clip, `s` saves the History selection, the main hotkey is rebindable through the settings modal |
-| 💾 **WebM/Opus** | All recordings are small, widely-supported Opus-in-WebM files |
+| 💾 **WebM / WAV / MP3** | Opus-in-WebM by default, WAV or MP3 when a DAW needs it |
 
 ---
 
@@ -112,7 +114,7 @@ flowchart LR
 1. App boots. Pick a source (a screen / window) or a loopback device (Speakers / Headphones / VoiceMeeter / …).
 2. A `MediaStream` opens against the chosen audio path. In *desktop* mode we go through Chromium's loopback mixer; in *loopback* mode the `.exe` helper pumps Float32-LE samples back over IPC into an in-DOM `AudioWorkletProcessor`, which exposes a `MediaStreamDestination` so the visualizer and `MediaRecorder` see the same node graph.
 3. `MediaRecorder` emits ~1 s Opus chunks to a **rolling ring buffer** capped at `bufferSeconds` (default 900s / 15 min). Older chunks are pruned in O(1).
-4. Hotkey → renderer concatenates the current buffer into one `Blob`, sends the bytes to the main process over IPC, `saveWebm()` writes them with the substituted filename template, and `tray.notifySaveCompleted()` pushes the file into the recent-saves ring buffer.
+4. **Save** → the renderer concatenates the current buffer into one `Blob`, sends the bytes to the main process over IPC, `saveWebm()` writes them with the substituted filename template, and `tray.notifySaveCompleted()` pushes the file into the recent-saves ring buffer. (The hotkey is a separate path: in rolling mode it starts/stops a **clip**, which streams to a temp file and never touches the rolling buffer.)
 
 ---
 
@@ -121,7 +123,7 @@ flowchart LR
 You need **Node ≥ 18**, **Rust-free environment** (no native module rebuild needed for the WASAPI helper), **Windows 10 or 11** (loopback backend; desktop backend works everywhere Electron 30 ships).
 
 ```bash
-git clone https://github.com/Serge/recordr
+git clone https://github.com/Chimthuwu/recordr
 cd recordr
 npm install
 npm run dev
@@ -133,8 +135,8 @@ When the window opens:
 
 1. Click ⚙ **Settings** → **Pick folder** → choose where recordings land
 2. Bottom dropdown → pick a screen/window (Spotify, Bitwig, …) **or** switch the **Capture backend** radio to **Per-output device (WASAPI)** and pick your speakers
-3. Hit **Start** (or just press <kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> if rolling is on)
-4. Play something; the visualizer fills in. Press the hotkey to snapshot the rolling buffer — toast confirms.
+3. Hit **Start** (or press <kbd>Alt</kbd>+<kbd>R</kbd> to cut a clip on its own)
+4. Play something; the visualizer fills in. **Save last 15 min** writes the rolling buffer to disk — toast confirms. The hotkey records a *clip* instead, leaving the rolling buffer untouched.
 
 ---
 
@@ -171,9 +173,9 @@ recordr/
 ├── native/
 │   └── RecordrLoopback/  WASAPI loopback helper (C#, .NET 8, NAudio)
 ├── loopback-build/        Built helper (committed; ~700 KB apphost + DLLs)
-├── scripts/
-│   └── build-loopback-helper.sh  rebuild the helper if you edit Program.cs
-├── docs/                   (drop screenshots here)
+├── scripts/                helper build, icon generation, theme shots, work-area reset, transcribe check
+├── spikes/                 throwaway feasibility spikes (Basic Pitch engine, tfjs backend bench)
+├── marketing-website/      static landing page (no build step)
 ├── todo.md                 detailed status / handoff doc
 ├── release/                output of `npm run package`
 └── package.json
@@ -183,7 +185,7 @@ recordr/
 |---|---|
 | `src/main/` | `BrowserWindow` lifecycle, single-instance lock, hotkey registration, IPC handlers, tray state, file save pipeline |
 | `src/preload/` | `contextBridge.exposeInMainWorld('api', …)` with typed methods + `platform` field |
-| `src/renderer/` | React + Zustand-lite local state, custom dark dropdown listbox, three visualizers |
+| `src/renderer/` | React hooks + local state, custom dark dropdown listbox, four visualizers (oscilloscope / spectrum / spectrogram / history) |
 | `src/shared/` | `IpcChannel` enum, `AppSettings` defaults, token list, helper functions |
 | `native/RecordrLoopback/` | Subprocess: NAudio `WasapiLoopbackCapture` → stdout Float32-LE PCM frames |
 
@@ -266,8 +268,8 @@ OS-illegal chars (`/\:*?"<>|`) are stripped and run-together `_` collapsed befor
 
 The list below is what an external user would hit if they pulled the repo right now. Track PRs against this section.
 
-- 🟡 **Renderer crash on Start in some WASAPI configurations** — `bad_message.cc(29) … reason 263` from Chromium-126 IPC; main process:renderer crash is usually recoverable but leaves the window blank until next launch. Reproducible when an invalid `sourceId` is fed to `getUserMedia({chromeMediaSource:'desktop',…})`. Open DevTools from the in-app menu to see the actual error.
-- 🟡 **First-launch dropdown UX has been re-implemented as an in-DOM custom listbox** — but the OS-native `<select>` styling inside *Settings* still picks up white-on-white on some Windows themes. The fix is in flight (apply `color-scheme: dark` to the document + explicit `option { background, color }`).
+- ✅ **Renderer crash on Start — fixed.** Chromium used to kill the whole renderer (`bad_message.cc(29) … reason 263`) when a *window* source or a stale `sourceId` reached `getUserMedia({chromeMediaSource:'desktop',…})`. A pre-flight guard in `useCapture` now rejects anything that isn't a live `screen:*` id and surfaces it as an ordinary error line.
+- ✅ **White-on-white dropdown — fixed.** The picker is an in-DOM listbox, and `color-scheme: dark` is set on `:root` so the native `<select>`s that remain in Settings follow the OS theme.
 - 🟢 **`npm run package` post-extract step fails on locked-down boxes** — `winCodeSign` archive contains macOS symlinks (`libcrypto.dylib`, `libssl.dylib`) that 7-Zip needs admin to recreate on Windows. Either run `electron-builder` in `--dir` mode, or pre-extract the archive and `touch marker.file` to short-circuit the hash re-download. The unpacked `release/win-unpacked/` is unaffected and fully usable.
 - 🟢 **No code signing** — `Recordr.exe` is unsigned, so SmartScreen warns the first time on most installs. Click *More info → Run anyway* until a real cert is wired up.
 - 🟢 **Default save folder is empty** — first-launch UX asks the user to pick before any recording. This is intentional but might frustrate power users; an `~/Recordings` default is on the roadmap.
@@ -280,8 +282,8 @@ See [`todo.md`](./todo.md) for the full deep-dive.
 
 > Order is approximate; priorities may shift based on user feedback.
 
-- [ ] Fix renderer crash on capture start (track down `bad_message.cc 263`)
-- [ ] Custom dropdown styling consistency across all pickers
+- [x] ~~Fix renderer crash on capture start (`bad_message.cc 263`)~~ — fixed (pre-flight source guard)
+- [x] ~~Custom dropdown styling consistency across all pickers~~ — fixed (in-DOM listbox + `color-scheme: dark`)
 - [ ] Real installer signed with a self-issued cert so SmartScreen stays quiet
 - [ ] In-app audio meter as a flying HUD on click
 - [ ] Optional mic capture via the same WASAPI helper
@@ -305,6 +307,12 @@ npm run build
 # Launch with hot-reload
 npm run dev
 
+# Unit tests for the MIDI transcription pipeline
+npm test
+
+# The same checks inside a real Electron (registerIpc + the shipped preload)
+npm run test:electron
+
 # Rebuild just the WASAPI helper (only if you edit Program.cs)
 ./scripts/build-loopback-helper.sh
 ```
@@ -323,7 +331,7 @@ The helper lives at `loopback-build/recordr-loopback.exe`. Smoke-test it on its 
 
 ## 🧾 License
 
-MIT — see [`LICENSE`](./LICENSE). If a license file is missing in your clone, treat this as a placeholder for now and check back before redistribution.
+**Not finalised.** There is no `LICENSE` file in this repository and `package.json` has no `license` field, so for now treat the code as all-rights-reserved. The badge above is aspirational — check back before redistributing anything.
 
 ---
 
