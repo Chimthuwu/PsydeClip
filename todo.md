@@ -1763,15 +1763,21 @@ findings below are concrete and bounded; promote one by moving it into an open s
       app.asar **278.4 MB → 77.9 MB** (−72 %; `release/win-unpacked` 522 → 331 MB), the asar now holds 0 `.map` / `.ts` /
       `tsbuildinfo` / `miniprogram` entries while the engine + model + `tfjs-backend-cpu` are all still there, and
       `npm run test:packaged` is **22/22** on the rebuilt artefact (real inference from inside the pruned asar).
-- [ ] **Renderer-pure modules have nowhere to be tested** [P2] [tests] [size:M]
-      Why: `npm test` is `node --test dist/main/transcribe/*.test.js`, so nothing under `src/renderer/lib/` can be tested at
+- [x] **Renderer-pure modules have nowhere to be tested** [P2] [tests] [size:M]
+      Why: `npm test` was `node --test dist/main/transcribe/*.test.js`, so nothing under `src/renderer/lib/` could be tested at
       all — not the `HistoryModel` zoom/pan/clamp math (verified by hand numerically, per §11.4 Phase 2), not `note-store`'s
-      LRU, not `export-engine`'s slice maths. The one shared-module test that exists only runs because it was filed under
+      LRU, not `export-engine`'s slice maths. The one shared-module test that existed only ran because it was filed under
       `src/main/transcribe/` (`piano-roll.test.ts`), which is the workaround this item removes.
-      Done when: a second test target (own tsconfig + glob) covers `src/shared/**` and the DOM-free renderer libs
-      (`history-model` only needs `performance.now()`, which node has) and `npm test` runs both.
-      Hints: keep the existing `tsconfig.main.json` build; add `tsconfig.test.json` including `src/shared` + `src/renderer/lib`
-      with `dom` in `lib` for the type-check only.
+      Done when: a second test target (own tsconfig + glob) covers `src/shared/**` and the DOM-free renderer libs and
+      `npm test` runs both.
+      **DONE 2026-10-07** — `tsconfig.test.json` + `npm run build:tests` compile `src/renderer/lib/**/*.test.ts` (CommonJS,
+      `types: ["node"]`, no DOM lib — `history-model` only needs the `performance` global), `tsconfig.renderer.json` excludes
+      test files so `npm run typecheck` stays clean, and `npm test` now runs both globs: **28 checks** (14 transcribe + 2 new
+      suites). `history-model.test.ts` locks in the window/fit-all/follow/fixed/zoom/pan/clamp/columnPeaks behaviour and
+      `note-store.test.ts` the 10 ms key rounding + LRU eviction — writing them already caught three of my own wrong
+      assumptions about the bucketing (`floor(t * columns)`), which is the point.
+      Note: the DOM-free libs are the ones testable this way; `visualizer.ts` / `export-engine.ts` need a browser and stay
+      out of scope until there is a real renderer test harness.
 - [x] **§6 and §7 still describe the BOM hardening as open — it landed already** [P2] [docs] [size:S]
       Why: §6 warns "Never hand-edit this file from PowerShell … Making `readSettings()` strip a leading BOM and log the
       failure would be a cheap, worthwhile hardening", and §7's not-scheduled list still carries "Harden `readSettings()`
