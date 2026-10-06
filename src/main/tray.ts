@@ -1,7 +1,7 @@
 import { Tray, Menu, nativeImage, BrowserWindow, app, shell } from 'electron';
 import { AppSettings } from '../shared/types';
 import { snapWindow } from './window-controls';
-import { createPopout, destroyPopout, isPopoutOpen, getPopout } from './popout';
+import { createPopout, destroyPopout, isPopoutOpen } from './popout';
 import { resetWorkArea } from './appbar';
 import { ICON_16_DATA_URL, ICON_32_DATA_URL, ICON_256_DATA_URL } from './icon-assets';
 
@@ -269,12 +269,15 @@ function buildMenu(): Electron.Menu {
     },
     {
       label: 'Dock to top of screen',
+      // The MAIN window, matching the title bar's ⤒ and the quick menu. This
+      // used to open the pop-out and dock that instead, which is the complaint
+      // in todo.md §11 bullet 1734 — and it made the pop-out the only way to
+      // get a docked strip, which is why its removal had to wait.
       click: () => {
-        if (!isPopoutOpen()) togglePopoutFromTray();
-        setTimeout(() => {
-          const popout = getPopout();
-          if (popout) snapWindow(popout, 'top');
-        }, 100);
+        const win = getWindowRef?.();
+        if (!win || win.isDestroyed()) return;
+        if (!win.isVisible()) win.show();
+        snapWindow(win, 'top');
       },
     },
     // Crash recovery, not a feature: a force-killed instance can leave the

@@ -620,18 +620,12 @@ export function registerIpc(ctx: IpcContext) {
       { type: 'separator' },
       {
         label: 'Dock to top of screen',
-        click: () => {
-          if (!isPopoutOpen()) {
-            createPopout(() => {
-              ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
-            });
-            apply({ popoutOpen: true });
-          }
-          setTimeout(() => {
-            const popout = getPopout();
-            if (popout) snapWindow(popout, 'top');
-          }, 100);
-        },
+        // Dock the window the user is looking at. This used to always open the
+        // pop-out and dock *that*, which meant the main window could never be
+        // docked from here — and made the pop-out the only route to a strip
+        // (todo.md §11, "Deprecate Pop-out Mode"). `windowSnap` routes to the
+        // sender, so a pop-out right-click still docks the pop-out.
+        click: () => snapWindow(win, 'top'),
       },
       {
         label: 'Docking reserves screen space',
