@@ -121,6 +121,7 @@ function ensureWorker(): Worker {
         job.status = 'done';
         job.fraction = 1;
         job.noteCount = msg.noteCount;
+        job.notes = msg.notes;
         job.elapsedMs = msg.elapsedMs;
         job.ratio = msg.ratio;
         releaseSlot(msg.id);
