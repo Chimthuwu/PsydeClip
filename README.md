@@ -39,24 +39,25 @@ Always quietly recording in memory — press a hotkey to save the last 15 minute
 | 🔁 **Rolling buffer** | Continuously captures the last 1 min → 1 hr to RAM; press the hotkey any time to save that slice to a `.webm`/Opus file |
 | ⏺️ **Traditional mode** | The same app, but the hotkey toggles record on/off and auto-saves on stop, like a normal recorder |
 | 🎛️ **Two capture backends** | `desktop` (Chromium screen/window picker) *or* `loopback` (true per-output WASAPI from the speakers / headphones / VoiceMeeter) |
-| 🌈 **Three visualizers** | Oscilloscope / spectrum bars / scrolling spectrogram, adapted from a hand-rolled analyser |
-| 🎨 **Two themes** | Modern neon-magenta on dark navy, or classic green-on-black CRT |
+| 🌈 **Four visualizers** | Oscilloscope / spectrum bars / scrolling spectrogram / the historical waveform you can scrub, select and drag out as a WAV |
+| 🎨 **Twelve themes** | Modern neon-magenta on dark navy, Classic green-on-black CRT, Cyberpunk, Synthwave, Monochrome, Kawaii, Aqua, Sakura, Lime, Blood red, Nocturnal, Black ice |
 | 🔥 **Tray icon** | Procedurally drawn 16×16 icon; live REC overlay, dynamic title `● 0:42`, multi-line tooltip, recent-saves submenu, balloon notifications |
 | 📂 **Filename templates** | `{date}`, `{time}`, `{device}`, `{mode}`, `{counter}`, … clickable token chips in settings |
 | 📌 **Always-on-top** | One click — window stays above your DAW even in fullscreen |
 | 🔒 **Single instance** | Second launch focuses the running app instead of opening a duplicate |
-| ⌨️ **Hotkeys** | `Shift+Alt+R` by default; rebindable through the settings modal |
+| ⌨️ **Hotkeys** | `Alt+R` saves a short clip, `s` saves the History selection, the main hotkey is rebindable through the settings modal |
 | 💾 **WebM/Opus** | All recordings are small, widely-supported Opus-in-WebM files |
 
 ---
 
 ## 🎬 Visualizers
 
-The visualizer code was adapted from a hand-rolled analyser (`Audio Oscilloscope & Spectrum Analyzer.html`) and split into two themes plus three modes.
+The visualizer code was adapted from a hand-rolled analyser (`Audio Oscilloscope & Spectrum Analyzer.html`); all twelve themes restyle every mode.
 
 - **Oscilloscope** — instant waveform of the most recent 2048 samples
 - **Spectrum** — 1024-bin FFT magnitude bars with a magenta-to-cyan gradient
 - **Spectrogram** — scrolling waterfall with the same colour ramp; frequency on the Y axis, time on the X
+- **History** — a scrubbable waveform of everything still in the rolling buffer; drag a selection and pull it straight into a DAW as a sample-accurate WAV, or save it with `s`
 
 <table>
 <tr>
@@ -66,7 +67,7 @@ The visualizer code was adapted from a hand-rolled analyser (`Audio Oscilloscope
 </tr>
 </table>
 
-> Drop a real screenshot into `docs/` and reference it here once you have one.
+> Real per-theme screenshots now exist in `marketing-website/assets/themes/` (`main-<theme>.png`, captured by `scripts/theme-shots.mjs`) — swap them in here when the frames are picked.
 
 ---
 
