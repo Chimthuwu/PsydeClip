@@ -13,6 +13,7 @@ import {
   TranscribeJobState,
   SnapTarget,
   TitleMenuKind,
+  TranscribedNote,
   UiLayout,
   THEMES,
   VIZ_GAIN_PRESETS,
@@ -34,6 +35,7 @@ import {
 } from './popout';
 import { readSettings, writeSettings } from './settings';
 import { saveRecordingFile } from './save';
+import { notesToMidiBytes, type NoteEvent } from './transcribe/engine';
 import {
   cancelTranscription,
   jobState,
@@ -130,6 +132,19 @@ export function registerIpc(ctx: IpcContext) {
     if (res.canceled || res.filePaths.length === 0) return null;
     return res.filePaths[0];
   });
+
+  ipcMain.handle(
+    IpcChannel.notesToMidi,
+    (_e, args: { notes: TranscribedNote[]; bpm?: number }): Uint8Array => {
+      const events: NoteEvent[] = args.notes.map((n) => ({
+        pitchMidi: n.pitch,
+        startTimeSeconds: n.startSec,
+        durationSeconds: n.durationSec,
+        amplitude: n.velocity,
+      }));
+      return notesToMidiBytes(events, args.bpm ?? 120);
+    },
+  );
 
   ipcMain.handle(
     IpcChannel.saveRecording,

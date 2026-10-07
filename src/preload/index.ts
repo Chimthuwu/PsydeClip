@@ -11,6 +11,7 @@ import {
   TranscribeJobState,
   SnapTarget,
   TitleMenuKind,
+  TranscribedNote,
   UiLayout,
   VizCommand,
   VizFrame,
@@ -35,9 +36,13 @@ const api = {
   saveRecording(args: { folder: string; bytes: Uint8Array; ext?: string; durationSec?: number; deviceName?: string }): Promise<SaveResult> {
     return ipcRenderer.invoke(IpcChannel.saveRecording, args);
   },
-  startDragExport(args: { bytes: Uint8Array; deviceName?: string }): void {
+  startDragExport(args: { bytes: Uint8Array; deviceName?: string; ext?: string }): void {
       ipcRenderer.send(IpcChannel.dragExport, args);
     },
+  /** Build a Standard MIDI File from a transcribed note list, for export/drag-out. */
+  notesToMidi(notes: TranscribedNote[], bpm?: number): Promise<Uint8Array> {
+    return ipcRenderer.invoke(IpcChannel.notesToMidi, { notes, bpm });
+  },
     /**
      * Queue a MIDI transcription for a recording that is ALREADY saved. The
      * audio file is never re-read or re-written; the `.mid` is written beside it

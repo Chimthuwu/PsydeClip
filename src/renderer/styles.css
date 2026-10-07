@@ -1001,6 +1001,31 @@ button.is-tight.labels-icon {
   opacity: 1;
 }
 
+/* MIDI export button (todo.md MIDI export complaint, 2026-10-07) — unlike
+   the hover-revealed ✕/⧉/tag cluster, this is left always-visible: exporting
+   is a deliberate action, not chrome, and it should stay discoverable. */
+.viz-pane-export {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 2;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--text-primary);
+  background: color-mix(in srgb, #ff2fd0 22%, rgba(0,0,0,0.6));
+  border: 1px solid color-mix(in srgb, #ff2fd0 55%, var(--border));
+  cursor: pointer;
+}
+.viz-pane-export:hover {
+  background: color-mix(in srgb, #ff2fd0 38%, rgba(0,0,0,0.6));
+}
+.board-export {
+  bottom: 10px;
+  left: 10px;
+}
+
 /* Sidebar ---------------------------------------------------------------- */
 
 /* One tight row — device on the left, mode chips, then FORMAT on the right.

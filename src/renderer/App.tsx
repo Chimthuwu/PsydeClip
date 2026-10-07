@@ -427,6 +427,41 @@ export default function App() {
     }
   }, [cs.recorder, cs.historyModel]);
 
+  /**
+   * Export the current piano-roll's notes as a real .mid file (todo.md MIDI
+   * export complaint, 2026-10-07) — into the configured save folder, named
+   * after the range it covers. Separate from the transcribeOnSave pipeline's
+   * own .mid (that one sits beside its audio); this exports whatever is
+   * CURRENTLY shown in the lane/MIDI view, including a notes-only selection
+   * that never had an audio file of its own.
+   */
+  const exportMidi = useCallback(async () => {
+    if (!noteLayer || !noteLayer.notes.length) {
+      emitToast('error', 'No MIDI notes to export yet.');
+      return;
+    }
+    if (!settings.saveFolder) {
+      emitToast('error', 'Set a save folder in Settings first.');
+      return;
+    }
+    try {
+      const bytes = await window.api.notesToMidi(noteLayer.notes);
+      const res = await window.api.saveRecording({
+        folder: settings.saveFolder,
+        bytes,
+        ext: 'mid',
+        durationSec: noteLayer.durationSec,
+      });
+      if (res.ok) {
+        emitToast('saved', `MIDI exported\n${(res.path ?? '').split(/[\\/]/).pop()}`);
+      } else {
+        emitToast('error', res.error ?? 'MIDI export failed');
+      }
+    } catch (e: any) {
+      emitToast('error', `MIDI export failed: ${e?.message ?? e}`);
+    }
+  }, [noteLayer, settings.saveFolder]);
+
   // Session seconds are only meaningful within one recording session, so a new
   // recorder (a restart) invalidates every cached layer.
   useEffect(() => {
@@ -939,7 +974,7 @@ export default function App() {
                        mosaic. Other panes are read-only overviews. */
                     interactive={m === 'history' || m === 'spectrogram'}
                     dragReady={m === 'history' || m === 'spectrogram' ? dragReady : undefined}
-                    pianoRoll={m === 'history' && settings.showMidiLane ? noteLayer : null}
+                    pianoRoll={(m === 'history' && settings.showMidiLane) || m === 'midi' ? noteLayer : null}
                     showOscilloscopeOverlay={m === 'history' && settings.showOscilloscopeOverlay}
                     onSelectionChange={
                       m === 'history' || m === 'spectrogram' ? handleSelectionChange : undefined
@@ -951,6 +986,17 @@ export default function App() {
                       emitToast('error', 'Snippet still preparing — give it a second, then drag.')
                     }
                   />
+                  {m === 'midi' && noteLayer && noteLayer.notes.length > 0 && (
+                    <button
+                      type="button"
+                      className="viz-pane-export"
+                      title="Export the current MIDI notes as a .mid file"
+                      aria-label="Export MIDI"
+                      onClick={exportMidi}
+                    >
+                      ⇩ .mid
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="viz-pane-pop"
@@ -982,7 +1028,7 @@ export default function App() {
                 gain={settings.vizGain}
                 historyModel={cs.historyModel}
                 dragReady={dragReady}
-                pianoRoll={settings.showMidiLane ? noteLayer : null}
+                pianoRoll={settings.showMidiLane || visibleModes[0] === 'midi' ? noteLayer : null}
                 showOscilloscopeOverlay={visibleModes[0] === 'history' && settings.showOscilloscopeOverlay}
                 onTranscribeSelection={settings.showMidiLane ? transcribeSelection : undefined}
                 onSelectionChange={handleSelectionChange}
@@ -990,6 +1036,17 @@ export default function App() {
                   emitToast('error', 'Snippet still preparing — give it a second, then drag.')
                 }
               />
+              {visibleModes[0] === 'midi' && noteLayer && noteLayer.notes.length > 0 && (
+                <button
+                  type="button"
+                  className="viz-pane-export board-export"
+                  title="Export the current MIDI notes as a .mid file"
+                  aria-label="Export MIDI"
+                  onClick={exportMidi}
+                >
+                  ⇩ .mid
+                </button>
+              )}
               <span className="board-mode-tag" aria-hidden="true">
                 {VISUALIZER_LABELS[visibleModes[0]]}
               </span>
