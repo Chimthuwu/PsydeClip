@@ -13,10 +13,7 @@ import {
   TitleMenuKind,
   TranscribedNote,
   UiLayout,
-  VizCommand,
-  VizFrame,
-  HistoryStream,
-  VizState,
+  ClipCommand,
   WindowAction,
 } from '../shared/types';
 
@@ -73,14 +70,6 @@ const api = {
   },
   startDragExportPrepared(): void {
     ipcRenderer.send(IpcChannel.dragExportPrepared);
-  },
-  startDragExportByProxy(bounds: [number, number]): void {
-    ipcRenderer.send(IpcChannel.dragExportProxy, { bounds });
-  },
-  onRequestDragExport(handler: (bounds: [number, number]) => void): () => void {
-    const listener = (_e: unknown, args: { bounds: [number, number] }) => handler(args.bounds);
-    ipcRenderer.on(IpcChannel.requestDragExport, listener);
-    return () => ipcRenderer.removeListener(IpcChannel.requestDragExport, listener);
   },
   onRecorderEvent(handler: (e: RecorderEvent) => void): () => void {
     const listener = (_e: unknown, ev: RecorderEvent) => handler(ev);
@@ -186,55 +175,16 @@ const api = {
     return () => ipcRenderer.removeListener(IpcChannel.windowState, listener);
   },
 
-  // ------- Pop-out visualizer --------------------------------------------------
+  // ------- Clip window -> main window -----------------------------------------
 
-  /**
-   * Open/close the pop-out. Pass `keepMain: true` to open it *alongside*
-   * the main window (the per-pane ⧉ flow) instead of swapping windows.
-   */
-  togglePopout(open?: boolean, opts?: { keepMain?: boolean }): Promise<{ open: boolean }> {
-    return ipcRenderer.invoke(IpcChannel.popoutToggle, { open, ...opts });
+  /** Clip window -> main window: stop / discard the running clip. */
+  sendClipCommand(cmd: ClipCommand): void {
+    ipcRenderer.send(IpcChannel.clipCommand, cmd);
   },
-  onPopoutState(handler: (s: { open: boolean }) => void): () => void {
-    const listener = (_e: unknown, s: { open: boolean }) => handler(s);
-    ipcRenderer.on(IpcChannel.popoutState, listener);
-    return () => ipcRenderer.removeListener(IpcChannel.popoutState, listener);
-  },
-  /** Main window → pop-out: one analyser frame. Fire-and-forget, ~30/s. */
-  sendVizFrame(frame: VizFrame): void {
-    ipcRenderer.send(IpcChannel.vizFrame, frame);
-  },
-  /** Main window → pop-out: capture/buffer/theme state, on change only. */
-  sendVizState(state: VizState): void {
-    ipcRenderer.send(IpcChannel.vizState, state);
-  },
-  onVizFrame(handler: (f: VizFrame) => void): () => void {
-    const listener = (_e: unknown, f: VizFrame) => handler(f);
-    ipcRenderer.on(IpcChannel.vizFrame, listener);
-    return () => ipcRenderer.removeListener(IpcChannel.vizFrame, listener);
-  },
-  onVizState(handler: (s: VizState) => void): () => void {
-    const listener = (_e: unknown, s: VizState) => handler(s);
-    ipcRenderer.on(IpcChannel.vizState, listener);
-    return () => ipcRenderer.removeListener(IpcChannel.vizState, listener);
-  },
-  /** Main window → pop-out: the rolling peak track + session clock stamp. */
-  sendVizHistory(state: HistoryStream): void {
-    ipcRenderer.send(IpcChannel.vizHistory, state);
-  },
-  onVizHistory(handler: (s: HistoryStream) => void): () => void {
-    const listener = (_e: unknown, s: HistoryStream) => handler(s);
-    ipcRenderer.on(IpcChannel.vizHistory, listener);
-    return () => ipcRenderer.removeListener(IpcChannel.vizHistory, listener);
-  },
-  /** Pop-out → main window: a transport command. */
-  sendVizCommand(cmd: VizCommand): void {
-    ipcRenderer.send(IpcChannel.vizCommand, cmd);
-  },
-  onVizCommand(handler: (c: VizCommand) => void): () => void {
-    const listener = (_e: unknown, c: VizCommand) => handler(c);
-    ipcRenderer.on(IpcChannel.vizCommand, listener);
-    return () => ipcRenderer.removeListener(IpcChannel.vizCommand, listener);
+  onClipCommand(handler: (c: ClipCommand) => void): () => void {
+    const listener = (_e: unknown, c: ClipCommand) => handler(c);
+    ipcRenderer.on(IpcChannel.clipCommand, listener);
+    return () => ipcRenderer.removeListener(IpcChannel.clipCommand, listener);
   },
 
   // ------- WASAPI loopback ----------------------------------------------------

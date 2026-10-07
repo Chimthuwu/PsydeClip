@@ -17,11 +17,10 @@ import { PeakBuffer } from './peak-buffer';
  *     stored in place of seconds, and what the exporters still slice by)
  *
  * The session clock is a *stamp* (`newestSec` at construction, advanced by
- * `performance.now()`). The main window constructs the model at capture start
- * with `newestSec = 0`; the pop-out reconstructs it from each `viz:history`
- * frame with the newestSec the main window stamped, so both windows agree on
- * what a given second means even though their `performance.now()` clocks have
- * independent origins.
+ * `performance.now()`). The model is constructed at capture start with
+ * `newestSec = 0` and restamped as audio arrives, so a given second keeps
+ * meaning the same thing even though the underlying `performance.now()` clock
+ * has its own origin.
  */
 export const HISTORY_BUCKET_MS = 20;
 export const HISTORY_BUCKET_SEC = HISTORY_BUCKET_MS / 1000;
@@ -67,9 +66,9 @@ export class HistoryModel {
 
   /**
    * Re-sync the session clock to a fresh `newestSec` stamp without allocating a
-   * new model. The pop-out gets a `viz:history` frame ~5×/s; rebuilding the
-   * model each time (and re-rendering to hand the new object down) is what made
-   * every visualizer flicker while popped out / docked.
+   * new model. The capture loop restamps ~5×/s; rebuilding the model each time
+   * (and re-rendering to hand the new object down) is what made every
+   * visualizer flicker.
    */
   restamp(newestSec: number): void {
     this.newestSecAt = newestSec;

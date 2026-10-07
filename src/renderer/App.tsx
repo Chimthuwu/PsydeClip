@@ -26,17 +26,10 @@ import { CLIP_STOP_PROMPT } from '../shared/utils';
 
 const LOOPBACK_SUPPORTED_PLATFORMS = new Set(['win32']);
 
-/** Pop-out frame rate. 30fps is plenty for a visualizer and a third of the
- *  IPC traffic of streaming every animation frame. */
-const VIZ_FRAME_MS = 33;
-
 export default function App() {
   const { settings, loaded, update } = useSettings();
   const [capturing, setCapturing] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // A single visualizer pinned into the pop-out window (a split pane's ⧉).
-  // Transient, not a setting — the pop-out normally mirrors the main window.
-  const [popoutOverride, setPopoutOverride] = useState<VisualizerMode | null>(null);
   const capture = useCapture(settings, capturing);
   const { state: cs, beginClip, endClip, discardClip } = capture;
   // When the clip button was pressed (0 = no clip has been recorded in this
@@ -238,9 +231,8 @@ export default function App() {
    * press again to stop — asking whether to keep (save) or discard it. Works
    * in any mode, even with the rolling recorder idle.
    *
-   * `skipAsk` is used for pop-out-invoked stops: the pop-out window asks its
-   * own confirm() (it may be the only window on screen — the main window can
-   * be hidden), so asking again here would double-prompt.
+   * `skipAsk` stops without the keep/discard confirm (the transport button and
+   * the clip window already made that choice).
    */
   async function toggleClipRecording(skipAsk = false) {
     // Guard against a double-click starting a phantom second clip while the
@@ -287,7 +279,7 @@ export default function App() {
       }
       if (!settings.saveFolder) {
         // A toast, not alert() — the hotkey can fire this while the main
-        // window is hidden behind the pop-out, where a modal would just block.
+        // window is hidden, where a modal would just block.
         emitToast('error', 'Pick a save folder in Settings before recording a clip.');
         return;
       }
@@ -301,8 +293,8 @@ export default function App() {
     }
   }
 
-  /** Pop-out "discard" command: stop the clip and delete its temp file.
-   *  (The pop-out asked the user already; here we just carry it out.) */
+  /** Clip window "discard": stop the clip and delete its temp file. (The clip
+   *  window already asked the user; here we just carry it out.) */
   async function discardClipRecording() {
     if (clipBusyRef.current || !cs.clipActive) return;
     clipBusyRef.current = true;
@@ -322,7 +314,7 @@ export default function App() {
   const handleSelectionChange = useCallback(async (sel: [number, number] | null) => {
     selectionRef.current = sel;
     // Tell main, so the native quick menu can offer "Save selection (Ns)" from
-    // either window — including the pop-out, where the main window is hidden.
+    // either window.
     window.api.selectionChanged(sel);
     const seq = ++dragSeqRef.current;
     setDragReady(false);
@@ -498,7 +490,7 @@ export default function App() {
   // Temporal smoothing is per visualizer mode (see SMOOTHING_FOR_MODE). It's
   // set on the live AnalyserNode here rather than inside the draw loop because
   // the draw loop is requestAnimationFrame-driven and stops dead while this
-  // window is hidden — which is exactly the case when the pop-out is the only
+  // window is hidden — which is exactly the case when the docked strip is the only
   // thing on screen and still needs correctly-smoothed frames.
   //
   // The split view renders several modes from one AnalyserNode, which can only
@@ -595,31 +587,6 @@ export default function App() {
     return unsub;
   }, [openSettingsPanel]);
 
-  // Pop-out lifecycle: main owns the window and persists whether it's up, so
-  // settings.popoutOpen is the single source of truth — no matter whether the
-  // toggle came from here, the tray menu, or the pop-out's own ✕.
-  const popoutOpen = loaded && settings.popoutOpen;
-
-  const togglePopout = useCallback(() => {
-    void window.api.togglePopout();
-  }, []);
-
-  // Closing the pop-out ends any pinned single-visualizer view.
-  useEffect(() => {
-    if (!popoutOpen) setPopoutOverride(null);
-  }, [popoutOpen]);
-
-  /** Pop the pop-out open pinned to one visualizer (split pane's ⧉). */
-  const popOutMode = useCallback(
-    (mode: VisualizerMode) => {
-      // ⧉ opens the pop-out *alongside* the main window: the main window
-      // keeps its split view while the one visualizer gets its own window.
-      if (!popoutOpen) void window.api.togglePopout(true, { keepMain: true });
-      setPopoutOverride(mode);
-    },
-    [popoutOpen],
-  );
-
   const events = useRecorderEvents({
     onHotkey: handleHotkey,
   });
@@ -674,35 +641,9 @@ export default function App() {
     cs.recorder,
   ]);
 
-  // ----- Pop-out bridge ----------------------------------------------------
-  // Stream analyser frames to the pop-out while it's open. Refs keep the
-  // effect from restarting whenever a callback identity changes.
-  const analyserRef = useRef(cs.analyser);
-  analyserRef.current = cs.analyser;
-
-  // A timer, not requestAnimationFrame: rAF is tied to compositing, so it
-  // stops the moment this window is minimised or hidden to the tray — which is
-  // precisely when the pop-out is the only thing the user can see. (main also
-  // sets backgroundThrottling: false so the timer keeps its interval.)
-  useEffect(() => {
-    if (!popoutOpen) return;
-    const id = setInterval(() => {
-      const a = analyserRef.current;
-      if (!a) return;
-      a.sample();
-      window.api.sendVizFrame({
-        time: a.timeData,
-        freq: a.freqData,
-        minDecibels: a.analyser.minDecibels,
-        maxDecibels: a.analyser.maxDecibels,
-      });
-    }, VIZ_FRAME_MS);
-    return () => clearInterval(id);
-  }, [popoutOpen]);
-
   // Live elapsed time on the record button while a clip is recording. An
   // interval rather than rAF so it keeps ticking even when this window is
-  // hidden behind the pop-out (backgroundThrottling is off, so it does).
+  // hidden (backgroundThrottling is off, so it does).
   useEffect(() => {
     if (!cs.clipActive) {
       setClipElapsed(0);
@@ -716,7 +657,7 @@ export default function App() {
 
   // Drive the always-on-top clip-recording window. It's a separate OS window so
   // the indicator + stop button stay visible no matter what state the app is in
-  // — minimised, hidden to the tray, docked, or with the visualizer popped out.
+  // — minimised, hidden to the tray, or docked.
   useEffect(() => {
     if (!loaded) return;
     window.api.setClipWindow({
@@ -727,91 +668,16 @@ export default function App() {
     });
   }, [loaded, cs.clipActive, clipStartedAt, settings.recordingFormat, settings.theme]);
 
-  // Slower-moving state. bufferedSeconds is floored so this fires about once a
-  // second instead of on every animation frame.
-  const bufferedWhole = Math.floor(cs.bufferedSeconds);
-  useEffect(() => {
-    if (!popoutOpen) return;
-    window.api.sendVizState({
-      capturing,
-      hasSource: !!cs.analyser,
-      canSave: canSaveNow,
-      clipActive: cs.clipActive,
-      clipStartedAt,
-      format: settings.recordingFormat,
-      bufferedSeconds: bufferedWhole,
-      bufferSeconds: settings.bufferSeconds,
-      recordMode: settings.recordMode,
-      theme: settings.theme,
-      visualizer: settings.visualizer,
-      overrideMode: popoutOverride,
-      rms: cs.rms,
-    });
-  }, [
-    popoutOpen, capturing, canSaveNow, bufferedWhole, cs.analyser, cs.clipActive, clipStartedAt,
-    settings.bufferSeconds, settings.recordMode, settings.theme, settings.visualizer,
-    settings.recordingFormat, popoutOverride,
-  ]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // The pop-out has no buffer of its own — its history pane is fed from the
-  // main window's peak track, and its spectrogram pane needs the same time
-  // stamp for its selection layer. Stream whenever either is on the (shared)
-  // board. The main window's own board reads the local buffer directly.
-  useEffect(() => {
-    if (!popoutOpen || !cs.peakBuffer) return;
-    const needsTimeStream =
-      !settings.vizHidden.includes('history') || !settings.vizHidden.includes('spectrogram');
-    if (!needsTimeStream) return;
-    const id = setInterval(() => {
-      if (cs.peakBuffer && cs.historyModel) {
-        // Stamp the session clock so the pop-out's selections land on the same
-        // absolute seconds as the main window's (todo.md §11.4 D1).
-        window.api.sendVizHistory({
-          ...cs.peakBuffer.getState(),
-          newestSec: cs.historyModel.newestSec,
-        });
-      }
-    }, 200);
-    return () => clearInterval(id);
-  }, [popoutOpen, settings.vizHidden, cs.peakBuffer]);
-
-  // Commands coming back from the pop-out's buttons.
-  const cmdRef = useRef({
-    toggleCapture,
-    performSave,
-    update,
-    handleSelectionChange,
-    toggleClipRecording,
-    discardClipRecording,
-  });
-  cmdRef.current = {
-    toggleCapture,
-    performSave,
-    update,
-    handleSelectionChange,
-    toggleClipRecording,
-    discardClipRecording,
-  };
+  // Stop / discard buttons on the always-on-top clip window. Refs so the
+  // subscription is made once while always calling the latest closures.
+  const clipCmdRef = useRef({ toggleClipRecording, discardClipRecording });
+  clipCmdRef.current = { toggleClipRecording, discardClipRecording };
   useEffect(
     () =>
-      window.api.onVizCommand((c) => {
-        const {
-          toggleCapture: tc,
-          performSave: ps,
-          update: up,
-          handleSelectionChange: hsc,
-          toggleClipRecording: tcr,
-          discardClipRecording: dcr,
-        } = cmdRef.current;
-        if (c.type === 'toggle-capture') tc();
-        else if (c.type === 'save') void ps();
-        // The pop-out asked keep/discard itself, so the save path skips the
-        // confirm here.
-        else if (c.type === 'toggle-clip') void tcr(true);
-        else if (c.type === 'discard-clip') void dcr();
-        else if (c.type === 'set-visualizer') void up({ visualizer: c.mode });
-        else if (c.type === 'set-override') setPopoutOverride(c.mode);
-        else if (c.type === 'selection-change') hsc(c.selection);
+      window.api.onClipCommand((c) => {
+        // The clip window asked keep/discard itself, so stopping skips the confirm.
+        if (c.type === 'toggle-clip') void clipCmdRef.current.toggleClipRecording(true);
+        else if (c.type === 'discard-clip') void clipCmdRef.current.discardClipRecording();
       }),
     [],
   );
@@ -824,8 +690,6 @@ export default function App() {
   // past the first two with the classic-green chrome.
   const themeClass = `theme-${settings.theme}`;
   const customChrome = settings.titleBarMode === 'custom';
-  // The board is skipped when the pop-out is showing the same signal.
-  const showBoard = !(popoutOpen && settings.hideBoardWhenPopped);
   // The footer always shows — it carries the save-format picker, which has no
   // other home on-screen (the quick menu aside). There is only one layout now
   // (the compact mode was retired); short windows shed chrome via CSS.
@@ -928,8 +792,6 @@ export default function App() {
           settings={settings}
           onUpdate={update}
           capturing={capturing}
-          popoutOpen={popoutOpen}
-          onTogglePopout={togglePopout}
           onOpenSettings={openSettingsPanel}
         />
       )}
@@ -957,103 +819,92 @@ export default function App() {
       {/* The capture cue only lights up for bounded recordings — a clip in
           progress or a traditional-mode session. The always-on rolling buffer
           gets no highlight: a border that never turns off conveys nothing. */}
-      {showBoard && (
-        <main className={`board ${cs.clipActive || (settings.recordMode === 'traditional' && capturing) ? 'is-capturing' : ''}`}>
-          {gridView ? (
-            <div className={`viz-grid panes-${visibleModes.length}`}>
-              {visibleModes.map((m) => (
-                <div className="viz-pane" key={m}>
-                  <VisualizerBoard
-                    analyser={cs.analyser}
-                    mode={m}
-                    theme={settings.theme}
-                    gain={settings.vizGain}
-                    historyModel={cs.historyModel}
-                    /* The History pane stays interactive even in the split so you
-                       can highlight + drag a snippet out without leaving the
-                       mosaic. Other panes are read-only overviews. */
-                    interactive={m === 'history' || m === 'spectrogram'}
-                    dragReady={m === 'history' || m === 'spectrogram' ? dragReady : undefined}
-                    pianoRoll={(m === 'history' && settings.showMidiLane) || m === 'midi' ? noteLayer : null}
-                    showOscilloscopeOverlay={m === 'history' && settings.showOscilloscopeOverlay}
-                    onSelectionChange={
-                      m === 'history' || m === 'spectrogram' ? handleSelectionChange : undefined
-                    }
-                    onTranscribeSelection={
-                      m === 'history' && settings.showMidiLane ? transcribeSelection : undefined
-                    }
-                    onDragNotReady={() =>
-                      emitToast('error', 'Snippet still preparing — give it a second, then drag.')
-                    }
-                  />
-                  {m === 'midi' && noteLayer && noteLayer.notes.length > 0 && (
-                    <button
-                      type="button"
-                      className="viz-pane-export"
-                      title="Export the current MIDI notes as a .mid file"
-                      aria-label="Export MIDI"
-                      onClick={exportMidi}
-                    >
-                      ⇩ .mid
-                    </button>
-                  )}
+      <main className={`board ${cs.clipActive || (settings.recordMode === 'traditional' && capturing) ? 'is-capturing' : ''}`}>
+        {gridView ? (
+          <div className={`viz-grid panes-${visibleModes.length}`}>
+            {visibleModes.map((m) => (
+              <div className="viz-pane" key={m}>
+                <VisualizerBoard
+                  analyser={cs.analyser}
+                  mode={m}
+                  theme={settings.theme}
+                  gain={settings.vizGain}
+                  historyModel={cs.historyModel}
+                  /* The History pane stays interactive even in the split so you
+                     can highlight + drag a snippet out without leaving the
+                     mosaic. Other panes are read-only overviews. */
+                  interactive={m === 'history' || m === 'spectrogram'}
+                  dragReady={m === 'history' || m === 'spectrogram' ? dragReady : undefined}
+                  pianoRoll={(m === 'history' && settings.showMidiLane) || m === 'midi' ? noteLayer : null}
+                  showOscilloscopeOverlay={m === 'history' && settings.showOscilloscopeOverlay}
+                  onSelectionChange={
+                    m === 'history' || m === 'spectrogram' ? handleSelectionChange : undefined
+                  }
+                  onTranscribeSelection={
+                    m === 'history' && settings.showMidiLane ? transcribeSelection : undefined
+                  }
+                  onDragNotReady={() =>
+                    emitToast('error', 'Snippet still preparing — give it a second, then drag.')
+                  }
+                />
+                {m === 'midi' && noteLayer && noteLayer.notes.length > 0 && (
                   <button
                     type="button"
-                    className="viz-pane-pop"
-                    title={`Pop the ${VISUALIZER_LABELS[m]} view into its own window`}
-                    aria-label={`Pop ${VISUALIZER_LABELS[m]} view out`}
-                    onClick={() => popOutMode(m)}
+                    className="viz-pane-export"
+                    title="Export the current MIDI notes as a .mid file"
+                    aria-label="Export MIDI"
+                    onClick={exportMidi}
                   >
-                    ⧉
+                    ⇩ .mid
                   </button>
-                  <button
-                    type="button"
-                    className="viz-pane-x"
-                    title={`Close the ${VISUALIZER_LABELS[m]} view`}
-                    aria-label={`Close ${VISUALIZER_LABELS[m]} view`}
-                    onClick={() => setPaneHidden(m, true)}
-                  >
-                    ✕
-                  </button>
-                  <span className="viz-pane-tag">{VISUALIZER_LABELS[m]}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <>
-              <VisualizerBoard
-                analyser={cs.analyser}
-                mode={visibleModes[0]}
-                theme={settings.theme}
-                gain={settings.vizGain}
-                historyModel={cs.historyModel}
-                dragReady={dragReady}
-                pianoRoll={settings.showMidiLane || visibleModes[0] === 'midi' ? noteLayer : null}
-                showOscilloscopeOverlay={visibleModes[0] === 'history' && settings.showOscilloscopeOverlay}
-                onTranscribeSelection={settings.showMidiLane ? transcribeSelection : undefined}
-                onSelectionChange={handleSelectionChange}
-                onDragNotReady={() =>
-                  emitToast('error', 'Snippet still preparing — give it a second, then drag.')
-                }
-              />
-              {visibleModes[0] === 'midi' && noteLayer && noteLayer.notes.length > 0 && (
+                )}
                 <button
                   type="button"
-                  className="viz-pane-export board-export"
-                  title="Export the current MIDI notes as a .mid file"
-                  aria-label="Export MIDI"
-                  onClick={exportMidi}
+                  className="viz-pane-x"
+                  title={`Close the ${VISUALIZER_LABELS[m]} view`}
+                  aria-label={`Close ${VISUALIZER_LABELS[m]} view`}
+                  onClick={() => setPaneHidden(m, true)}
                 >
-                  ⇩ .mid
+                  ✕
                 </button>
-              )}
-              <span className="board-mode-tag" aria-hidden="true">
-                {VISUALIZER_LABELS[visibleModes[0]]}
-              </span>
-            </>
-          )}
-        </main>
-      )}
+                <span className="viz-pane-tag">{VISUALIZER_LABELS[m]}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <VisualizerBoard
+              analyser={cs.analyser}
+              mode={visibleModes[0]}
+              theme={settings.theme}
+              gain={settings.vizGain}
+              historyModel={cs.historyModel}
+              dragReady={dragReady}
+              pianoRoll={settings.showMidiLane || visibleModes[0] === 'midi' ? noteLayer : null}
+              showOscilloscopeOverlay={visibleModes[0] === 'history' && settings.showOscilloscopeOverlay}
+              onTranscribeSelection={settings.showMidiLane ? transcribeSelection : undefined}
+              onSelectionChange={handleSelectionChange}
+              onDragNotReady={() =>
+                emitToast('error', 'Snippet still preparing — give it a second, then drag.')
+              }
+            />
+            {visibleModes[0] === 'midi' && noteLayer && noteLayer.notes.length > 0 && (
+              <button
+                type="button"
+                className="viz-pane-export board-export"
+                title="Export the current MIDI notes as a .mid file"
+                aria-label="Export MIDI"
+                onClick={exportMidi}
+              >
+                ⇩ .mid
+              </button>
+            )}
+            <span className="board-mode-tag" aria-hidden="true">
+              {VISUALIZER_LABELS[visibleModes[0]]}
+            </span>
+          </>
+        )}
+      </main>
 
       <footer className="sidebar">
         {settings.showSourcePicker ? sourcePicker : <span />}
@@ -1068,8 +919,6 @@ export default function App() {
           onPickFolder={() => window.api.pickFolder()}
           active={capturing}
           loopbackSupported={loopbackSupported}
-          popoutOpen={popoutOpen}
-          onTogglePopout={togglePopout}
         />
       )}
 

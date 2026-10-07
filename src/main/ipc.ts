@@ -23,16 +23,6 @@ import {
 } from '../shared/types';
 import { applyLayout, performWindowAction, snapWindow, tempExpand } from './window-controls';
 import { removeAppBar } from './appbar';
-import {
-  createPopout,
-  destroyPopout,
-  forwardVizFrame,
-  forwardVizState,
-  forwardVizHistory,
-  getPopout,
-  isPopoutOpen,
-  markPopoutKeepMain,
-} from './popout';
 import { readSettings, writeSettings } from './settings';
 import { saveRecordingFile } from './save';
 import { notesToMidiBytes, type NoteEvent } from './transcribe/engine';
@@ -317,17 +307,6 @@ export function registerIpc(ctx: IpcContext) {
     }
   );
 
-  ipcMain.on(
-    IpcChannel.dragExportProxy,
-    (e, args: { bounds: [number, number] }) => {
-      // Popout window requested a drag. We ask the main window to perform the export.
-      const mainWin = ctx.getWindow();
-      if (mainWin && !mainWin.isDestroyed()) {
-        mainWin.webContents.send(IpcChannel.requestDragExport, args);
-      }
-    }
-  );
-
   // ------- WASAPI loopback helpers ---------------------------------------------------------
 
   ipcMain.handle(IpcChannel.loopbackList, async (): Promise<LoopbackDevice[]> => {
@@ -381,7 +360,7 @@ export function registerIpc(ctx: IpcContext) {
   ipcMain.handle(
     IpcChannel.windowControl,
     (e, args: { action: WindowAction }): void => {
-      // Route to whichever window asked — the pop-out has its own close button.
+      // Route to whichever window asked.
       const w = BrowserWindow.fromWebContents(e.sender) ?? ctx.getWindow();
       performWindowAction(w, args.action);
     },
@@ -391,20 +370,6 @@ export function registerIpc(ctx: IpcContext) {
     IpcChannel.windowSnap,
     (e, args: { target: SnapTarget }): void => {
       const w = BrowserWindow.fromWebContents(e.sender);
-      if (w === ctx.getWindow() && args.target === 'top') {
-        if (!isPopoutOpen()) {
-          createPopout(() => {
-            ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
-          });
-          ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: true }));
-        }
-        setTimeout(() => {
-          const popout = getPopout();
-          if (popout) snapWindow(popout, 'top');
-        }, 100);
-        return;
-      }
-
       const targetWin = w ?? ctx.getWindow();
       snapWindow(targetWin, args.target);
     },
@@ -514,7 +479,7 @@ export function registerIpc(ctx: IpcContext) {
 
     // "Save selection" leads the menu when there is one: it is the action the
     // user is most likely to want after dragging a range out of the waveform,
-    // and it is the only way to save a crop from a docked/pop-out window.
+    // and it is the only way to save a crop from a docked window.
     // Added to the existing quick menu rather than intercepting right-click
     // with a second menu — one menu, and the "Save as" submenu below already
     // governs which format it writes (todo.md index, History phase 5).
@@ -616,30 +581,10 @@ export function registerIpc(ctx: IpcContext) {
         checked: s.alwaysOnTop,
         click: () => apply({ alwaysOnTop: !s.alwaysOnTop }),
       },
-      {
-        label: 'Pop out visualizer',
-        type: 'checkbox',
-        checked: isPopoutOpen(),
-        click: () => {
-          const want = !isPopoutOpen();
-          if (want) {
-            createPopout(() => {
-              ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
-            });
-          } else {
-            destroyPopout();
-          }
-          apply({ popoutOpen: want });
-        },
-      },
       { type: 'separator' },
       {
         label: 'Dock to top of screen',
-        // Dock the window the user is looking at. This used to always open the
-        // pop-out and dock *that*, which meant the main window could never be
-        // docked from here — and made the pop-out the only route to a strip
-        // (todo.md §11, "Deprecate Pop-out Mode"). `windowSnap` routes to the
-        // sender, so a pop-out right-click still docks the pop-out.
+        // Dock the window the user is looking at.
         click: () => snapWindow(win, 'top'),
       },
       {
@@ -727,44 +672,10 @@ export function registerIpc(ctx: IpcContext) {
     },
   );
 
-  // ------- Pop-out visualizer ------------------------------------------------
-
-  ipcMain.handle(
-    IpcChannel.popoutToggle,
-    (_e, args: { open?: boolean; keepMain?: boolean } = {}): { open: boolean } => {
-      const want = args.open ?? !isPopoutOpen();
-      if (want) {
-        createPopout(() => {
-          // Closed by its own ✕. Same path as an explicit toggle-off so the
-          // main window comes back and every window sees the new state.
-          ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
-          const w = ctx.getWindow();
-          if (w && !w.isDestroyed()) w.webContents.send(IpcChannel.popoutState, { open: false });
-        });
-      } else {
-        destroyPopout();
-      }
-      // A per-pane ⧉ pop-out opens alongside the main window: tell the swap
-      // policy (which fires on this settings transition) to leave it visible.
-      if (want && args.keepMain) markPopoutKeepMain();
-      // Route through onSettingsChanged rather than writing quietly: main hides
-      // or restores the main window off this transition, and the pop-out's own
-      // useSettings only learns about it from the settings:changed broadcast.
-      ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: want }));
-      const w = ctx.getWindow();
-      if (w && !w.isDestroyed()) w.webContents.send(IpcChannel.popoutState, { open: want });
-      return { open: want };
-    },
-  );
-
-  // Relays. These run at frame rate, so they're `on`/`send` rather than
-  // `handle`/`invoke` — no promise per frame, and nothing to await.
-  ipcMain.on(IpcChannel.vizFrame, (_e, payload) => forwardVizFrame(payload));
-  ipcMain.on(IpcChannel.vizState, (_e, payload) => forwardVizState(payload));
-  ipcMain.on(IpcChannel.vizHistory, (_e, payload) => forwardVizHistory(payload));
-  ipcMain.on(IpcChannel.vizCommand, (_e, payload) => {
+  // Clip window -> main window: its stop / discard buttons.
+  ipcMain.on(IpcChannel.clipCommand, (_e, payload) => {
     const w = ctx.getWindow();
-    if (w && !w.isDestroyed()) w.webContents.send(IpcChannel.vizCommand, payload);
+    if (w && !w.isDestroyed()) w.webContents.send(IpcChannel.clipCommand, payload);
   });
 
   // ------- Tray state --------------------------------------------------------
