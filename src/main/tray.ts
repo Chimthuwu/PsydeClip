@@ -1,7 +1,6 @@
 import { Tray, Menu, nativeImage, BrowserWindow, app, shell } from 'electron';
 import { AppSettings } from '../shared/types';
 import { snapWindow } from './window-controls';
-import { createPopout, destroyPopout, isPopoutOpen } from './popout';
 import { resetWorkArea } from './appbar';
 import { ICON_16_DATA_URL, ICON_32_DATA_URL, ICON_256_DATA_URL } from './icon-assets';
 
@@ -24,7 +23,6 @@ let lastSaveFlashUntil = 0;
 let setSettingsRef: ((patch: Partial<AppSettings>) => AppSettings) | null = null;
 let getSettingsRef: (() => AppSettings) | null = null;
 let getWindowRef: (() => BrowserWindow | null) | null = null;
-let onPopoutClosedRef: (() => void) | null = null;
 
 const REC_RED = { r: 255, g: 93, b: 108 };
 
@@ -83,12 +81,10 @@ export function initTray(
   getWindow: () => BrowserWindow | null,
   getSettings: () => AppSettings,
   setSettings: (patch: Partial<AppSettings>) => AppSettings,
-  onPopoutClosed?: () => void,
 ): Tray {
   getWindowRef = getWindow;
   setSettingsRef = setSettings;
   getSettingsRef = getSettings;
-  onPopoutClosedRef = onPopoutClosed ?? null;
 
   if (!trayInstance) {
     trayInstance = new Tray(makeTrayIcon(false));
@@ -262,17 +258,8 @@ function buildMenu(): Electron.Menu {
       click: () => setAlwaysOnTop(!isAlwaysOnTop),
     },
     {
-      label: 'Pop-out visualizer',
-      type: 'checkbox',
-      checked: isPopoutOpen(),
-      click: () => togglePopoutFromTray(),
-    },
-    {
       label: 'Dock to top of screen',
-      // The MAIN window, matching the title bar's ⤒ and the quick menu. This
-      // used to open the pop-out and dock that instead, which is the complaint
-      // in todo.md §11 bullet 1734 — and it made the pop-out the only way to
-      // get a docked strip, which is why its removal had to wait.
+      // The MAIN window, matching the title bar's ⤒ and the quick menu.
       click: () => {
         const win = getWindowRef?.();
         if (!win || win.isDestroyed()) return;
@@ -336,17 +323,6 @@ function setAlwaysOnTop(value: boolean) {
   isAlwaysOnTop = value;
   if (setSettingsRef) {
     try { setSettingsRef({ alwaysOnTop: value }); } catch { /* ignore */ }
-  }
-  refreshTray();
-}
-
-function togglePopoutFromTray() {
-  if (isPopoutOpen()) {
-    destroyPopout();
-    setSettingsRef?.({ popoutOpen: false });
-  } else {
-    createPopout(() => onPopoutClosedRef?.());
-    setSettingsRef?.({ popoutOpen: true });
   }
   refreshTray();
 }

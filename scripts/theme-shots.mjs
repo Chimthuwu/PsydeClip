@@ -43,7 +43,7 @@ async function getTarget() {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/json/list`);
       const list = await res.json();
-      const page = list.find((t) => t.type === 'page' && !t.url.includes('#popout'));
+      const page = list.find((t) => t.type === 'page');
       if (page) return page;
     } catch {
       /* not up */
@@ -88,7 +88,7 @@ async function evalJs(cdp, expression) {
 }
 
 const GUARD = `({
-  ok: !!document.querySelector('.app, .popout'),
+  ok: !!document.querySelector('.app'),
   hasPhaser: !!document.querySelector('#phaser-container, canvas.phaser'),
   api: typeof window.api,
   bodyClass: document.body.className,
@@ -122,45 +122,7 @@ async function main() {
     shots.push(file);
   }
 
-  // Pop-out (drag strip + board) per theme. Non-fatal on purpose: the pop-out
-  // is slated for removal (todo §11) and the marketing site only needs the
-  // main-window shots, so a pop-out that won't open must not throw away a run
-  // that has already written them.
-  let pcdp = null;
-  try {
-    await evalJs(cdp, `window.api.togglePopout(true).then(() => true)`);
-    await sleep(1500);
-    let pop = null;
-    for (let i = 0; i < 20 && !pop; i++) {
-      const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-      pop = list.find((t) => t.type === 'page' && t.url.includes('#popout'));
-      if (!pop) await sleep(300);
-    }
-    if (!pop) throw new Error('pop-out did not open');
-    pcdp = await connect(pop.webSocketDebuggerUrl);
-    await pcdp.send('Page.enable');
-    await pcdp.send('Runtime.enable');
-    const pg = await evalJs(pcdp, `({ ok: !!document.querySelector('.popout'), phaser: !!document.querySelector('#phaser-container') })`);
-    if (!pg.ok || pg.phaser) throw new Error('pop-out is not Recordr');
-    for (const theme of themes) {
-      await setTheme(theme);
-      await sleep(900);
-      const file = path.join(outDir, `popout-${theme}.png`);
-      const shot = await pcdp.send('Page.captureScreenshot', { format: 'png' });
-      fs.writeFileSync(file, Buffer.from(shot.data, 'base64'));
-      shots.push(file);
-    }
-  } catch (e) {
-    console.warn(`pop-out shots skipped: ${e.message || e}`);
-  } finally {
-    pcdp?.close();
-    try {
-      await evalJs(cdp, `window.api.togglePopout(false).then(() => true)`);
-    } catch {
-      /* the window may already be gone */
-    }
-    cdp.close();
-  }
+  cdp.close();
 
   const expected = themes.map((t) => path.join(outDir, `main-${t}.png`));
   const missing = expected.filter((f) => !fs.existsSync(f));

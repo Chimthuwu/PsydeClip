@@ -6,8 +6,6 @@ interface Props {
   settings: AppSettings;
   onUpdate: (patch: Partial<AppSettings>) => Promise<AppSettings> | void;
   capturing: boolean;
-  popoutOpen: boolean;
-  onTogglePopout: () => void;
   onOpenSettings: () => void;
   /** Optional controls rendered inline in the strip between title and actions. */
   children?: ReactNode;
@@ -18,7 +16,7 @@ interface Props {
  *
  * 26px tall against the OS bar's ~32px, and it earns that space back by
  * carrying the controls that matter for a docked window: pin, dock-to-top,
- * pop-out. (There is no layout switch anymore — the compact layout was
+ * settings. (There is no layout switch anymore — the compact layout was
  * retired, and the full one sheds chrome to a strip via CSS breakpoints.)
  *
  * Dragging: the strip is the drag region (CSS `-webkit-app-region: drag`);
@@ -28,8 +26,6 @@ export function TitleBar({
   settings,
   onUpdate,
   capturing,
-  popoutOpen,
-  onTogglePopout,
   onOpenSettings,
   children,
 }: Props) {
@@ -65,14 +61,6 @@ export function TitleBar({
           onClick={() => window.api.snapWindow('top')}
         >
           ↥
-        </button>
-        <button
-          type="button"
-          className={`tb-btn ${popoutOpen ? 'is-on' : ''}`}
-          title={popoutOpen ? 'Close the pop-out visualizer' : 'Pop the visualizer out into its own window'}
-          onClick={onTogglePopout}
-        >
-          ⧉
         </button>
         <button type="button" className="tb-btn" title="Settings" onClick={onOpenSettings}>
           ⚙
