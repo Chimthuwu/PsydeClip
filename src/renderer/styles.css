@@ -651,6 +651,20 @@ html:has(.app.has-custom-titlebar) #root {
   letter-spacing: 0.04em;
   border-radius: var(--radius-pill);
 }
+/* Always-visible MIDI toggle in the HUD status row (todo.md §MIDI-1 UX fix) —
+   a standalone pill, so unlike .hud-live's internal pill it needs its own
+   border/background to read as a button. */
+.midi-toggle {
+  border: 1.5px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.midi-toggle.on {
+  color: var(--accent-bright);
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 calc(8px * var(--glow)) color-mix(in srgb, var(--accent-bright) 60%, transparent);
+}
 /* Inside the capsule the pill drops its own chrome — the wrapper carries it. */
 .hud-live .pill {
   border: none;

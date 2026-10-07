@@ -93,9 +93,25 @@ export default function App() {
       // Fire-and-forget AFTER the success toast: the audio is on disk and the
       // recording is complete. Nothing below can undo that.
       if (settings.transcribeOnSave && res.path) {
+        // Show the notes in the piano-roll lane too, not just the toast + the
+        // .mid on disk — the always-on MIDI toggle should feel like it did
+        // something visible, not just drop a file silently (todo.md §MIDI-1
+        // UX fix). Best-effort absolute-time placement: "the last durationSec
+        // up to right now", which is exact for a rolling export and close
+        // enough for a clip/traditional stop (both just finished).
+        const endSec = cs.historyModel?.newestSec ?? durationSec;
+        const startSec = Math.max(0, endSec - durationSec);
+        const label = rangeLabel(startSec, durationSec);
         void transcribeSavedRecording(
           { audioPath: res.path, ...(pcm ?? { bytes }) },
-          { emitToast },
+          {
+            emitToast,
+            onSettled: (state) => {
+              if (state.status !== 'done' || !state.notes?.length) return;
+              const layer: NoteLayer = { startSec, durationSec, notes: state.notes, label };
+              setNoteLayer(layer);
+            },
+          },
         );
       }
     } else {
@@ -523,11 +539,19 @@ export default function App() {
     if (loaded) window.api.setTrayCapturing(capturing);
   }, [capturing, loaded]);
 
+  // Settings is a tall modal; a docked strip can be as short as 52px
+  // (DOCK_MIN_HEIGHT in main/window-controls.ts), which would otherwise
+  // squeeze the modal into an unusable sliver. Borrow the same
+  // tempExpandWindow mechanism the old bar-layout device dropdown used:
+  // grow the window while Settings is open, snap back on close.
+  const SETTINGS_MIN_HEIGHT = 420;
   const openSettingsPanel = useCallback(() => {
     setSettingsOpen(true);
+    window.api.tempExpandWindow(SETTINGS_MIN_HEIGHT);
   }, []);
   const closeSettingsPanel = useCallback(() => {
     setSettingsOpen(false);
+    window.api.tempExpandWindow(null);
   }, []);
 
   // Listen for "open settings" requests from the tray menu.
@@ -891,6 +915,8 @@ export default function App() {
         clipElapsed={cs.clipActive ? clipElapsed : undefined}
         onToggleClip={() => toggleClipRecording(true)}
         clipEnabled={!!cs.stream && !!settings.saveFolder}
+        midiOn={settings.transcribeOnSave}
+        onToggleMidi={() => update({ transcribeOnSave: !settings.transcribeOnSave })}
       />
 
       {/* The capture cue only lights up for bounded recordings — a clip in
