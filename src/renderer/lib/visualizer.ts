@@ -24,6 +24,14 @@ export interface VisualizerState {
    */
   historyModel?: HistoryModel | null;
   /**
+   * Layered visualizers (todo.md section 11, DECIDED 2026-10-07): when the
+   * mode is 'history', also draw a live oscilloscope inset at the right edge,
+   * at reduced opacity, behind `settings.showOscilloscopeOverlay`. Ignored for
+   * every other mode. The scope's ~43ms window can't share History's
+   * minutes-long x-axis, so it is a fixed-width inset, not a full overlay.
+   */
+  showOscilloscopeOverlay?: boolean;
+  /**
    * Zoom/pan viewport for the history track, as absolute session seconds
    * `[start, end]` (already resolved via `HistoryModel.effectiveViewport`).
    * Absent = fit-all (the whole buffer at the live edge) — what the read-only
@@ -105,11 +113,74 @@ export function drawVisualizer(state: VisualizerState, analyser: AnalyserLike) {
   analyser.sample();
 
   const gain = state.gain ?? 1;
-  if (mode === 'history')
+  if (mode === 'history') {
     drawHistory(ctx, historyModel, state.viewport ?? null, width, height, theme, gain);
+    if (state.showOscilloscopeOverlay) {
+      drawOscilloscopeOverlayInset(ctx, analyser.timeData, width, height, theme, gain);
+    }
+  }
   else if (mode === 'oscilloscope') drawOscilloscope(ctx, analyser.timeData, width, height, theme, gain);
   else if (mode === 'spectrum') drawSpectrum(ctx, analyser.freqData, analyser.analyser, width, height, theme, gain);
   else drawSpectrogram(ctx, analyser.freqData, analyser.analyser, width, height, theme, gain);
+}
+
+/**
+ * Layered-visualizer inset (todo.md section 11, DECIDED 2026-10-07): a live
+ * oscilloscope drawn over the right edge of the History board at ~35%
+ * opacity, behind a layer toggle. Fixed-width because the scope's ~43ms
+ * window has no sensible shared x-axis with History's minutes-long span —
+ * stretching it to match would be meaningless, so it stays a small
+ * self-contained panel instead of trying to align with the waveform below.
+ */
+function drawOscilloscopeOverlayInset(
+  ctx: CanvasRenderingContext2D,
+  data: Float32Array,
+  w: number,
+  h: number,
+  theme: Theme,
+  gain: number,
+) {
+  if (data.length === 0 || w <= 0 || h <= 0) return;
+  const insetW = Math.max(60, Math.min(160, w * 0.28));
+  const x0 = w - insetW;
+  const p = palette(theme);
+
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  // A faint backing panel so the trace reads against a busy waveform
+  // underneath, without fully occluding the History data behind it.
+  ctx.fillStyle = p.bg;
+  ctx.fillRect(x0, 0, insetW, h);
+
+  ctx.beginPath();
+  ctx.rect(x0, 0, insetW, h);
+  ctx.clip();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = p.wave;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  const slice = insetW / data.length;
+  for (let i = 0; i < data.length; i++) {
+    const v = Math.max(-1, Math.min(1, data[i] * gain));
+    const y = h / 2 + v * (h / 2) * 0.9;
+    const x = x0 + i * slice;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // A thin divider so the inset reads as its own panel, not a draw glitch.
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = p.accent;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x0 + 0.5, 0);
+  ctx.lineTo(x0 + 0.5, h);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** Themes whose oscilloscope trace gets a soft neon bloom. */
