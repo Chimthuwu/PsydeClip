@@ -80,6 +80,7 @@ export const SMOOTHING_FOR_MODE: Record<VisualizerMode, number> = {
   spectrum: 0.82,
   spectrogram: 0.2,
   history: 0.82,
+  midi: 0.82,
 };
 
 export class AudioAnalyser implements AnalyserLike {
@@ -1051,19 +1052,30 @@ export function drawPianoRollLane(
   }
   ctx.stroke();
 
-  // Notes. Velocity → alpha, so dynamics are visible without a legend.
+  // Notes. Fixed, theme-independent colour deliberately — the note bars need
+  // to read clearly against every grid/background theme, and reusing p.wave
+  // (the oscilloscope/history colour) made them nearly invisible on themes
+  // where grid and wave sit in the same hue family (todo.md MIDI contrast
+  // complaint, 2026-10-07). A thin dark outline keeps it legible even on the
+  // brightest themes (kawaii, monochrome). Velocity -> alpha, so dynamics are
+  // visible without a legend.
+  const NOTE_FILL = '#ff2fd0';
+  const NOTE_STROKE = 'rgba(0,0,0,0.55)';
   const inset = laneH >= 4 ? 1 : 0;
   const radius = Math.min(3, Math.max(0, (laneH - inset * 2) / 2));
   const canRound = typeof (ctx as { roundRect?: unknown }).roundRect === 'function';
   for (const r of layout.rects) {
-    ctx.globalAlpha = 0.35 + 0.65 * r.velocity;
-    ctx.fillStyle = p.wave;
+    ctx.globalAlpha = 0.55 + 0.45 * r.velocity;
+    ctx.fillStyle = NOTE_FILL;
+    ctx.strokeStyle = NOTE_STROKE;
+    ctx.lineWidth = 1;
     const y = r.y + inset;
     const barH = Math.max(1, r.h - inset * 2);
     if (canRound && radius > 0) {
       ctx.beginPath();
       ctx.roundRect(r.x, y, r.w, barH, radius);
       ctx.fill();
+      if (barH >= 3) ctx.stroke();
     } else {
       ctx.fillRect(r.x, y, r.w, barH);
     }

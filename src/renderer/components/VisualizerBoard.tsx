@@ -371,7 +371,26 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
       // effect's deps tore down and recreated the whole rAF loop that often —
       // which flashed every pane blank.
       const model = modelRef.current;
-      if (analyser || mode === 'history' || mode === 'spectrogram') {
+      if (mode === 'midi') {
+        // Standalone MIDI visualizer (todo.md MIDI contrast/visibility
+        // complaint, 2026-10-07): the whole board is the piano roll, drawn
+        // over the current noteLayer's own absolute time range — not
+        // History's viewport, so it reads the same whether or not History
+        // is even open. drawPianoRollLane already does background + grid +
+        // notes + the "No notes in view" placeholder, so no separate idle
+        // path is needed here.
+        const layer = pianoRollRef.current;
+        const layout = layoutPianoRoll(layer?.notes ?? [], {
+          startSec: layer?.startSec ?? 0,
+          endSec: (layer?.startSec ?? 0) + Math.max(1, layer?.durationSec ?? 1),
+          width: canvas.width,
+          height: canvas.height,
+        });
+        drawPianoRollLane(ctx as unknown as CanvasRenderingContext2D, layout, theme, {
+          label: layer?.label,
+          emptyText: 'No MIDI yet — select a range in History and press m, or turn on the ♪ MIDI toggle',
+        });
+      } else if (analyser || mode === 'history' || mode === 'spectrogram') {
         // Resolve the visible time window fresh every frame: a `following`
         // history viewport (and the spectrogram's fixed window) both slide with
         // the live edge even though React state only changes on gestures.

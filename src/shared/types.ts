@@ -32,7 +32,7 @@ export const THEMES: readonly { value: Theme; label: string; swatch: string }[] 
   { value: 'black-ice', label: 'Black ice', swatch: '#7fe3f5' },
 ];
 
-export type VisualizerMode = 'oscilloscope' | 'spectrum' | 'spectrogram' | 'history';
+export type VisualizerMode = 'oscilloscope' | 'spectrum' | 'spectrogram' | 'history' | 'midi';
 
 /**
  * All visualizer modes, in the fixed order the split view lays them out.
@@ -43,6 +43,7 @@ export const VISUALIZER_MODES: readonly VisualizerMode[] = [
   'spectrum',
   'spectrogram',
   'history',
+  'midi',
 ];
 
 /** User-facing name for each visualizer mode (pane tags, add-tile buttons). */
@@ -51,6 +52,7 @@ export const VISUALIZER_LABELS: Record<VisualizerMode, string> = {
   spectrum: 'Spectrum',
   spectrogram: 'Spectrogram',
   history: 'History',
+  midi: 'MIDI',
 };
 
 /**
@@ -261,7 +263,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'modern',
   visualizer: 'oscilloscope',
   // Everything except the primary mode starts hidden → a single board.
-  vizHidden: ['spectrum', 'spectrogram', 'history'],
+  vizHidden: ['spectrum', 'spectrogram', 'history', 'midi'],
   vizGain: 1,
   showMidiLane: true,
   showOscilloscopeOverlay: false,
@@ -399,6 +401,8 @@ export const IpcChannel = {
   /** Main → renderer: the user picked "Save selection" in the quick menu. */
   requestSaveSelection: 'recording:request-save-selection',
   dragExport: 'drag:export',
+  /** Build a Standard MIDI File from a transcribed note list (notes->bytes). */
+  notesToMidi: 'transcribe:notes-to-midi',
   recordingEvent: 'recording:event',
   hotkeySet: 'hotkey:set',
   loopbackList: 'loopback:list',
