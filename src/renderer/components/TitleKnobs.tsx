@@ -4,7 +4,7 @@ import { AppSettings } from '../../shared/types';
  * The three quick knobs — save format / visualizer sensitivity / rolling-buffer
  * length — as compact mono buttons that pop native menus (`ipc.ts` titleMenu),
  * so they're never clipped by a short or docked window. Shared by the custom
- * title bar and the pop-out's drag strip (the pop-out IS the docked view).
+ * title bar.
  */
 export function TitleKnobs({ settings }: { settings: AppSettings }) {
   const formatLabel = settings.recordingFormat.toUpperCase();

@@ -13,7 +13,7 @@ interface Props {
 
 /**
  * Floating "recording a clip" panel. Rendered by both windows whenever a clip
- * is in progress (clip state is mirrored to the pop-out over VizState), so
+ * is in progress (clip state is mirrored to the clip window), so
  * whichever window is on screen shows it. It's an overlay, not a modal — only
  * the panel itself takes pointer events, everything behind stays usable.
  *

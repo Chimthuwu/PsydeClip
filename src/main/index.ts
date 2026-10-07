@@ -66,7 +66,7 @@ function createWindow(bounds?: Electron.Rectangle) {
       sandbox: false,
       // This window is the audio engine, not just a view: it owns the
       // AnalyserNode, the rolling-buffer bookkeeping and the frame pump that
-      // feeds the pop-out. Chromium throttles timers and animation frames to a
+      // feeds the clip window. Chromium throttles timers and animation frames to a
       // crawl for backgrounded windows — and Recordr spends most of its life
       // minimised or hidden to the tray, which is exactly when it must keep
       // running.
@@ -344,7 +344,7 @@ function init() {
       () => readSettings(),
       (patch) => {
         // Route tray writes through the same path as the settings modal so
-        // the renderer sees them (layout, pop-out, always-on-top…).
+        // the renderer sees them (layout, always-on-top…).
         const merged = writeSettings({ ...readSettings(), ...patch });
         handleSettingsChanged(merged);
         return merged;

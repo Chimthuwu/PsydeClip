@@ -115,7 +115,7 @@ export function SettingsPanel({
   const templateRef = useRef<HTMLInputElement | null>(null);
   // Keys the user has touched in this panel but not saved yet. Everything else
   // tracks the live settings, so a change made elsewhere while the panel is
-  // open (the footer format picker, the quick menu, the pop-out, the tray)
+  // open (the footer format picker, the quick menu, the tray)
   // shows here — and Save only writes back what was actually edited instead of
   // clobbering those external changes with a stale whole-object snapshot.
   const dirty = useRef<Set<keyof AppSettings>>(new Set());

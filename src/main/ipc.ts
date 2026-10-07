@@ -464,7 +464,7 @@ export function registerIpc(ctx: IpcContext) {
 
     // "Save selection" leads the menu when there is one: it is the action the
     // user is most likely to want after dragging a range out of the waveform,
-    // and it is the only way to save a crop from a docked/pop-out window.
+    // and it is the only way to save a crop from a docked window.
     // Added to the existing quick menu rather than intercepting right-click
     // with a second menu — one menu, and the "Save as" submenu below already
     // governs which format it writes (todo.md index, History phase 5).

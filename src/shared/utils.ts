@@ -29,7 +29,7 @@ export function mmssTenths(seconds: number): string {
  * Shown when the record button is pressed while a clip is recording. OK keeps
  * & saves the clip (temp file moves to the save folder); Cancel discards it
  * (temp file is deleted). Used by both windows that can stop a clip — the main
- * HUD and the pop-out's transport — so the wording stays in one place.
+ * HUD and the transport — so the wording stays in one place.
  */
 export const CLIP_STOP_PROMPT =
   'Stop recording this clip?\n\n  OK — save it\n  Cancel — discard it.';
