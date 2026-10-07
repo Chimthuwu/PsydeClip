@@ -397,6 +397,22 @@ export function SettingsPanel({
               </em>
             </span>
           </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.showOscilloscopeOverlay}
+              onChange={(e) => applyNow({ showOscilloscopeOverlay: e.target.checked })}
+            />
+            <span>
+              <strong>Layer a live oscilloscope over History</strong>
+              <em>
+                A small live scope inset at the right edge of the History
+                board, at reduced opacity. Its ~43ms window can't share
+                History's minutes-long time axis, so it stays a fixed-width
+                strip rather than stretching across the waveform.
+              </em>
+            </span>
+          </label>
         </section>
 
         <section>

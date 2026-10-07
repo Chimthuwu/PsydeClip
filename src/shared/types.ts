@@ -182,6 +182,15 @@ export interface AppSettings {
    * produced notes, so it costs nothing until it has something to show.
    */
   showMidiLane: boolean;
+  /**
+   * Layered visualizer (todo.md section 11 DECISION 2026-10-07): draw a live
+   * oscilloscope inset over the History board, at reduced opacity, behind this
+   * toggle. The scope's ~43ms window can't share History's minutes-long time
+   * axis, so it's a fixed-width inset at the right edge rather than a
+   * full-width overlay. Off by default — it's an extra draw on top of History,
+   * and most users want the plain waveform.
+   */
+  showOscilloscopeOverlay: boolean;
   /** Buffer length in seconds, applies to rolling mode. */
   bufferSeconds: number;
   /** Opus bitrate kbps. Also the target bitrate when saving as MP3 (clamped to 128–320). */
@@ -238,6 +247,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vizHidden: ['spectrum', 'spectrogram', 'history'],
   vizGain: 1,
   showMidiLane: true,
+  showOscilloscopeOverlay: false,
   bufferSeconds: 15 * 60,
   bitrateKbps: 96,
   recordingFormat: 'webm',

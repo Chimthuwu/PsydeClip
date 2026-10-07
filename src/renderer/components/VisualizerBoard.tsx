@@ -58,6 +58,12 @@ interface Props {
    * viewport exactly. Null/absent = no lane.
    */
   pianoRoll?: NoteLayer | null;
+  /**
+   * Layered visualizers (todo.md section 11, DECIDED 2026-10-07): draw a live
+   * oscilloscope inset over the right edge of the History board at reduced
+   * opacity. Ignored for every other mode.
+   */
+  showOscilloscopeOverlay?: boolean;
   /** Shown as a ♪ affordance on the selection; absent = no button. */
   onTranscribeSelection?: () => void;
   onSelectionChange?: (sel: [number, number] | null) => void;
@@ -84,7 +90,7 @@ function timelineView(
   return model.effectiveViewport(viewport);
 }
 
-export function VisualizerBoard({ analyser, mode, theme, className, idleText, historyModel, interactive = true, gain = 1, dragReady = true, pianoRoll = null, onTranscribeSelection, onSelectionChange, onDragExport, onDragNotReady }: Props) {
+export function VisualizerBoard({ analyser, mode, theme, className, idleText, historyModel, interactive = true, gain = 1, dragReady = true, pianoRoll = null, showOscilloscopeOverlay = false, onTranscribeSelection, onSelectionChange, onDragExport, onDragNotReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const laneRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -380,6 +386,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
             historyModel: model,
             viewport: v,
             gain,
+            showOscilloscopeOverlay,
           },
           analyser || STUB_ANALYSER,
         );
@@ -458,7 +465,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
     // them from refs. In the pop-out historyModel changes ~5×/s and restarting
     // the loop that often flickered every pane. `laneOn` IS a dep: it adds or
     // removes a canvas, which has to be measured before it can be drawn into.
-  }, [analyser, mode, theme, idleText, interactive, gain, laneOn]);
+  }, [analyser, mode, theme, idleText, interactive, gain, laneOn, showOscilloscopeOverlay]);
 
   // Initial overlay geometry at render; the rAF loop keeps it exact between
   // renders as the view slides or zooms.

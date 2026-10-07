@@ -775,6 +775,7 @@ export default function App() {
                   interactive={m === 'history' || m === 'spectrogram'}
                   dragReady={m === 'history' || m === 'spectrogram' ? dragReady : undefined}
                   pianoRoll={m === 'history' && settings.showMidiLane ? noteLayer : null}
+                  showOscilloscopeOverlay={m === 'history' && settings.showOscilloscopeOverlay}
                   onSelectionChange={
                     m === 'history' || m === 'spectrogram' ? handleSelectionChange : undefined
                   }
@@ -808,6 +809,7 @@ export default function App() {
               historyModel={cs.historyModel}
               dragReady={dragReady}
               pianoRoll={settings.showMidiLane ? noteLayer : null}
+              showOscilloscopeOverlay={visibleModes[0] === 'history' && settings.showOscilloscopeOverlay}
               onTranscribeSelection={settings.showMidiLane ? transcribeSelection : undefined}
               onSelectionChange={handleSelectionChange}
               onDragNotReady={() =>
