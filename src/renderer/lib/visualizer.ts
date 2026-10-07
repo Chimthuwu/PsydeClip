@@ -187,6 +187,32 @@ function drawOscilloscopeOverlayInset(
 /** Themes whose oscilloscope trace gets a soft neon bloom. */
 const GLOW_THEMES = new Set<Theme>(['modern', 'aqua', 'lime', 'sakura', 'blood-red', 'nocturnal']);
 
+/**
+ * Blend two CSS hex colours, `t` = 0 gives `a`, 1 gives `b`.
+ *
+ * Only the `#rgb`/`#rrggbb` forms the palettes above actually use are handled —
+ * this is a draw-time helper, not a general colour library, and a silent
+ * fallback to `a` is the right failure mode (a wrong tint of a live-note bar is
+ * cosmetic; a thrown exception would take out the whole rAF loop).
+ */
+function mixHex(a: string, b: string, t: number): string {
+  const parse = (hex: string): [number, number, number] | null => {
+    const h = hex.trim().replace(/^#/, '');
+    const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+    if (!/^[0-9a-f]{6}$/i.test(full)) return null;
+    return [
+      parseInt(full.slice(0, 2), 16),
+      parseInt(full.slice(2, 4), 16),
+      parseInt(full.slice(4, 6), 16),
+    ];
+  };
+  const ca = parse(a);
+  const cb = parse(b);
+  if (!ca || !cb) return a;
+  const mix = ca.map((v, i) => Math.round(v + (cb[i] - v) * Math.max(0, Math.min(1, t))));
+  return `rgb(${mix[0]},${mix[1]},${mix[2]})`;
+}
+
 function palette(theme: Theme) {
   switch (theme) {
     case 'aqua':
@@ -981,7 +1007,7 @@ export function drawPianoRollLane(
   ctx: CanvasRenderingContext2D,
   layout: PianoRollLayout,
   theme: Theme,
-  opts: { label?: string; emptyText?: string } = {},
+  opts: { label?: string; emptyText?: string; live?: boolean } = {},
 ): void {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
@@ -1021,13 +1047,21 @@ export function drawPianoRollLane(
   // brightest themes (kawaii, monochrome). Velocity -> alpha, so dynamics are
   // visible without a legend.
   const NOTE_FILL = '#ff2fd0';
+  // Live-tracked notes (todo.md §MIDI-1 Phase B) draw in the theme's own accent
+  // instead, tinted toward the background: they read as provisional next to the
+  // flat hot-magenta of a real transcription without inventing a second fixed
+  // hue that could clash on a theme whose grid is itself magenta (sakura).
+  // Alpha is held down too — two signals, so "which of these is the real answer"
+  // is legible at a glance.
+  const liveFill = mixHex(p.accent, p.bg, 0.45);
+  const fill = opts.live ? liveFill : NOTE_FILL;
   const NOTE_STROKE = 'rgba(0,0,0,0.55)';
   const inset = laneH >= 4 ? 1 : 0;
   const radius = Math.min(3, Math.max(0, (laneH - inset * 2) / 2));
   const canRound = typeof (ctx as { roundRect?: unknown }).roundRect === 'function';
   for (const r of layout.rects) {
-    ctx.globalAlpha = 0.55 + 0.45 * r.velocity;
-    ctx.fillStyle = NOTE_FILL;
+    ctx.globalAlpha = opts.live ? 0.3 + 0.4 * r.velocity : 0.55 + 0.45 * r.velocity;
+    ctx.fillStyle = fill;
     ctx.strokeStyle = NOTE_STROKE;
     ctx.lineWidth = 1;
     const y = r.y + inset;
@@ -1045,8 +1079,10 @@ export function drawPianoRollLane(
 
   // Caption: which range this is (and how much of it is in view), or why the
   // lane is empty. Drawn last so a note can never sit on top of it.
-  const text = layout.rects.length
-    ? `${opts.label ? `${opts.label} · ` : ''}${layout.rects.length} note${layout.rects.length === 1 ? '' : 's'}`
+  const count = layout.rects.length;
+  const noun = `${count} ${opts.live ? 'live ' : ''}note${count === 1 ? '' : 's'}`;
+  const text = count
+    ? `${opts.label ? `${opts.label} · ` : ''}${noun}`
     : opts.emptyText ?? 'No notes in view';
   ctx.font = '10px ui-monospace, Consolas, monospace';
   ctx.textAlign = 'left';
@@ -1054,5 +1090,15 @@ export function drawPianoRollLane(
   ctx.fillStyle = p.gridStrong;
   ctx.globalAlpha = 0.9;
   ctx.fillText(text, 4, 3);
+  // Right-aligned second caption: the "preview, not the real answer" status is
+  // carried by the caption as well as the colour, because colour alone is lost
+  // to anyone who cannot separate the two hues.
+  if (count && opts.live) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = p.accent;
+    ctx.globalAlpha = 0.95;
+    ctx.fillText('live preview', w - 4, 3);
+  }
+  ctx.textAlign = 'left';
   ctx.globalAlpha = 1;
 }

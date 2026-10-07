@@ -23,6 +23,17 @@ export interface NoteLayer {
   notes: TranscribedNote[];
   /** Short range label for the lane's corner, e.g. `12.4–18.9s`. */
   label: string;
+  /**
+   * True while these notes come from the live YIN tracker rather than a Basic
+   * Pitch transcription (todo.md §MIDI-1 Phase B).
+   *
+   * The distinction is shown rather than hidden: live notes draw in a dim tint
+   * and a layer stays `live` until a real transcription replaces it. A YIN
+   * estimate is monophonic and cheap, so drawing it identically to a
+   * transcription would claim a precision it does not have — which is also why
+   * it is kept out of the `.mid` export.
+   */
+  live?: boolean;
 }
 
 /** How many layers to keep. Each is small (a few hundred notes at most). */

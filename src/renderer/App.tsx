@@ -345,6 +345,47 @@ export default function App() {
   const noteBusyRef = useRef(false);
 
   /**
+   * What the grid actually draws: a real transcription when there is one, and
+   * otherwise the live YIN preview (todo.md §MIDI-1 Phase B).
+   *
+   * A transcription wins outright and the preview is dropped — that is the
+   * colour change you asked for, and it is also just true: Basic Pitch is the
+   * accurate, polyphonic answer, the tracker is a monophonic estimate.
+   *
+   * Built with useMemo rather than state, and reading the tracker's live
+   * `notes` array BY REFERENCE: the array is mutated in place by the 20 Hz
+   * analysis loop, and the board's rAF loop reads it directly every frame. So
+   * drawing a live melody costs zero React renders, while this memo still
+   * re-derives whenever the tracker itself is swapped for a new recording.
+   */
+  const liveLayer = useMemo<NoteLayer | null>(() => {
+    const tracker = cs.liveNotes;
+    if (!tracker) return null;
+    const layer: NoteLayer = {
+      startSec: 0,
+      durationSec: 1,
+      notes: tracker.notes,
+      label: 'live',
+      live: true,
+    };
+    // The window's END has to be read fresh every frame, not frozen at the
+    // moment the memo ran: `tracker.lastSec` grows as the recording goes, and
+    // a layer that captured it once would clamp the board to the recording's
+    // first second and then never show a note again. A getter keeps the
+    // object's IDENTITY stable (so this memo still runs once per recording)
+    // while the extent stays live — which is exactly the same contract the
+    // mutable `notes` array relies on.
+    Object.defineProperty(layer, 'durationSec', {
+      get: () => Math.max(1, tracker.lastSec),
+      enumerable: true,
+    });
+    return layer;
+  }, [cs.liveNotes]);
+
+  // Real notes take precedence: that is the "colour change on stop".
+  const drawnLayer = noteLayer ?? liveLayer;
+
+  /**
    * Transcribe the current History selection and show its notes in the
    * piano-roll lane (`m`, or the ♪ button on the selection).
    *
@@ -835,7 +876,7 @@ export default function App() {
                      mosaic. Other panes are read-only overviews. */
                   interactive={m === 'history' || m === 'spectrogram'}
                   dragReady={m === 'history' || m === 'spectrogram' ? dragReady : undefined}
-                  pianoRoll={(m === 'history' && settings.showMidiLane) || m === 'midi' ? noteLayer : null}
+                  pianoRoll={(m === 'history' && settings.showMidiLane) || m === 'midi' ? drawnLayer : null}
                   showOscilloscopeOverlay={m === 'history' && settings.showOscilloscopeOverlay}
                   onSelectionChange={
                     m === 'history' || m === 'spectrogram' ? handleSelectionChange : undefined
@@ -847,7 +888,10 @@ export default function App() {
                     emitToast('error', 'Snippet still preparing — give it a second, then drag.')
                   }
                 />
-                {m === 'midi' && noteLayer && noteLayer.notes.length > 0 && (
+                {/* Real notes only — a live YIN preview is a monophonic
+                    estimate and has no business in a file the user opens in a
+                    DAW, so it gets no export button. */}
+                {m === 'midi' && noteLayer && !noteLayer.live && noteLayer.notes.length > 0 && (
                   <button
                     type="button"
                     className="viz-pane-export"
@@ -880,7 +924,7 @@ export default function App() {
               gain={settings.vizGain}
               historyModel={cs.historyModel}
               dragReady={dragReady}
-              pianoRoll={settings.showMidiLane || visibleModes[0] === 'midi' ? noteLayer : null}
+              pianoRoll={settings.showMidiLane || visibleModes[0] === 'midi' ? drawnLayer : null}
               showOscilloscopeOverlay={visibleModes[0] === 'history' && settings.showOscilloscopeOverlay}
               onTranscribeSelection={settings.showMidiLane ? transcribeSelection : undefined}
               onSelectionChange={handleSelectionChange}
@@ -888,7 +932,7 @@ export default function App() {
                 emitToast('error', 'Snippet still preparing — give it a second, then drag.')
               }
             />
-            {visibleModes[0] === 'midi' && noteLayer && noteLayer.notes.length > 0 && (
+            {visibleModes[0] === 'midi' && noteLayer && !noteLayer.live && noteLayer.notes.length > 0 && (
               <button
                 type="button"
                 className="viz-pane-export board-export"

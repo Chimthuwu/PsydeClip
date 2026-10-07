@@ -53,9 +53,15 @@ interface Props {
   /** True once App has a temp file ready for the current selection. */
   dragReady?: boolean;
   /**
-   * Transcribed notes to draw under the History waveform (todo.md §MIDI-1
-   * Phase A). Absolute session seconds, so the lane shares the waveform's
-   * viewport exactly. Null/absent = no lane.
+   * Notes to draw under the History waveform (todo.md §MIDI-1 Phase A) and, as
+   * the whole board, as the `midi` mode. Absolute session seconds, so the lane
+   * shares the waveform's viewport exactly. Null/absent = no lane.
+   *
+   * `notes` MAY BE A LIVE, MUTATED ARRAY: while a recording runs, the YIN tracker
+   * appends to it in place (todo.md §MIDI-1 Phase B) and the rAF loop below
+   * re-lays it out every frame. That is deliberate — it is what keeps live
+   * tracking free of React renders — so the prop's identity is NOT a signal that
+   * the contents changed. `layer.live` is what decides the note colour.
    */
   pianoRoll?: NoteLayer | null;
   /**
@@ -387,7 +393,10 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
         });
         drawPianoRollLane(ctx as unknown as CanvasRenderingContext2D, layout, theme, {
           label: layer?.label,
-          emptyText: 'No MIDI yet — select a range in History and press m, or turn on the ♪ MIDI toggle',
+          live: layer?.live,
+          emptyText: layer
+            ? undefined
+            : 'No MIDI yet — record something, or select a range in History and press m',
         });
       } else if (analyser || mode === 'history' || mode === 'spectrogram') {
         // Resolve the visible time window fresh every frame: a `following`
@@ -439,7 +448,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
               width: lane.width,
               height: lane.height,
             });
-            drawPianoRollLane(lctx, layout, theme, { label: layer.label });
+            drawPianoRollLane(lctx, layout, theme, { label: layer.label, live: layer.live });
           }
         }
       } else {

@@ -4,9 +4,11 @@ import { pickSourceAndCapture, listSources } from '../lib/audio-capture';
 import { AudioAnalyser } from '../lib/visualizer';
 import { createRecorder, RecorderHandle } from '../lib/recorder';
 import { startLoopbackStream, LoopbackStream, resumeContext } from '../lib/loopback-capture';
+import { DISPLAY_PICKER_PREFIX } from '../lib/audio-capture';
 import { PeakBuffer } from '../lib/peak-buffer';
 import { HistoryModel } from '../lib/history-model';
 import { PcmRing } from '../lib/pcm-ring';
+import { LiveNoteTracker } from '../lib/live-pitch';
 
 export interface CaptureState {
   /** Wins are listed when settings.captureBackend === 'desktop'. */
@@ -49,6 +51,18 @@ export interface CaptureState {
    * saying so the two look identical.
    */
   noSignal: boolean;
+  /**
+   * Live pitch tracker for the MIDI grid (todo.md §MIDI-1 Phase B). Non-null
+   * ONLY while a recording is in progress, which is what keeps the ~1 ms/frame
+   * analysis off the idle CPU budget — no timer runs when this is null.
+   *
+   * `notes` is a mutable array read directly by the board's rAF loop, so tracking
+   * a melody costs zero React renders. It SURVIVES the stop (frozen, no timer
+   * running) so the grid keeps showing what you just played. Never feed it to the
+   * `.mid` export: it is a monophonic preview, and a real transcription outranks
+   * it on the board.
+   */
+  liveNotes: LiveNoteTracker | null;
 }
 
 /**
@@ -71,6 +85,13 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
   const [clipActive, setClipActive] = useState(false);
   const [rms, setRms] = useState(0);
   const [noSignal, setNoSignal] = useState(false);
+  const [liveNotes, setLiveNotes] = useState<LiveNoteTracker | null>(null);
+  // A bounded recording is in progress — the ONLY gate on live pitch tracking
+  // (todo.md §MIDI-1 Phase B). Computed here rather than passed in, because it is
+  // derived from this hook's own state: a clip, or a traditional-mode session.
+  // The rolling buffer is never "the recording", so it is never analysed
+  // continuously — that is the standing CPU cost this gate exists to prevent.
+  const tracking = clipActive || (settings.recordMode === 'traditional' && capturing);
   const [error, setError] = useState<string | null>(null);
   const [bufferedSeconds, setBufferedSeconds] = useState(0);
 
@@ -88,6 +109,10 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
   const ctxRef = useRef<AudioContext | null>(null);
   const recorderRef = useRef<RecorderHandle | null>(null);
   const pcmTapRef = useRef<{ dispose: () => void } | null>(null);
+  // The session clock, mirrored into a ref so the live-pitch interval can read
+  // it without being a dependency (it is restamped ~5x/s).
+  const historyModelRef = useRef<HistoryModel | null>(null);
+  historyModelRef.current = historyModel;
 
   // 1. Enumerate devices for whichever backend is selected.
   useEffect(() => {
@@ -231,6 +256,72 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
     return () => clearInterval(id);
   }, [analyser, capturing, settings.bufferSeconds]);
 
+    // 5. Live pitch tracking for the MIDI grid (todo.md §MIDI-1 Phase B).
+  //
+  // Runs ONLY while a bounded recording is actually in progress — a clip, or a
+  // traditional-mode session. The always-on rolling buffer deliberately does NOT
+  // get it: that buffer is never "the recording", it is the window you save a
+  // slice out of, and analysing it continuously is exactly the standing CPU cost
+  // this avoids (todo.md, Stooge 2026-10-08).
+  //
+  // A setInterval rather than rAF for the same reason as the peak tracker above:
+  // requestAnimationFrame pauses while the window is hidden, and a recording must
+  // not stop being tracked because the app is in the background. It is torn down
+  // the instant the recording stops, so idle costs nothing — no timer alive.
+  //
+  // On stop the tracker is deliberately KEPT, not discarded: the notes you just
+  // played stay on the grid (frozen, still marked "live preview") so the grid
+  // does not blank out the moment you hit stop. A new recording makes a fresh
+  // tracker, and a real transcription outranks the preview entirely.
+  useEffect(() => {
+    const an = analyser;
+    if (!an) {
+      setLiveNotes(null);
+      return;
+    }
+    // Not recording: keep whatever preview is on screen, just stop pushing.
+    if (!tracking) return;
+
+    const ctx = an.analyser.context as AudioContext | undefined;
+    const sampleRate = ctx?.sampleRate ?? 44100;
+    const tracker = new LiveNoteTracker({ sampleRate });
+    setLiveNotes(tracker);
+
+    // Session seconds for each window's LEADING edge — the analyser hands back
+    // the last `frameSec` of audio, so the window began one frame ago. On the
+    // same axis as the History waveform, so a live bar sits over the audio that
+    // produced it.
+    const model = historyModelRef.current;
+    const frameSec = an.timeData.length / sampleRate;
+    // With no History model there is no session clock to join (nothing is being
+    // peak-tracked), so this recording's own age is the axis — and the live grid
+    // is then the only thing on screen, so its 0 is this recording's 0.
+    const beganAt = performance.now();
+
+    const id = setInterval(() => {
+      an.analyser.getFloatTimeDomainData(an.timeData);
+      const leadSec = model ? model.newestSec - frameSec : (performance.now() - beganAt) / 1000;
+      tracker.push(an.timeData, Math.max(0, leadSec));
+    }, 50);
+
+    // Published on `window` for verification harnesses. It carries no new
+    // authority — it is the same object the board draws from — but a note count
+    // is the only way to assert the CPU gate from outside, since a drawn canvas
+    // can be static for unrelated reasons.
+    (window as unknown as { __recordrLiveNotes?: LiveNoteTracker }).__recordrLiveNotes = tracker;
+
+    return () => {
+      clearInterval(id);
+      // Close whatever note was sounding so the last bar gets a real length
+      // instead of hanging open for ever. The notes stay for the grid to draw.
+      tracker.finish(model ? model.newestSec : (performance.now() - beganAt) / 1000);
+    };
+    // historyModel is read through a ref, never a dep: it is restamped ~5x/s as
+    // audio arrives, and depending on it would tear this interval down and
+    // rebuild it dozens of times a second.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyser, tracking]);
+
   const refreshSources = useCallback(async () => {
     if (settings.captureBackend === 'loopback') {
       const list = await window.api.listLoopbackDevices();
@@ -264,6 +355,7 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
       bufferedSeconds,
       error,
       noSignal,
+      liveNotes,
     } as CaptureState,
     refreshSources,
     stopStreamNow,
@@ -406,7 +498,11 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
     // getUserMedia call, because once it's made there is no recovering:
     //   1. a window source — only screens carry the loopback audio mixer;
     //   2. a stale id, e.g. a screen that was unplugged since we enumerated.
-    if (!sourceId.startsWith('screen:')) {
+    // The browser target's one source carries the `display:` prefix and is
+    // captured with getDisplayMedia, where neither rule applies (the user
+    // picks the screen or tab inside the browser's own dialog).
+    const isBrowserSource = sourceId.startsWith(DISPLAY_PICKER_PREFIX);
+    if (!isBrowserSource && !sourceId.startsWith('screen:')) {
       setError(
         'Window sources have no audio on Windows — pick a screen. ' +
           'Its capture already carries all system audio.',
