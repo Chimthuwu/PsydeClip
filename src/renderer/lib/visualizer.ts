@@ -30,7 +30,6 @@ export interface VisualizerState {
    * split-view panes use.
    */
   viewport?: [number, number] | null;
-  isPopout?: boolean;
   /**
    * Visualizer sensitivity multiplier (1 = neutral). Applied at draw time
    * only — the analyser data itself is untouched, so recordings, playback
@@ -43,9 +42,7 @@ export interface VisualizerState {
 /**
  * Everything the draw routines actually need from an analyser.
  *
- * The main window supplies a real `AudioAnalyser` wrapping an AnalyserNode;
- * the pop-out window has no audio graph of its own and supplies a
- * `RemoteAnalyser` fed by IPC frames instead. Both satisfy this.
+ * Supplied by the real `AudioAnalyser` wrapping an AnalyserNode.
  */
 export interface AnalyserLike {
   readonly timeData: Float32Array;
@@ -53,7 +50,7 @@ export interface AnalyserLike {
   readonly analyser: {
     minDecibels: number;
     maxDecibels: number;
-    /** Present on a real AnalyserNode; absent on the pop-out's RemoteAnalyser. */
+    /** Present on a real AnalyserNode. */
     smoothingTimeConstant?: number;
   };
   sample(): { rms: number };
@@ -99,37 +96,6 @@ export class AudioAnalyser implements AnalyserLike {
   }
 }
 
-/**
- * An `AnalyserLike` with no audio graph behind it — the pop-out window fills
- * it from `viz:frame` IPC messages produced by the main window's real
- * analyser. `sample()` is a no-op because the data is already current.
- */
-export class RemoteAnalyser implements AnalyserLike {
-  timeData: Float32Array = new Float32Array(2048);
-  freqData: Float32Array = new Float32Array(1024);
-  analyser = { minDecibels: -90, maxDecibels: -10 };
-  private lastRms = 0;
-
-  update(frame: {
-    time: Float32Array;
-    freq: Float32Array;
-    minDecibels: number;
-    maxDecibels: number;
-  }) {
-    this.timeData = frame.time;
-    this.freqData = frame.freq;
-    this.analyser.minDecibels = frame.minDecibels;
-    this.analyser.maxDecibels = frame.maxDecibels;
-    let sum = 0;
-    for (let i = 0; i < frame.time.length; i++) sum += frame.time[i] ** 2;
-    this.lastRms = Math.sqrt(sum / Math.max(1, frame.time.length));
-  }
-
-  sample(): { rms: number } {
-    return { rms: this.lastRms };
-  }
-}
-
 export function drawVisualizer(state: VisualizerState, analyser: AnalyserLike) {
   const { ctx, width, height, theme, mode, historyModel } = state;
   // The spectrogram keeps its own scroll buffer, so it repaints in full every
@@ -140,7 +106,7 @@ export function drawVisualizer(state: VisualizerState, analyser: AnalyserLike) {
 
   const gain = state.gain ?? 1;
   if (mode === 'history')
-    drawHistory(ctx, historyModel, state.viewport ?? null, width, height, theme, !!state.isPopout, gain);
+    drawHistory(ctx, historyModel, state.viewport ?? null, width, height, theme, gain);
   else if (mode === 'oscilloscope') drawOscilloscope(ctx, analyser.timeData, width, height, theme, gain);
   else if (mode === 'spectrum') drawSpectrum(ctx, analyser.freqData, analyser.analyser, width, height, theme, gain);
   else drawSpectrogram(ctx, analyser.freqData, analyser.analyser, width, height, theme, gain);
@@ -816,7 +782,6 @@ function drawHistory(
   width: number,
   height: number,
   theme: Theme,
-  isPopout?: boolean,
   gain: number = 1,
 ) {
   if (!model) {
@@ -825,11 +790,7 @@ function drawHistory(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '12px ui-monospace, Consolas, monospace';
-    if (isPopout) {
-      ctx.fillText('History not available in pop-out', width / 2, height / 2);
-    } else {
-      ctx.fillText('Waiting for recording to start...', width / 2, height / 2);
-    }
+    ctx.fillText('Waiting for recording to start...', width / 2, height / 2);
     return;
   }
 

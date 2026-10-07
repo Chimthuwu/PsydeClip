@@ -439,7 +439,7 @@ export default function App() {
   // Temporal smoothing is per visualizer mode (see SMOOTHING_FOR_MODE). It's
   // set on the live AnalyserNode here rather than inside the draw loop because
   // the draw loop is requestAnimationFrame-driven and stops dead while this
-  // window is hidden — which is exactly the case when the pop-out is the only
+  // window is hidden — which is exactly the case when the docked strip is the only
   // thing on screen and still needs correctly-smoothed frames.
   //
   // The split view renders several modes from one AnalyserNode, which can only

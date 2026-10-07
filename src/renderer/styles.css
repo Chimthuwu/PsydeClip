@@ -359,8 +359,7 @@
 }
 /* Lit chip: with the bright fuchsia accent, translucent-accent-on-dark loses
    contrast — give it a solid bright fill + dark text (still on-theme, punchy). */
-.theme-sakura button.chip.on,
-.popout.theme-sakura button.chip.on {
+.theme-sakura button.chip.on {
   background: var(--accent);
   color: #2a0522;
   border-color: var(--accent-bright);
@@ -893,8 +892,7 @@ button.is-tight.labels-icon {
   overflow: hidden;
   background: var(--bg-surface);
 }
-.viz-pane-x,
-.viz-pane-pop {
+.viz-pane-x {
   position: absolute;
   top: 6px;
   z-index: 2;
@@ -915,27 +913,19 @@ button.is-tight.labels-icon {
 .viz-pane-x {
   right: 6px;
 }
-/* Pop-out sits just left of the ✕ so the two read as one close/float pair. */
-.viz-pane-pop {
-  right: 32px;
-}
+
+
 /* The whole corner cluster — ✕, ⧉ and the name tag — stays out of the way
    until the cursor is over the window, then ✕/⧉ come to 0.6 and to full on
    the pane itself (or keyboard focus). */
-.app:hover .viz-pane-x,
-.app:hover .viz-pane-pop,
-.popout:hover .viz-pane-x,
-.popout:hover .viz-pane-pop {
+.app:hover .viz-pane-x {
   opacity: 0.6;
 }
 .viz-pane:hover .viz-pane-x,
-.viz-pane:hover .viz-pane-pop,
-.viz-pane-x:focus-visible,
-.viz-pane-pop:focus-visible {
+.viz-pane-x:focus-visible {
   opacity: 1;
 }
-.viz-pane-x:hover,
-.viz-pane-pop:hover {
+.viz-pane-x:hover {
   color: var(--text-primary);
   border-color: var(--accent);
   background: rgba(0, 0, 0, 0.75);
@@ -958,8 +948,7 @@ button.is-tight.labels-icon {
   transition: opacity 140ms ease;
 }
 /* Pane name tags stay out of the way until the cursor is over the window. */
-.app:hover .viz-pane-tag,
-.popout:hover .viz-pane-tag {
+.app:hover .viz-pane-tag {
   opacity: 1;
 }
 /* Single-view mode label: the active visualizer's name in the top-right
@@ -982,8 +971,7 @@ button.is-tight.labels-icon {
   opacity: 0;
   transition: opacity 140ms ease;
 }
-.app:hover .board-mode-tag,
-.popout:hover .board-mode-tag {
+.app:hover .board-mode-tag {
   opacity: 1;
 }
 
@@ -1817,7 +1805,7 @@ small {
   color: #fff;
   line-height: 1;
 }
-.popout .clip-hud-time { font-size: 18px; }
+
 
 .clip-hud-stop {
   display: inline-flex;
@@ -2344,17 +2332,6 @@ small {
   }
 }
 
-/* Same knobs in the pop-out's drag strip (the pop-out is the docked view) —
-   pushed to the right, grouped with the ⤒/⋯/✕ controls, same as the main
-   title bar. The strip is only 20px tall, so trim the buttons to fit. */
-.popout-drag .tb-ctls { margin-left: auto; }
-.popout-drag .tb-ctl {
-  height: 16px;
-  padding: 0 4px;
-  font-size: 9px;
-  letter-spacing: 0;
-}
-.popout-title { min-width: 0; }
 
 /* Bar layout --------------------------------------------------------------
    One row, nothing else. Intended to live docked across the top of a monitor
@@ -2439,147 +2416,10 @@ small {
   opacity: 0.85;
 }
 
-/* Pop-out visualizer window ------------------------------------------------ */
 
-.popout {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--bg-gradient);
-  color: var(--fg);
-  overflow: hidden;
-}
-.popout.theme-kawaii { background: #fff0f7; }
-.popout.theme-classic { background: #000; }
-
-.popout-drag {
-  -webkit-app-region: drag;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 20px;
-  padding: 0 2px 0 8px;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: rgba(0, 0, 0, 0.35);
-  flex: 0 0 auto;
-}
-.popout-title {
-  flex: 1 1 auto;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.popout-drag .tb-btn {
-  height: 18px;
-  width: 22px;
-}
-
-.popout-board {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-/* Recording ring.
-   This used to be a 1px border on `.popout-board`, which failed exactly where
-   it mattered most: docked to the top of a monitor the pop-out is ~100px tall,
-   the board gets ~60px of that, and `.popout-controls` — absolutely positioned
-   at bottom:0 and never fully transparent — covered the bottom edge. One green
-   pixel tucked under the 20px drag strip read as chrome, not as state.
-
-   So the ring now belongs to the window, not to the canvas: an overlay pinned
-   to `.popout` itself, above the controls in paint order, at a thickness that
-   survives a 100px-tall window. It can't be occluded and it can't be squeezed. */
-.popout::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 5;
-  border: 2px solid transparent;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.popout.is-capturing::after {
-  border-color: var(--rec, #39ff14);
-  box-shadow:
-    inset 0 0 22px -6px var(--rec, #39ff14),
-    inset 0 0 3px var(--rec, #39ff14);
-}
 /* Kawaii breathes rather than sitting hard on, matching `.board.is-capturing`. */
-.popout.theme-kawaii.is-capturing::after {
-  animation: popout-rec-pulse 1.8s ease-in-out infinite;
-}
-@keyframes popout-rec-pulse {
-  0%, 100% { box-shadow: inset 0 0 20px -8px var(--rec), inset 0 0 3px var(--rec); }
-  50% { box-shadow: inset 0 0 34px -6px var(--rec), inset 0 0 6px var(--rec); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .popout.theme-kawaii.is-capturing::after {
-    animation: none;
-  }
-}
-.popout-board canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
 
-/* Controls sit over the waveform and fade up on hover so a parked pop-out is
-   just the visualizer. */
-.popout-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 7px;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
-  opacity: 0.25;
-  transition: opacity 140ms ease;
-  flex-wrap: wrap;
-}
-.popout-controls.is-shown {
-  opacity: 1;
-}
-.popout-chips {
-  display: flex;
-  gap: 3px;
-  margin-left: auto;
-}
-.popout-chips .chip {
-  padding: 2px 7px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-.popout.theme-kawaii .popout-controls {
-  background: linear-gradient(0deg, rgba(255, 240, 247, 0.9), rgba(255, 240, 247, 0));
-}
-/* Narrow or short pop-out windows keep their transport usable. The format
-   tags are the widest thing on the buttons, so below 560px of width they go;
-   a docked monitor strip is short but wide, so below 240px of height the
-   whole control row tightens instead (media queries are viewport-based, and
-   the pop-out is its own window, so these fire on its own size). */
-@media (max-width: 560px) {
-  .popout .lbl-ext { display: none; }
-  .popout-controls { padding: 3px 5px; gap: 3px; }
-  .popout-chips { gap: 2px; }
-  .popout-chips .chip { padding: 2px 6px; font-size: 11px; }
-}
-@media (max-height: 240px) {
-  .popout .lbl-ext { display: none; }
-  .popout-controls { padding: 2px 5px; gap: 3px; }
-  .popout-controls button.is-tight,
-  .popout-controls button.primary.big.is-tight {
-    padding: 2px 7px;
-    font-size: 11px;
-  }
-  .popout-chips .chip { padding: 1px 6px; font-size: 11px; }
-}
+
 /* ==========================================================================
    Docked Mode Adjustments
    ========================================================================== */
@@ -2655,127 +2495,10 @@ small {
   opacity: 0.85;
 }
 
-/* Pop-out visualizer window ------------------------------------------------ */
 
-.popout {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--bg-gradient);
-  color: var(--fg);
-  overflow: hidden;
-}
-.popout.theme-kawaii { background: #fff0f7; }
-.popout.theme-classic { background: #000; }
-
-.popout-drag {
-  -webkit-app-region: drag;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 20px;
-  padding: 0 2px 0 8px;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: rgba(0, 0, 0, 0.35);
-  flex: 0 0 auto;
-}
-.popout-title {
-  flex: 1 1 auto;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.popout-drag .tb-btn {
-  height: 18px;
-  width: 22px;
-}
-
-.popout-board {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-/* Recording ring.
-   This used to be a 1px border on `.popout-board`, which failed exactly where
-   it mattered most: docked to the top of a monitor the pop-out is ~100px tall,
-   the board gets ~60px of that, and `.popout-controls` — absolutely positioned
-   at bottom:0 and never fully transparent — covered the bottom edge. One green
-   pixel tucked under the 20px drag strip read as chrome, not as state.
-
-   So the ring now belongs to the window, not to the canvas: an overlay pinned
-   to `.popout` itself, above the controls in paint order, at a thickness that
-   survives a 100px-tall window. It can't be occluded and it can't be squeezed. */
-.popout::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 5;
-  border: 2px solid transparent;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.popout.is-capturing::after {
-  border-color: var(--rec, #39ff14);
-  box-shadow:
-    inset 0 0 22px -6px var(--rec, #39ff14),
-    inset 0 0 3px var(--rec, #39ff14);
-}
 /* Kawaii breathes rather than sitting hard on, matching `.board.is-capturing`. */
-.popout.theme-kawaii.is-capturing::after {
-  animation: popout-rec-pulse 1.8s ease-in-out infinite;
-}
-@keyframes popout-rec-pulse {
-  0%, 100% { box-shadow: inset 0 0 20px -8px var(--rec), inset 0 0 3px var(--rec); }
-  50% { box-shadow: inset 0 0 34px -6px var(--rec), inset 0 0 6px var(--rec); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .popout.theme-kawaii.is-capturing::after {
-    animation: none;
-  }
-}
-.popout-board canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
 
-/* Controls sit over the waveform and fade up on hover so a parked pop-out is
-   just the visualizer. */
-.popout-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 7px;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
-  opacity: 0.25;
-  transition: opacity 140ms ease;
-  flex-wrap: wrap;
-  z-index: 20;
-}
-.popout-controls.is-shown {
-  opacity: 1;
-}
-.popout-chips {
-  display: flex;
-  gap: 3px;
-  margin-left: auto;
-}
-.popout-chips .chip {
-  padding: 2px 7px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-.popout.theme-kawaii .popout-controls {
-  background: linear-gradient(0deg, rgba(255, 240, 247, 0.9), rgba(255, 240, 247, 0));
-}
+
 /* ==========================================================================
 }
 

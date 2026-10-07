@@ -18,12 +18,12 @@ interface Props {
   clipEnabled?: boolean;
   /** Container a save will be written as — shown as a tag on the buttons. */
   format?: RecordingFormat;
-  /** Rendered smaller, for the bar strip and the pop-out. */
+  /** Rendered smaller, for the bar strip. */
   tight?: boolean;
 }
 
 /**
- * Start/stop + save, shared by the HUD and the pop-out window so they stay
+ * Start/stop + save, shared by the HUD and the clip window so they stay
  * in step.
  *
  * Label handling is the reason this is a component rather than two buttons:

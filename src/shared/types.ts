@@ -223,23 +223,6 @@ export interface AppSettings {
    * is not something to opt a user into silently.
    */
   dockReservesSpace: boolean;
-  /** Re-open the pop-out visualizer window on launch. */
-  popoutOpen: boolean;
-  /** Keep the pop-out above other windows. */
-  popoutAlwaysOnTop: boolean;
-  /** Pop-out window opacity, 0.2–1. */
-  popoutOpacity: number;
-  /** Render transport buttons inside the pop-out. */
-  popoutControls: boolean;
-  /** Hide the main window's visualizer while the pop-out is open. */
-  hideBoardWhenPopped: boolean;
-  /**
-   * Hide the *whole* main window while the pop-out is open, so popping out
-   * swaps windows instead of leaving two on screen. The tray icon and the
-   * global hotkey still work, and closing the pop-out brings the main window
-   * back — as does Show from the tray menu.
-   */
-  hideMainWhenPopped: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -286,12 +269,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showHint: true,
   magneticSnap: true,
   dockReservesSpace: false,
-  popoutOpen: false,
-  popoutAlwaysOnTop: true,
-  popoutOpacity: 1,
-  popoutControls: true,
-  hideBoardWhenPopped: false,
-  hideMainWhenPopped: true,
 };
 
 /**
