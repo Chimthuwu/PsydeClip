@@ -40,6 +40,7 @@ interface Props {
    * to absolute session seconds through it (todo.md §11.4 Phase 1).
    */
   historyModel?: HistoryModel | null;
+  isPopout?: boolean;
   /**
    * False for split-view panes: the history pane there is a read-only
    * overview, so no selection drag / drag-export / zoom layer is attached.
@@ -90,7 +91,7 @@ function timelineView(
   return model.effectiveViewport(viewport);
 }
 
-export function VisualizerBoard({ analyser, mode, theme, className, idleText, historyModel, interactive = true, gain = 1, dragReady = true, pianoRoll = null, showOscilloscopeOverlay = false, onTranscribeSelection, onSelectionChange, onDragExport, onDragNotReady }: Props) {
+export function VisualizerBoard({ analyser, mode, theme, className, idleText, historyModel, isPopout = false, interactive = true, gain = 1, dragReady = true, pianoRoll = null, showOscilloscopeOverlay = false, onTranscribeSelection, onSelectionChange, onDragExport, onDragNotReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const laneRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -385,6 +386,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
             rms: 0,
             historyModel: model,
             viewport: v,
+            isPopout,
             gain,
             showOscilloscopeOverlay,
           },
@@ -465,7 +467,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
     // them from refs. In the pop-out historyModel changes ~5×/s and restarting
     // the loop that often flickered every pane. `laneOn` IS a dep: it adds or
     // removes a canvas, which has to be measured before it can be drawn into.
-  }, [analyser, mode, theme, idleText, interactive, gain, laneOn, showOscilloscopeOverlay]);
+  }, [analyser, mode, theme, idleText, interactive, isPopout, gain, laneOn, showOscilloscopeOverlay]);
 
   // Initial overlay geometry at render; the rAF loop keeps it exact between
   // renders as the view slides or zooms.

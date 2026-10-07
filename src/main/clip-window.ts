@@ -8,7 +8,7 @@ import { ClipWindowState, IpcChannel } from '../shared/types';
  *
  * It's a separate OS window (not a DOM overlay inside the main window) so the
  * indicator is visible no matter what the app is doing — minimised, hidden to
- * the tray, or docked. It owns no recording
+ * the tray, docked, or with the visualizer popped out. It owns no recording
  * state: the main renderer drives the clip, this window just displays it and
  * relays its two buttons back as `viz:command` (`toggle-clip` / `discard-clip`).
  */
