@@ -425,8 +425,14 @@ export const IpcChannel = {
   windowTempExpand: 'window:temp-expand',
   windowState: 'window:state',
   contextMenu: 'window:context-menu',
-  /** Clip window -> main window: its stop / discard buttons. */
-  clipCommand: 'clip:command',
+  popoutToggle: 'popout:toggle',
+  popoutState: 'popout:state',
+  vizFrame: 'viz:frame',
+  vizState: 'viz:state',
+  vizCommand: 'viz:command',
+  vizHistory: 'viz:history',
+  dragExportProxy: 'drag:export-proxy',
+  requestDragExport: 'drag:request-export',
   dragPrepare: 'drag:prepare',
   dragExportPrepared: 'drag:export-prepared',
   /** Pop a native menu for a title-bar knob (format / sensitivity / buffer). */
@@ -435,6 +441,60 @@ export const IpcChannel = {
 
 /** Simple window verbs the custom title bar can ask main to perform. */
 export type WindowAction = 'minimize' | 'maximize' | 'restore-or-max' | 'hide' | 'close';
+
+/** What the main renderer streams to the pop-out visualizer, ~30×/s. */
+export interface VizFrame {
+  /** Time-domain samples, one AnalyserNode fftSize window. */
+  time: Float32Array;
+  /** Frequency bins in dB. */
+  freq: Float32Array;
+  minDecibels: number;
+  maxDecibels: number;
+}
+
+/**
+ * Main window → pop-out: the rolling peak track plus its session clock.
+ *
+ * The pop-out reconstructs a `HistoryModel` from this. `newestSec` is the
+ * session-relative second of the newest bucket as stamped by the main window,
+ * so both windows agree on what a selection's absolute seconds mean even
+ * though each renderer's `performance.now()` has an independent origin
+ * (todo.md §11.4, D1).
+ */
+export interface HistoryStream {
+  buffer: Float32Array;
+  head: number;
+  count: number;
+  capacity: number;
+  /** Session-relative seconds of the newest bucket at capture time. */
+  newestSec: number;
+}
+
+/** Slower-moving state the pop-out mirrors (sent only when it changes). */
+export interface VizState {
+  capturing: boolean;
+  hasSource: boolean;
+  canSave: boolean;
+  /** A dedicated clip recording is in progress. */
+  clipActive: boolean;
+  /** Epoch ms when the active clip started (0 when none) — for the live
+   *  stopwatch on the pop-out's record button. */
+  clipStartedAt: number;
+  /** Container a save will be written as — shown on the pop-out's buttons. */
+  format: RecordingFormat;
+  bufferedSeconds: number;
+  bufferSeconds: number;
+  recordMode: RecordMode;
+  theme: Theme;
+  visualizer: VisualizerMode;
+  /**
+   * When non-null, the pop-out shows ONLY this visualizer, pinned from a
+   * split-view pane's ⧉ button, instead of mirroring the main window's view.
+   * Transient (not a setting): cleared when the pop-out closes.
+   */
+  overrideMode: VisualizerMode | null;
+  rms: number;
+}
 
 /**
  * What the always-on-top clip-recording window shows. `active: false` tells it
@@ -449,8 +509,15 @@ export interface ClipWindowState {
   theme: Theme;
 }
 
-/** Commands the clip window sends back to the main renderer. */
-export type ClipCommand = { type: 'toggle-clip' } | { type: 'discard-clip' };
+/** Commands the pop-out sends back to the main renderer. */
+export type VizCommand =
+  | { type: 'toggle-capture' }
+  | { type: 'save' }
+  | { type: 'toggle-clip' }
+  | { type: 'discard-clip' }
+  | { type: 'set-visualizer'; mode: VisualizerMode }
+  | { type: 'set-override'; mode: VisualizerMode | null }
+  | { type: 'selection-change'; selection: [number, number] | null };
 
 export type RecorderEvent =
   | { type: 'saved'; path: string; bytes: number; durationSec: number }
