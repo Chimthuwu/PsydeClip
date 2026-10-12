@@ -392,6 +392,7 @@ export default function App() {
 
   // Real notes take precedence: that is the "colour change on stop".
   const drawnLayer = noteLayer ?? liveLayer;
+  const exportableLayer = noteLayer ?? liveLayer;
 
   /**
    * Transcribe the current History selection and show its notes in the
@@ -477,7 +478,8 @@ export default function App() {
    * that never had an audio file of its own.
    */
   const exportMidi = useCallback(async () => {
-    if (!noteLayer || !noteLayer.notes.length) {
+    const layer = noteLayer ?? liveLayer;
+    if (!layer || !layer.notes.length) {
       emitToast('error', 'No MIDI notes to export yet.');
       return;
     }
@@ -486,12 +488,12 @@ export default function App() {
       return;
     }
     try {
-      const bytes = await window.api.notesToMidi(noteLayer.notes);
+      const bytes = await window.api.notesToMidi(layer.notes);
       const res = await window.api.saveRecording({
         folder: settings.saveFolder,
         bytes,
         ext: 'mid',
-        durationSec: noteLayer.durationSec,
+        durationSec: layer.durationSec,
       });
       if (res.ok) {
         emitToast('saved', `MIDI exported\n${(res.path ?? '').split(/[\\/]/).pop()}`);
@@ -501,7 +503,7 @@ export default function App() {
     } catch (e: any) {
       emitToast('error', `MIDI export failed: ${e?.message ?? e}`);
     }
-  }, [noteLayer, settings.saveFolder]);
+  }, [noteLayer, liveLayer, settings.saveFolder]);
 
   // Session seconds are only meaningful within one recording session, so a new
   // recorder (a restart) invalidates every cached layer.
@@ -854,8 +856,15 @@ export default function App() {
         else if (c.type === 'set-override') setPopoutOverride(c.mode);
         else if (c.type === 'selection-change') hsc(c.selection);
       }),
-    [],
+    [exportMidi],
   );
+  // Auto-enable MIDI transcription when MIDI visualizer is visible
+  useEffect(() => {
+    const midiVisible = !settings.vizHidden.includes('midi');
+    if (midiVisible && !settings.transcribeOnSave) {
+      update({ transcribeOnSave: true });
+    }
+  }, [settings.vizHidden, settings.transcribeOnSave, update]);
 
   // The clip window's stop/discard ride their own channel. Opposite of the
   // pop-out's toggle-clip: this window is visible, so the keep/discard prompt
@@ -952,7 +961,7 @@ export default function App() {
         const only = active && visibleModes.length === 1;
         return (
           <button
-            key={m}
+            key={m === 'oscilloscope' ? '∿' : m === 'spectrum' ? '▥' : m === 'spectrogram' ? '▦' : m === 'history' ? '◷' : m === 'midi' ? '🎹' : '◷'}
             type="button"
             className={`chip ${active ? 'on' : ''}`}
             aria-pressed={active}
@@ -965,7 +974,7 @@ export default function App() {
             }
             onClick={() => toggleMode(m)}
           >
-            {m}
+            {m === 'oscilloscope' ? '∿' : m === 'spectrum' ? '▥' : m === 'spectrogram' ? '▦' : m === 'history' ? '◷' : m === 'midi' ? '🎹' : '◷'}
           </button>
         );
       })}
@@ -1002,15 +1011,9 @@ export default function App() {
         formatControl={formatPicker}
         clipActive={cs.clipActive}
         clipElapsed={cs.clipActive ? clipElapsed : undefined}
-        onToggleClip={() => toggleClipRecording(true)}
         clipEnabled={!!cs.stream && !!settings.saveFolder}
-        midiOn={settings.transcribeOnSave}
-        onToggleMidi={() => update({ transcribeOnSave: !settings.transcribeOnSave })}
+        onToggleClip={toggleClipRecording}
       />
-
-      {/* The capture cue only lights up for bounded recordings — a clip in
-          progress or a traditional-mode session. The always-on rolling buffer
-          gets no highlight: a border that never turns off conveys nothing. */}
       {showBoard && (
         <main className={`board ${cs.clipActive || (settings.recordMode === 'traditional' && capturing) ? 'is-capturing' : ''}`}>
           {gridView ? (
@@ -1023,26 +1026,14 @@ export default function App() {
                     theme={settings.theme}
                     gain={settings.vizGain}
                     historyModel={cs.historyModel}
-                    /* The History pane stays interactive even in the split so you
-                       can highlight + drag a snippet out without leaving the
-                       mosaic. Other panes are read-only overviews. */
-                    interactive={m === 'history' || m === 'spectrogram'}
-                    dragReady={m === 'history' || m === 'spectrogram' ? dragReady : undefined}
-                    /* The MIDI grid is its own visualizer mode now, so History
-                       carries no piano-roll lane — one grid, not two. */
+                    dragReady={dragReady}
                     pianoRoll={m === 'midi' ? drawnLayer : null}
                     showOscilloscopeOverlay={m === 'history' && settings.showOscilloscopeOverlay}
-                    onSelectionChange={
-                      m === 'history' || m === 'spectrogram' ? handleSelectionChange : undefined
-                    }
-                    onTranscribeSelection={
-                      m === 'history' ? transcribeSelection : undefined
-                    }
-                    onDragNotReady={() =>
-                      emitToast('error', 'Snippet still preparing — give it a second, then drag.')
-                    }
+                    onTranscribeSelection={transcribeSelection}
+                    onSelectionChange={handleSelectionChange}
+                    onDragNotReady={() => emitToast('error', 'Snippet still preparing — give it a second, then drag.')}
                   />
-                  {m === 'midi' && noteLayer && !noteLayer.live && noteLayer.notes.length > 0 && (
+                  {exportableLayer && exportableLayer.notes.length > 0 && (
                     <button
                       type="button"
                       className="viz-pane-export"
@@ -1088,11 +1079,9 @@ export default function App() {
                 showOscilloscopeOverlay={visibleModes[0] === 'history' && settings.showOscilloscopeOverlay}
                 onTranscribeSelection={transcribeSelection}
                 onSelectionChange={handleSelectionChange}
-                onDragNotReady={() =>
-                  emitToast('error', 'Snippet still preparing — give it a second, then drag.')
-                }
+                onDragNotReady={() => emitToast('error', 'Snippet still preparing — give it a second, then drag.')}
               />
-              {visibleModes[0] === 'midi' && noteLayer && !noteLayer.live && noteLayer.notes.length > 0 && (
+              {exportableLayer && exportableLayer.notes.length > 0 && (
                 <button
                   type="button"
                   className="viz-pane-export board-export"
