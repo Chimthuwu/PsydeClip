@@ -89,7 +89,6 @@ const api = {
     // drawn" no matter what the grid was doing.
     vizHidden: ['oscilloscope', 'spectrum', 'spectrogram', 'history'],
     vizGain: 1,
-    showMidiLane: true,
     showOscilloscopeOverlay: false,
     bitrateKbps: 128,
     bufferSeconds: 300,
@@ -154,6 +153,24 @@ const api = {
   onTranscription: noop,
   cancelTranscription: () => false,
   notesToMidi: async () => new Uint8Array(),
+
+  // ------- Pop-out window ---------------------------------------------------
+  // Restored 2026-10-10 along with the pop-out itself. The harness never opens
+  // a second window, so these are inert — but they must EXIST: App.tsx's pop-out
+  // bridge calls them on mount, and a missing one is a TypeError that unmounts
+  // the whole renderer and makes every other check in this file report zero.
+  // The `on*` entries return an unsubscribe fn because React's useEffect feeds
+  // the return value straight into its cleanup — returning undefined throws too.
+  togglePopout: async () => ({ open: false }),
+  onPopoutState: () => noop,
+  sendVizFrame: () => {},
+  sendVizState: () => {},
+  sendVizHistory: () => {},
+  sendVizCommand: () => {},
+  onVizFrame: () => noop,
+  onVizState: () => noop,
+  onVizHistory: () => noop,
+  onVizCommand: () => noop,
 };
 
 // Harness control surface, kept off `window.api` so it cannot be confused with

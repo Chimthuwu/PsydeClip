@@ -12,8 +12,8 @@ export function useSettings() {
       setLoaded(true);
     });
     // Settings can change outside this window — the tray's always-on-top
-    // toggle, or the clip window — so mirror the broadcast main sends after
-    // every write.
+    // toggle, or the other window when the pop-out is open — so mirror the
+    // broadcast main sends after every write.
     return window.api.onSettingsChanged(setSettings);
   }, []);
 

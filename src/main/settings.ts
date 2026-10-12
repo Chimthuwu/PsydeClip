@@ -45,6 +45,10 @@ export function readSettings(): AppSettings {
       if (p.hotkey === 'Shift+Alt+R') p.hotkey = 'Alt+R';
       // 'dark-lime' theme was renamed to 'black-ice' (and restyled).
       if (p.theme === 'dark-lime') p.theme = 'black-ice';
+      // The piano-roll lane under History was retired: the MIDI grid is its own
+      // visualizer mode now, so an old file's toggle would only resurrect a
+      // second, overlapping grid. Drop the key so it can never come back.
+      delete p.showMidiLane;
     } else if (parsed !== undefined && !Array.isArray(parsed)) {
       // Not a JSON object (e.g. the file holds a bare literal). Fall through to
       // the defaults rather than merging garbage in; the catch below never sees

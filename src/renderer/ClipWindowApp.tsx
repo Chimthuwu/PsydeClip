@@ -8,7 +8,7 @@ import { ClipWindowState } from '../shared/types';
  * It owns no recording state — the main renderer drives the clip. This window
  * just shows the live timer and relays its two buttons back as `viz:command`
  * (`toggle-clip` = stop & save, `discard-clip` = throw away), which main
- * forwards to the main renderer as a clip command.
+ * forwards to the main renderer exactly like a pop-out command.
  */
 export function ClipWindowApp() {
   const [state, setState] = useState<ClipWindowState | null>(null);
