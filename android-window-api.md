@@ -33,10 +33,16 @@ Based on analysis of `src/preload/index.ts` and usage in `src/renderer/`, the `w
 - `showItemInFolder(path: string): Promise<void>`
 - `openPath(path: string): Promise<void>`
 
+### Popout Window
+*(Related to detaching visualizer)*
+
 ### Clip Recording
 - `beginClip(): Promise<void>`
 - `endClip(): Promise<void>`
 - `toggleClip(): Promise<void>`
+
+### Visualizer Controls
+*(Commands sent to popout window)*
 
 ### Theme/Layout
 - Various getters/setters for UI preferences
