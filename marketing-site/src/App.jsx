@@ -1,19 +1,22 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import {
-  Download,
-  Radio,
-  Music,
-  Check,
-  Keyboard,
-  History,
-  Volume2,
-  Scissors,
-} from 'lucide-react';
+import { Download, Radio, Music, Check, Keyboard, History, Volume2, Scissors } from 'lucide-react';
 
 const REPO = 'https://github.com/Chimthuwu/recordr';
 const RELEASE = REPO + '/releases/latest';
+/** Stable across versions: the release carries a versionless copy of the installer. */
+const SETUP = REPO + '/releases/latest/download/Unrecordable-Windows-Setup.exe';
 const VERSION = '3.2.0';
+
+const fadeIn = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6 } },
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
+};
 
 /**
  * lucide dropped its brand icons, so the GitHub mark is inline rather than a
@@ -26,16 +29,6 @@ function GithubMark({ size = 16 }) {
     </svg>
   );
 }
-
-const fadeIn = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6 } },
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-};
 
 /** Mirrors THEMES in src/shared/types.ts — same order, same labels. */
 const THEMES = [
@@ -52,6 +45,9 @@ const THEMES = [
   { slug: 'nocturnal', label: 'Nocturnal' },
   { slug: 'black-ice', label: 'Black ice' },
 ];
+
+/** Mirrors VISUALIZER_LABELS in src/shared/types.ts. */
+const MODES = ['Oscilloscope', 'Spectrum', 'Spectrogram', 'History', 'MIDI'];
 
 const FEATURES = [
   {
@@ -104,18 +100,18 @@ const ROADMAP = [
 ];
 
 const ACCENTS = {
-  magenta: { ring: 'hover:border-neon-magenta/50', bg: 'bg-neon-magenta/20', fg: 'text-neon-magenta' },
-  cyan: { ring: 'hover:border-neon-cyan/50', bg: 'bg-neon-cyan/20', fg: 'text-neon-cyan' },
-  purple: { ring: 'hover:border-neon-purple/50', bg: 'bg-neon-purple/20', fg: 'text-neon-purple' },
+  magenta: { ring: 'hover:border-neon-magenta/50', bg: 'bg-neon-magenta/10', fg: 'text-neon-magenta' },
+  cyan: { ring: 'hover:border-neon-cyan/50', bg: 'bg-neon-cyan/10', fg: 'text-neon-cyan' },
+  purple: { ring: 'hover:border-neon-purple/50', bg: 'bg-neon-purple/10', fg: 'text-neon-purple' },
 };
 
 function Nav() {
   return (
-    <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-[#05050A]/80 backdrop-blur-md">
+    <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-[#05050A]/70 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <a href="#top" className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-neon-magenta animate-pulse" />
-          <span className="font-bold text-xl tracking-tight">recordr</span>
+        <a href="#top" className="flex items-center gap-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-neon-magenta animate-pulse-dot" />
+          <span className="font-extrabold text-xl tracking-tight">unrecordable</span>
         </a>
         <div className="flex items-center gap-6">
           <a href="#features" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
@@ -132,31 +128,112 @@ function Nav() {
           >
             <GithubMark size={16} /> GitHub
           </a>
+          <a
+            href={SETUP}
+            className="hidden sm:flex text-sm px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:-translate-y-0.5 transition-all"
+          >
+            Download
+          </a>
         </div>
       </div>
     </nav>
   );
 }
 
+/**
+ * The app window, drawn rather than screenshotted: the real captures are of an
+ * idle app with a flat board, and a still frame cannot show a moving trace.
+ * The chrome, chips and status line mirror the real UI.
+ */
+function AppMockup() {
+  return (
+    <div className="max-w-5xl mx-auto px-4 mt-20 [perspective:1200px]">
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.4 }}
+        className="group rounded-2xl border border-white/10 bg-[#0A0A0F] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_80px_rgba(255,0,255,0.15)] [transform:rotateX(5deg)] hover:[transform:rotateX(0deg)_translateY(-10px)] transition-transform duration-500"
+      >
+        <div className="h-10 bg-[#12121A] border-b border-white/5 flex items-center px-4 gap-2">
+          <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+          <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+          <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
+          <span className="mx-auto text-xs text-gray-500 font-mono">unrecordable</span>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4 bg-[#05050A]">
+          <div className="flex justify-between items-center flex-wrap gap-3">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan font-mono text-xs">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse-dot" />
+              LIVE 04:49 / 15:00
+            </div>
+            <div className="flex gap-2">
+              {['WebM', 'WAV', 'MP3'].map((f) => (
+                <span
+                  key={f}
+                  className={`px-3 py-1.5 rounded-md border font-mono text-[11px] ${
+                    f === 'MP3'
+                      ? 'bg-neon-magenta/20 border-neon-magenta text-neon-magenta'
+                      : 'bg-white/5 border-white/10 text-gray-400'
+                  }`}
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative h-[220px] rounded-xl border border-white/10 bg-[#0A0A0F] overflow-hidden">
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:30px_30px]" />
+            <svg className="relative z-10 w-full h-full" viewBox="0 0 800 200" preserveAspectRatio="none">
+              <path
+                className="wave-path"
+                d="M0,100 Q50,20 100,100 T200,100 T300,100 T400,100 T500,100 T600,100 T700,100 T800,100"
+              />
+              <path
+                className="wave-path wave-path--alt"
+                d="M0,100 Q50,180 100,100 T200,100 T300,100 T400,100 T500,100 T600,100 T700,100 T800,100"
+              />
+            </svg>
+          </div>
+
+          <div className="flex justify-between items-center gap-3 flex-wrap pt-2 border-t border-white/10 font-mono text-[11px] text-gray-400">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10">
+              <Volume2 size={12} /> Speakers (Corsair HS55 SURROUND)
+            </span>
+            <span className="flex gap-3 uppercase tracking-wide">
+              {MODES.map((m) => (
+                <span key={m} className={m === 'Spectrum' ? 'text-neon-cyan' : ''}>
+                  {m}
+                </span>
+              ))}
+            </span>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function Hero() {
   return (
-    <section id="top" className="relative pt-32 pb-20 lg:pt-44 lg:pb-28 overflow-hidden">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] max-w-[160vw] bg-neon-magenta/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] max-w-[120vw] bg-neon-cyan/10 rounded-full blur-[100px] pointer-events-none" />
-
+    <section id="top" className="relative pt-32 pb-20 lg:pt-44 lg:pb-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
         <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
           <motion.div
             variants={fadeIn}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-neon-cyan mb-6"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 text-xs font-semibold text-neon-cyan mb-6"
           >
-            <span className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-neon-cyan" />
             v{VERSION} · Windows · work in progress
           </motion.div>
 
-          <motion.h1 variants={fadeIn} className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6">
+          <motion.h1
+            variants={fadeIn}
+            className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1]"
+          >
             Never miss a moment of{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-neon-magenta">
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-cyan to-neon-magenta">
               audio.
             </span>
           </motion.h1>
@@ -169,46 +246,28 @@ function Hero() {
 
           <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
-              href={RELEASE}
-              className="px-8 py-4 rounded-full bg-gradient-to-r from-neon-magenta to-neon-purple text-white font-bold hover:opacity-90 transition-opacity flex items-center gap-2 w-full sm:w-auto justify-center"
+              href={SETUP}
+              className="px-8 py-4 rounded-full bg-gradient-to-br from-neon-magenta to-neon-purple text-white font-bold shadow-[0_4px_20px_rgba(255,0,255,0.3)] hover:shadow-[0_6px_30px_rgba(255,0,255,0.5)] hover:-translate-y-0.5 transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
             >
               <Download size={20} /> Download for Windows
             </a>
             <a
               href="#features"
-              className="px-8 py-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex items-center gap-2 w-full sm:w-auto justify-center"
+              className="px-8 py-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:-translate-y-0.5 transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
             >
               Explore features
             </a>
           </motion.div>
 
-          <motion.p variants={fadeIn} className="mt-4 text-xs text-gray-500 max-w-xl mx-auto">
-            The repository is private while this is in progress, so the download needs access. The installer is
-            unsigned — SmartScreen will warn on first run.
+          <motion.p variants={fadeIn} className="mt-5 text-xs text-gray-500 max-w-xl mx-auto">
+            v{VERSION} · 83 MB installer, ~330 MB installed · Windows 10 or later. The repository is private while this
+            is in progress, so the download needs access, and the installer is unsigned — SmartScreen will warn on first
+            run.
           </motion.p>
         </motion.div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
-        className="max-w-6xl mx-auto px-4 mt-20"
-      >
-        <div className="relative rounded-2xl border border-white/10 bg-[#0A0A0F] shadow-2xl shadow-neon-magenta/20 overflow-hidden">
-          <div className="h-10 bg-[#12121A] border-b border-white/5 flex items-center px-4 gap-2">
-            <span className="w-3 h-3 rounded-full bg-red-500/80" />
-            <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
-            <span className="w-3 h-3 rounded-full bg-green-500/80" />
-            <span className="text-xs text-gray-500 ml-4 font-mono">recordr — modern neon</span>
-          </div>
-          <img
-            src="/shots/main-modern.png"
-            alt="The Recordr dashboard: transport, VU meter and the visualizer board"
-            className="w-full block"
-          />
-        </div>
-      </motion.div>
+      <AppMockup />
     </section>
   );
 }
@@ -224,8 +283,11 @@ function Features() {
           variants={fadeIn}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">
-            Packed with <span className="text-neon-cyan">power.</span>
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
+            Packed with{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-cyan to-neon-magenta">
+              power.
+            </span>
           </h2>
           <p className="text-gray-400 max-w-2xl mx-auto">
             Everything you need to capture, watch and keep system audio without interrupting what you were doing.
@@ -245,14 +307,12 @@ function Features() {
               <motion.div
                 key={title}
                 variants={fadeIn}
-                className={`p-6 rounded-2xl bg-white/5 border border-white/10 transition-colors group ${a.ring}`}
+                className={`card-sweep relative overflow-hidden p-8 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/5 hover:-translate-y-1.5 transition-all duration-300 group ${a.ring}`}
               >
-                <div
-                  className={`w-12 h-12 rounded-full ${a.bg} ${a.fg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}
-                >
+                <div className={`w-12 h-12 rounded-xl ${a.bg} ${a.fg} flex items-center justify-center mb-5`}>
                   <Icon size={24} />
                 </div>
-                <h3 className="text-xl font-bold mb-2">{title}</h3>
+                <h3 className="text-xl font-bold mb-3">{title}</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">{body}</p>
               </motion.div>
             );
@@ -265,7 +325,7 @@ function Features() {
 
 function Themes() {
   return (
-    <section id="themes" className="py-20 overflow-hidden border-y border-white/5 bg-white/[0.02]">
+    <section id="themes" className="py-20 overflow-hidden border-y border-white/5 bg-white/[0.01]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial="hidden"
@@ -274,23 +334,24 @@ function Themes() {
           variants={fadeIn}
           className="text-center mb-10"
         >
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">
-            Make it <span className="text-neon-purple">yours.</span>
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
+            Make it{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-purple to-neon-magenta">
+              yours.
+            </span>
           </h2>
-          <p className="text-gray-400">
-            Twelve themes, every card a real screenshot of the running app. Swipe through them.
-          </p>
+          <p className="text-gray-400">Twelve themes, every card a real screenshot of the running app.</p>
         </motion.div>
 
         <div className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar">
           {THEMES.map(({ slug, label }) => (
             <figure
               key={slug}
-              className="min-w-[280px] md:min-w-[520px] snap-center rounded-2xl border border-white/10 bg-white/5 p-4"
+              className="min-w-[280px] md:min-w-[520px] snap-center rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-white/20 transition-colors"
             >
               <img
                 src={`/shots/main-${slug}.png`}
-                alt={`Recordr in the ${label} theme`}
+                alt={`Unrecordable in the ${label} theme`}
                 loading="lazy"
                 className="rounded-lg border border-white/10 w-full block mb-4"
               />
@@ -306,12 +367,15 @@ function Themes() {
 function TechStack() {
   const stack = ['Electron 30', 'React 18', 'TypeScript 5', 'Vite 5', 'NAudio WASAPI', 'WebM / Opus', 'Basic Pitch'];
   return (
-    <section className="py-20">
+    <section className="py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-2xl font-bold mb-10 text-gray-400">Built on</h2>
-        <div className="flex flex-wrap justify-center gap-3 md:gap-4 items-center opacity-70">
+        <h3 className="text-sm uppercase tracking-[0.2em] text-gray-500 mb-8">Built with</h3>
+        <div className="flex flex-wrap justify-center gap-3 max-w-3xl mx-auto">
           {stack.map((tech) => (
-            <span key={tech} className="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-sm font-medium">
+            <span
+              key={tech}
+              className="px-5 py-2 rounded-full border border-white/10 bg-white/[0.03] font-mono text-[13px] text-gray-300"
+            >
               {tech}
             </span>
           ))}
@@ -330,10 +394,13 @@ function Roadmap() {
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeIn}
-          className="text-center mb-16"
+          className="text-center mb-14"
         >
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">
-            The <span className="text-neon-magenta">roadmap</span>
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
+            The{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-magenta to-neon-purple">
+              roadmap
+            </span>
           </h2>
           <p className="text-gray-400">Where it is, and where it goes next.</p>
         </motion.div>
@@ -347,12 +414,12 @@ function Roadmap() {
               transition={{ delay: Math.min(i, 5) * 0.08 }}
               viewport={{ once: true }}
               className={`flex items-center gap-4 p-4 rounded-xl border ${
-                item.done ? 'border-neon-cyan/30 bg-neon-cyan/5' : 'border-white/10 bg-white/5'
+                item.done ? 'border-neon-cyan/30 bg-neon-cyan/5' : 'border-white/10 bg-white/[0.03]'
               }`}
             >
               <span
                 className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center border ${
-                  item.done ? 'bg-neon-cyan border-neon-cyan text-black' : 'border-gray-500'
+                  item.done ? 'bg-neon-cyan border-neon-cyan text-black' : 'border-gray-600'
                 }`}
               >
                 {item.done && <Check size={14} strokeWidth={3} />}
@@ -370,16 +437,20 @@ function Footer() {
   return (
     <footer className="py-12 border-t border-white/10 text-center text-gray-500 text-sm">
       <div className="max-w-7xl mx-auto px-4">
-        <p className="mb-4">Built in Windsor, Ontario. Windows 10 or later, and a drive with room for what you keep.</p>
+        <p className="mb-2">Built in Windsor, Ontario · Windows 10 or later.</p>
+        <p className="mb-4 text-xs max-w-2xl mx-auto">
+          ~330 MB installed. The rolling buffer lives in RAM, so disk only fills as fast as you save — about 0.7 MB a
+          minute at the default 96 kbps Opus, ~11 MB a minute for WAV.
+        </p>
         <p>MIT License · Copyright © 2026 Chimthuwu</p>
-        <div className="flex justify-center gap-4 mt-6">
-          <a href={REPO} className="hover:text-white transition-colors">
+        <div className="flex justify-center gap-6 mt-6">
+          <a href={REPO} className="text-neon-cyan hover:underline">
             GitHub
           </a>
-          <a href={`${REPO}/issues`} className="hover:text-white transition-colors">
+          <a href={`${REPO}/issues`} className="text-neon-cyan hover:underline">
             Issues
           </a>
-          <a href={RELEASE} className="hover:text-white transition-colors">
+          <a href={RELEASE} className="text-neon-cyan hover:underline">
             Releases
           </a>
         </div>
@@ -390,7 +461,9 @@ function Footer() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-[#05050A] text-white font-sans">
+    <div className="relative min-h-screen bg-[#05050A] text-white font-sans overflow-x-hidden">
+      <div className="glow-orb glow-1" aria-hidden="true" />
+      <div className="glow-orb glow-2" aria-hidden="true" />
       <Nav />
       <Hero />
       <Features />

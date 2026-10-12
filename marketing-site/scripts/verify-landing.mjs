@@ -39,7 +39,13 @@ app.whenReady().then(async () => {
   });
 
   await win.loadURL(URL);
-  await new Promise((r) => setTimeout(r, 2500));
+  await new Promise((r) => setTimeout(r, 2000));
+  // The theme rail is lazy-loaded and below the fold: without scrolling to it,
+  // every shot reports naturalWidth 0 and the check measures nothing.
+  await win.webContents.executeJavaScript(
+    "document.querySelector('#themes').scrollIntoView(); window.scrollBy(0, -80);",
+  );
+  await new Promise((r) => setTimeout(r, 1500));
 
   const result = await win.webContents.executeJavaScript(`(() => {
     const q = (s) => document.querySelector(s);
@@ -55,7 +61,10 @@ app.whenReady().then(async () => {
       roadmapRows: all('section:nth-of-type(5) .space-y-4 > div').length,
       images: imgs.length,
       brokenImages: imgs.filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.getAttribute('src')),
-      heroShot: (() => { const i = q('img[src*="main-modern"]'); return i ? i.naturalWidth + 'x' + i.naturalHeight : 'absent'; })(),
+      mockupTrace: all('.wave-path').length,
+      brandHits: (document.body.innerText.match(/Recordr/g) || []).length,
+      brandName: q('nav a span:last-child') ? q('nav a span:last-child').innerText : '',
+      themeShot: (() => { const i = q('img[src*="main-modern"]'); return i ? i.naturalWidth + 'x' + i.naturalHeight : 'absent'; })(),
       downloadHref: q('a[href*="releases"]') ? q('a[href*="releases"]').href : '',
       bodyBg: getComputedStyle(document.body).backgroundColor,
       tailwindApplied: q('h1') ? getComputedStyle(q('h1')).fontWeight : '',
@@ -71,7 +80,10 @@ app.whenReady().then(async () => {
   check('all six feature cards', result.featureCards === 6, `${result.featureCards}`);
   check('all twelve theme cards', result.themeCards === 12, `${result.themeCards}`);
   check('the roadmap is populated', result.roadmapRows === 8, `${result.roadmapRows} rows`);
-  check('the hero screenshot loaded', result.heroShot !== 'absent' && !/^0x/.test(result.heroShot), result.heroShot);
+  check('the animated mockup is drawn', result.mockupTrace === 2, `${result.mockupTrace} traces`);
+  check('the theme screenshots loaded', result.themeShot !== 'absent' && !/^0x/.test(result.themeShot), result.themeShot);
+  check('the brand reads Unrecordable', result.brandName === 'unrecordable', result.brandName);
+  check('no stray "Recordr" in the copy', result.brandHits === 0, `${result.brandHits} hits`);
   check('no broken images', result.brokenImages.length === 0, result.brokenImages.join(', ') || 'none');
   check('Tailwind is applied', result.bodyBg === 'rgb(5, 5, 10)', `body bg ${result.bodyBg}`);
   check('the download points at the release', /releases/.test(result.downloadHref), result.downloadHref);

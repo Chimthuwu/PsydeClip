@@ -6,11 +6,120 @@ body {
   background-color: #05050a;
   color: #ffffff;
   overflow-x: hidden;
+  /* Two fixed washes behind everything, so the page is never flat black. */
+  background-image:
+    radial-gradient(circle at 15% 50%, rgba(255, 0, 255, 0.08), transparent 40%),
+    radial-gradient(circle at 85% 30%, rgba(0, 243, 255, 0.08), transparent 40%);
+  background-attachment: fixed;
 }
 
 ::selection {
   background-color: #ff00ff;
   color: #ffffff;
+}
+
+/* Ambient drifting orbs. Behind the content, never interactive. */
+.glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  animation: float 10s infinite ease-in-out alternate;
+}
+
+.glow-1 {
+  top: 6%;
+  left: 12%;
+  width: min(400px, 70vw);
+  height: min(400px, 70vw);
+  background: #ff00ff;
+}
+
+.glow-2 {
+  top: 34%;
+  right: 6%;
+  width: min(500px, 80vw);
+  height: min(500px, 80vw);
+  background: #00f3ff;
+  animation-delay: -5s;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(-30px) scale(1.1);
+  }
+}
+
+/* The mockup's oscilloscope trace: draws itself in, then breathes. */
+.wave-path {
+  stroke: #00f3ff;
+  stroke-width: 3;
+  fill: none;
+  filter: drop-shadow(0 0 8px #00f3ff);
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation:
+    drawWave 2s ease-out forwards,
+    pulseWave 2s 2s infinite alternate;
+}
+
+.wave-path--alt {
+  stroke: #ff00ff;
+  filter: drop-shadow(0 0 8px #ff00ff);
+  animation-delay: 0.5s, 2.5s;
+}
+
+@keyframes drawWave {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pulseWave {
+  0% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* A light sweep across a feature card's top edge on hover. */
+.card-sweep::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00f3ff, transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.card-sweep:hover::before {
+  opacity: 1;
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulseDot 1.5s infinite;
 }
 
 /* The theme rail is swiped horizontally; hide the bar, keep the scroll. */
@@ -28,5 +137,10 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* The trace is drawn by an animation, so it needs an explicit resting state. */
+  .wave-path {
+    stroke-dashoffset: 0;
   }
 }
