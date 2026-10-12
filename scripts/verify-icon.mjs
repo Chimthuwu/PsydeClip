@@ -1,5 +1,5 @@
 /**
- * Verify a packaged build wears Recordr's own icon, not the Electron atom.
+ * Verify a packaged build wears the app's own icon, not the Electron atom.
  *
  * v3.1.0 shipped with the default Electron icon on the taskbar: rcedit never
  * ran, because the winCodeSign cache that carries it could not be unpacked
@@ -15,6 +15,11 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+// The exe is named after productName, which changed with the rename; read it
+// rather than hard-coding a name this check would then silently SKIP.
+const { build } = JSON.parse(readFileSync('package.json', 'utf8'));
+const PRODUCT = build?.productName ?? 'app';
+
 const outDir = process.argv[2] || 'release';
 const ico = readFileSync('build/icon.ico');
 
@@ -29,7 +34,7 @@ for (let i = 0; i < count; i++) {
   });
 }
 
-const targets = [path.join(outDir, 'win-unpacked', 'Recordr.exe')];
+const targets = [path.join(outDir, 'win-unpacked', `${PRODUCT}.exe`)];
 if (existsSync(outDir)) {
   for (const f of readdirSync(outDir)) {
     if (f.endsWith('.exe')) targets.push(path.join(outDir, f));
@@ -58,5 +63,5 @@ if (!checked) {
   console.log(`FAIL  nothing to check in ${outDir}/ — run npm run package first`);
   process.exit(1);
 }
-console.log(`\n  ${checked - failures}/${checked} binaries carry the Recordr icon`);
+console.log(`\n  ${checked - failures}/${checked} binaries carry the ${PRODUCT} icon`);
 process.exit(failures ? 1 : 0);

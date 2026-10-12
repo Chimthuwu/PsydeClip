@@ -337,7 +337,9 @@ MIT — see [`LICENSE`](LICENSE). Copyright (c) 2026 Chimthuwu.
 
 <div align="center">
 
-Built with ❤️ in Windsor, Ontario · run it on a Windows machine that has more than 100 GB of free C: drive space  
-(I lost ~430 MB to the .NET SDK and ~700 KB to the NAudio helper.)
+Built with ❤️ in Windsor, Ontario · Windows 10 or later  
+Installed it takes ~330 MB; the rolling buffer lives in RAM, so disk only fills as fast as you save
+(~0.7 MB/min at the default 96 kbps Opus, ~11 MB/min for WAV).  
+*Building from source* is the hungry part — the one-time .NET SDK bootstrap alone is ~430 MB.
 
 </div>

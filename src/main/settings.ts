@@ -5,11 +5,38 @@ import { AppSettings, DEFAULT_SETTINGS, VISUALIZER_MODES } from '../shared/types
 
 const SETTINGS_FILENAME = 'recordr-settings.json';
 
+/**
+ * The app was called Recordr until 2026-10-12. `userData` is derived from the
+ * product name, so the rename moved it from %APPDATA%/Recordr to
+ * %APPDATA%/Unrecordable and would have silently reset everybody's save
+ * folder, theme and hotkey. The file name inside it is deliberately unchanged.
+ */
+const LEGACY_USER_DATA_DIR = 'Recordr';
+
 function settingsPath(): string {
   return path.join(app.getPath('userData'), SETTINGS_FILENAME);
 }
 
+/**
+ * One-shot carry-over of a pre-rename settings file. Copy, never move: an
+ * older build left installed keeps working off its own copy.
+ */
+function migrateLegacySettings(): void {
+  const current = settingsPath();
+  if (fs.existsSync(current)) return;
+  try {
+    const legacy = path.join(app.getPath('appData'), LEGACY_USER_DATA_DIR, SETTINGS_FILENAME);
+    if (!fs.existsSync(legacy)) return;
+    fs.mkdirSync(path.dirname(current), { recursive: true });
+    fs.copyFileSync(legacy, current);
+    console.log('[settings] carried over pre-rename settings from', legacy);
+  } catch (err) {
+    console.warn('[settings] could not carry over pre-rename settings:', err);
+  }
+}
+
 export function readSettings(): AppSettings {
+  migrateLegacySettings();
   try {
     let raw = fs.readFileSync(settingsPath(), 'utf8');
     if (raw.charCodeAt(0) === 0xFEFF) {
