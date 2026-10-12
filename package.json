@@ -28,7 +28,12 @@
     "package:dir": "npm run build && npm run seed:wincodesign && electron-builder --dir",
     "start": "cross-env NODE_ENV=production electron .",
     "seed:wincodesign": "node scripts/seed-wincodesign.mjs",
-    "verify:icon": "node scripts/verify-icon.mjs"
+    "verify:icon": "node scripts/verify-icon.mjs",
+    "site:dev": "npm --prefix marketing-site run dev",
+    "site:build": "npm --prefix marketing-site run build",
+    "site:preview": "npm --prefix marketing-site run preview",
+    "site:verify": "electron marketing-site/scripts/verify-landing.mjs",
+    "site:shoot": "electron marketing-site/scripts/shoot-landing.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
