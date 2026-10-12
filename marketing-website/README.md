@@ -7,7 +7,7 @@ step, no dependencies, no tracking. Open `index.html` in a browser to see it.
 marketing-website/
 ├── index.html        # the whole page
 ├── styles.css        # one stylesheet, palette copied from the app's default theme
-└── assets/themes/    # committed: main-<theme>.png ×12 (scripts/theme-shots.mjs)
+└── assets/themes/    # committed: main-<theme>.png ×12 + popout-<theme>.png ×12 (scripts/theme-shots.mjs)
 ```
 
 ## What's on the page
@@ -28,8 +28,9 @@ marketing-website/
 
 ## Screenshots
 
-All 12 frames are committed: `main-<theme>.png`, one per theme, for the hero and
-the gallery. Each card also carries its theme's accent colour as the `--sw`
+All 24 frames are committed: `main-<theme>.png` ×12 for the hero and the gallery,
+plus `popout-<theme>.png` ×12 (the pop-out is slated for removal, so the page
+doesn't use those). Each card also carries its theme's accent colour as the `--sw`
 custom property, so if an image ever goes missing the card falls back to a canvas
 of that colour and the `<img>` removes itself (`onerror`).
 
@@ -44,9 +45,10 @@ NODE_ENV=development npx electron . --remote-debugging-port=9223
 node scripts/theme-shots.mjs
 ```
 
-That writes `main-<theme>.png` for all 12 themes into `assets/themes/`. It
-refuses to shoot unless the page it finds is Recordr. Note that it drives the
-live app: it switches the theme 12 times, so don't run it while you're using it.
+That writes `main-<theme>.png` for all 12 themes into `assets/themes/` and then
+tries the pop-out shots (non-fatal if the pop-out doesn't open). It refuses to
+shoot unless the page it finds is Recordr. Note that it drives the live app:
+it switches the theme 12 times, so don't run it while you're using it.
 
 ## Open items before this can go live
 
