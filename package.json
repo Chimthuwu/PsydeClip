@@ -91,23 +91,23 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico",
-      "artifactName": "${productName} - Windows Setup v${version}.${ext}"
+      "artifactName": "${productName}-Windows-Setup-v${version}.${ext}"
     },
     "mac": {
       "target": "dmg",
       "icon": "build/icon.png",
-      "artifactName": "${productName} - macOS v${version}.${ext}"
+      "artifactName": "${productName}-macOS-v${version}.${ext}"
     },
     "linux": {
       "target": "AppImage",
       "icon": "build/icon.png",
-      "artifactName": "${productName} - Linux v${version}.${ext}"
+      "artifactName": "${productName}-Linux-v${version}.${ext}"
     },
     "nsis": {
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
-      "artifactName": "${productName} - Windows Setup v${version}.${ext}",
+      "artifactName": "${productName}-Windows-Setup-v${version}.${ext}",
       "shortcutName": "Unrecordable"
     }
   },
