@@ -5,10 +5,12 @@ import { readSettings, writeSettings } from './settings';
 import { HotkeyManager } from './hotkeys';
 import {
   AppSettings,
+  AUTO_POPOUT_HEIGHT,
   IpcChannel,
   LAYOUT_MIN_SIZE,
   RecorderEvent,
 } from '../shared/types';
+import { restoredHeight, shouldHandOverToPopout } from '../shared/window-mode';
 import { registerIpc } from './ipc';
 import { initTray, destroyTray, makeAppIcon } from './tray';
 import { handleWindowMoved, reapplyOnResize } from './window-controls';
@@ -25,6 +27,8 @@ import {
   createPopout,
   destroyPopout,
   getPopout,
+  handOverToPopout,
+  isPopoutOpen,
 } from './popout';
 import { pruneAbandonedClips } from './clip';
 import { destroyClipWindow } from './clip-window';
@@ -66,7 +70,7 @@ function createWindow(bounds?: Electron.Rectangle) {
     // frameless window itself).
     frame: settings.titleBarMode !== 'custom',
     transparent: settings.titleBarMode === 'custom',
-    title: 'Recordr',
+    title: 'Unrecordable',
     backgroundColor: settings.titleBarMode === 'custom' ? '#00000000' : '#070a1c',
     autoHideMenuBar: true,
     show: false, // show after ready-to-show
@@ -141,7 +145,10 @@ function createWindow(bounds?: Electron.Rectangle) {
   // It also releases an appbar reservation if the window is dragged out of the
   // dock — see handleWindowMoved().
   mainWindow.on('moved', () => handleWindowMoved(mainWindow));
-  mainWindow.on('resized', () => reapplyOnResize(mainWindow));
+  mainWindow.on('resized', () => {
+    reapplyOnResize(mainWindow);
+    maybeHandOverToPopout();
+  });
 
   const pushWindowState = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -165,6 +172,7 @@ function createWindow(bounds?: Electron.Rectangle) {
   mainWindow.on('resized', () => {
     reapplyOnResize(mainWindow);
     pushWindowState();
+    maybeHandOverToPopout();
   });
 
   // Apply initial always-on-top flag.
@@ -215,6 +223,63 @@ function handleSettingsChanged(s: AppSettings) {
 }
 
 /**
+ * The last main-window bounds that were big enough to be worth looking at, so
+ * closing the pop-out can give the window back at a usable size instead of the
+ * sliver that triggered the hand-over.
+ */
+let lastRoomyBounds: Electron.Rectangle | null = null;
+
+/**
+ * Shrink the main window far enough and the pop-out takes over its bounds.
+ *
+ * The main window simply has no good small form: its HUD sheds controls as it
+ * gets shorter and ends up a strip with no way to change what it is showing.
+ * The pop-out is the small form — chips, transport, waveform — so rather than
+ * leave a squashed window on screen, hand the space to it.
+ *
+ * Only fires on a window the user can actually see shrinking, and never while
+ * the pop-out is already up (which is also what stops the hide/show in
+ * `applyPopoutWindowSwap` from bouncing back into here).
+ */
+function maybeHandOverToPopout(): void {
+  const w = mainWindow;
+  if (!w || w.isDestroyed()) return;
+  const s = readSettings();
+  const bounds = w.getBounds();
+  const visible = w.isVisible() && !w.isMinimized();
+  if (visible && bounds.height > AUTO_POPOUT_HEIGHT) lastRoomyBounds = bounds;
+  if (
+    !shouldHandOverToPopout({
+      height: bounds.height,
+      autoPopoutWhenSmall: s.autoPopoutWhenSmall,
+      popoutOpen: isPopoutOpen(),
+      visible,
+    })
+  ) {
+    return;
+  }
+  handOverToPopout({
+    onClosed: onPopoutClosed,
+    onSettingsChanged: handleSettingsChanged,
+    bounds,
+  });
+}
+
+/**
+ * Give the main window a usable size on the way back from a hand-over — it was
+ * left at the sliver that triggered it, and restoring it as-is would hand
+ * straight back to the pop-out.
+ */
+function restoreRoomyBounds(w: BrowserWindow): void {
+  const bounds = w.getBounds();
+  if (bounds.height > AUTO_POPOUT_HEIGHT) return;
+  const min = LAYOUT_MIN_SIZE[readSettings().uiLayout];
+  const height = restoredHeight(lastRoomyBounds?.height ?? null, min?.height ?? 0);
+  const next = lastRoomyBounds && lastRoomyBounds.height === height ? lastRoomyBounds : { ...bounds, height };
+  try { w.setBounds(next); } catch { /* display went away */ }
+}
+
+/**
  * Popping the visualizer out should *move* the app into that window, not add a
  * second one — so the main window hides while the pop-out is up and comes back
  * when it closes.
@@ -241,6 +306,7 @@ function applyPopoutWindowSwap(s: AppSettings) {
     w.hide();
   } else {
     if (!s.hideMainWhenPopped) return;
+    restoreRoomyBounds(w);
     w.show();
     w.focus();
   }
@@ -292,11 +358,15 @@ function ensureDesktopRecoveryTask(): void {
     app.getPath('appData'),
     'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup',
   );
-  const vbsPath = path.join(startUpDir, 'Recordr Desktop Recovery.vbs');
+  const vbsPath = path.join(startUpDir, 'Unrecordable Desktop Recovery.vbs');
+  // The app was called Recordr until 2026-10-12; that launcher points at an exe
+  // path that no longer exists, so clear it rather than leaving two behind.
+  const legacyVbsPath = path.join(startUpDir, 'Recordr Desktop Recovery.vbs');
   const script = buildRecoveryLauncher(process.execPath);
   try {
     fs.mkdirSync(startUpDir, { recursive: true });
     fs.writeFileSync(vbsPath, script, 'utf8');
+    if (fs.existsSync(legacyVbsPath)) fs.rmSync(legacyVbsPath, { force: true });
   } catch (err) {
     console.warn('[appbar] could not write desktop-recovery launcher:', err);
   }
@@ -314,8 +384,8 @@ function buildRecoveryLauncher(exePath: string): string {
   // literals would eat `\r`/`\u`… out of a Windows path — double them first.
   const vbs = (p: string) => p.replace(/\\/g, '\\\\').replace(/"/g, '""');
   return [
-    `' Recordr desktop recovery: reclaims the top-of-screen strip an unexpected`,
-    `' exit can leave reserved. Generated by Recordr at startup; safe to delete.`,
+    `' Unrecordable desktop recovery: reclaims the top-of-screen strip an`,
+    `' unexpected exit can leave reserved. Generated at startup; safe to delete.`,
     `On Error Resume Next`,
     `Set fso = CreateObject("Scripting.FileSystemObject")`,
     `If Not fso.FileExists("${vbs(marker)}") Then WScript.Quit 0`,

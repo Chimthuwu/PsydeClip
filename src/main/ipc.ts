@@ -30,6 +30,7 @@ import {
   forwardVizState,
   forwardVizHistory,
   getPopout,
+  handOverToPopout,
   isPopoutOpen,
   markPopoutKeepMain,
 } from './popout';
@@ -396,17 +397,11 @@ export function registerIpc(ctx: IpcContext) {
       // visualizer chips and its own transport — the main window's strip is just
       // a squashed HUD with no way to change what it is showing.
       if (w === ctx.getWindow() && args.target === 'top') {
-        if (!isPopoutOpen()) {
-          createPopout(() => {
-            ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false }));
-          });
-          ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: true }));
-        }
-        // Let the pop-out finish constructing before it is resized.
-        setTimeout(() => {
-          const popout = getPopout();
-          if (popout) snapWindow(popout, 'top');
-        }, 100);
+        handOverToPopout({
+          onClosed: () => ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false })),
+          onSettingsChanged: ctx.onSettingsChanged,
+          target: 'top',
+        });
         return;
       }
 
@@ -640,12 +635,20 @@ export function registerIpc(ctx: IpcContext) {
       { type: 'separator' },
       {
         label: 'Dock to top of screen',
-        // Dock the window the user is looking at. This used to always open the
-        // pop-out and dock *that*, which meant the main window could never be
-        // docked from here — and made the pop-out the only route to a strip
-        // (todo.md §11, "Deprecate Pop-out Mode"). `windowSnap` routes to the
-        // sender, so a pop-out right-click still docks the pop-out.
-        click: () => snapWindow(win, 'top'),
+        // A docked window is always the pop-out: the main window's HUD has no
+        // small form, so docking it leaves a monitor-wide strip with no
+        // visualizer buttons. Right-clicking the pop-out itself just docks it.
+        click: () => {
+          if (win === getPopout()) {
+            snapWindow(win, 'top');
+            return;
+          }
+          handOverToPopout({
+            onClosed: () => ctx.onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: false })),
+            onSettingsChanged: ctx.onSettingsChanged,
+            target: 'top',
+          });
+        },
       },
       {
         label: 'Docking reserves screen space',
