@@ -89,9 +89,9 @@ export type CaptureBackend = 'desktop' | 'loopback';
  *
  * The old 'compact' mode (title bar + single control row + visualizer) was
  * retired: the full layout already sheds chrome to a strip through its
- * height/width breakpoints, which covers the small-monitor use case. The union
- * keeps 'compact' so pre-existing settings files parse, but main normalizes
- * any stored 'compact' to 'full' (see settings.ts).
+ * height/width breakpoints, and the pop-out window covers the small-monitor
+ * use case. The union keeps 'compact' so pre-existing settings files parse,
+ * but main normalizes any stored 'compact' to 'full' (see settings.ts).
  */
 export type UiLayout = 'full' | 'compact';
 
@@ -159,7 +159,7 @@ export interface AppSettings {
   theme: Theme;
   /**
    * The "primary" visualizer mode — the one a lone-pane view shows, and what
-   * the smoothing / quick-menu fallbacks key off. Kept in sync with
+   * the smoothing / quick-menu / pop-out fallback key off. Kept in sync with
    * the first entry of the visible set (`VISUALIZER_MODES` minus `vizHidden`).
    */
   visualizer: VisualizerMode;
@@ -178,12 +178,6 @@ export interface AppSettings {
    * visualizers more.
    */
   vizGain: number;
-  /**
-   * Draw the MIDI piano-roll lane under the History waveform (todo.md §MIDI-1
-   * Phase A). On by default: the lane only appears once a transcription has
-   * produced notes, so it costs nothing until it has something to show.
-   */
-  showMidiLane: boolean;
   /**
    * Layered visualizer (todo.md section 11 DECISION 2026-10-07): draw a live
    * oscilloscope inset over the History board, at reduced opacity, behind this
@@ -234,6 +228,23 @@ export interface AppSettings {
    * is not something to opt a user into silently.
    */
   dockReservesSpace: boolean;
+  /** Re-open the pop-out visualizer window on launch. */
+  popoutOpen: boolean;
+  /** Keep the pop-out above other windows. */
+  popoutAlwaysOnTop: boolean;
+  /** Pop-out window opacity, 0.2–1. */
+  popoutOpacity: number;
+  /** Render transport buttons inside the pop-out. */
+  popoutControls: boolean;
+  /** Hide the main window's visualizer while the pop-out is open. */
+  hideBoardWhenPopped: boolean;
+  /**
+   * Hide the *whole* main window while the pop-out is open, so popping out
+   * swaps windows instead of leaving two on screen. The tray icon and the
+   * global hotkey still work, and closing the pop-out brings the main window
+   * back — as does Show from the tray menu.
+   */
+  hideMainWhenPopped: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -248,7 +259,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Everything except the primary mode starts hidden → a single board.
   vizHidden: ['spectrum', 'spectrogram', 'history', 'midi'],
   vizGain: 1,
-  showMidiLane: true,
   showOscilloscopeOverlay: false,
   bufferSeconds: 15 * 60,
   bitrateKbps: 96,
@@ -281,6 +291,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showHint: true,
   magneticSnap: true,
   dockReservesSpace: false,
+  popoutOpen: false,
+  popoutAlwaysOnTop: true,
+  popoutOpacity: 1,
+  popoutControls: true,
+  hideBoardWhenPopped: false,
+  hideMainWhenPopped: true,
 };
 
 /**
@@ -371,8 +387,8 @@ export const IpcChannel = {
   /**
    * Renderer → main: the current History/spectrogram selection, as absolute
    * session seconds (null when there is none). Main keeps the latest value so
-   * the native quick menu can offer "Save selection" whenever a selection
-   * exists.
+   * the native quick menu can offer "Save selection" from either window —
+   * including the pop-out while the main window is hidden.
    */
   selectionChanged: 'selection:changed',
   /** Main → renderer: the user picked "Save selection" in the quick menu. */
@@ -406,8 +422,17 @@ export const IpcChannel = {
   windowTempExpand: 'window:temp-expand',
   windowState: 'window:state',
   contextMenu: 'window:context-menu',
-  /** Clip window -> main window: its stop / discard buttons. */
+  popoutToggle: 'popout:toggle',
+  popoutState: 'popout:state',
+  vizFrame: 'viz:frame',
+  vizState: 'viz:state',
+  vizCommand: 'viz:command',
+  /** Clip window -> main window. Distinct from viz:command so the clip
+      window's stop/discard buttons keep working with no pop-out open. */
   clipCommand: 'clip:command',
+  vizHistory: 'viz:history',
+  dragExportProxy: 'drag:export-proxy',
+  requestDragExport: 'drag:request-export',
   dragPrepare: 'drag:prepare',
   dragExportPrepared: 'drag:export-prepared',
   /** Pop a native menu for a title-bar knob (format / sensitivity / buffer). */
@@ -416,6 +441,60 @@ export const IpcChannel = {
 
 /** Simple window verbs the custom title bar can ask main to perform. */
 export type WindowAction = 'minimize' | 'maximize' | 'restore-or-max' | 'hide' | 'close';
+
+/** What the main renderer streams to the pop-out visualizer, ~30×/s. */
+export interface VizFrame {
+  /** Time-domain samples, one AnalyserNode fftSize window. */
+  time: Float32Array;
+  /** Frequency bins in dB. */
+  freq: Float32Array;
+  minDecibels: number;
+  maxDecibels: number;
+}
+
+/**
+ * Main window → pop-out: the rolling peak track plus its session clock.
+ *
+ * The pop-out reconstructs a `HistoryModel` from this. `newestSec` is the
+ * session-relative second of the newest bucket as stamped by the main window,
+ * so both windows agree on what a selection's absolute seconds mean even
+ * though each renderer's `performance.now()` has an independent origin
+ * (todo.md §11.4, D1).
+ */
+export interface HistoryStream {
+  buffer: Float32Array;
+  head: number;
+  count: number;
+  capacity: number;
+  /** Session-relative seconds of the newest bucket at capture time. */
+  newestSec: number;
+}
+
+/** Slower-moving state the pop-out mirrors (sent only when it changes). */
+export interface VizState {
+  capturing: boolean;
+  hasSource: boolean;
+  canSave: boolean;
+  /** A dedicated clip recording is in progress. */
+  clipActive: boolean;
+  /** Epoch ms when the active clip started (0 when none) — for the live
+   *  stopwatch on the pop-out's record button. */
+  clipStartedAt: number;
+  /** Container a save will be written as — shown on the pop-out's buttons. */
+  format: RecordingFormat;
+  bufferedSeconds: number;
+  bufferSeconds: number;
+  recordMode: RecordMode;
+  theme: Theme;
+  visualizer: VisualizerMode;
+  /**
+   * When non-null, the pop-out shows ONLY this visualizer, pinned from a
+   * split-view pane's ⧉ button, instead of mirroring the main window's view.
+   * Transient (not a setting): cleared when the pop-out closes.
+   */
+  overrideMode: VisualizerMode | null;
+  rms: number;
+}
 
 /**
  * What the always-on-top clip-recording window shows. `active: false` tells it
@@ -430,7 +509,23 @@ export interface ClipWindowState {
   theme: Theme;
 }
 
-/** Commands the clip window sends back to the main renderer. */
+/**
+ * Commands the pop-out sends back to the main renderer.
+ *
+ * The clip window's stop/discard buttons ride a separate `clip:command`
+ * channel (`ClipCommand`) rather than this one — the clip window is not the
+ * pop-out and must keep working with it closed.
+ */
+export type VizCommand =
+  | { type: 'toggle-capture' }
+  | { type: 'save' }
+  | { type: 'toggle-clip' }
+  | { type: 'discard-clip' }
+  | { type: 'set-visualizer'; mode: VisualizerMode }
+  | { type: 'set-override'; mode: VisualizerMode | null }
+  | { type: 'selection-change'; selection: [number, number] | null };
+
+/** The clip window's two buttons, relayed to the main renderer. */
 export type ClipCommand = { type: 'toggle-clip' } | { type: 'discard-clip' };
 
 export type RecorderEvent =

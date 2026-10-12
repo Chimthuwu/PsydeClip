@@ -24,13 +24,16 @@ interface Props {
   active: boolean;
   /** Whether the WASAPI loopback helper can be used on this platform. */
   loopbackSupported: boolean;
+  /** Whether the pop-out visualizer window is currently up. */
+  popoutOpen: boolean;
+  onTogglePopout: () => void;
 }
 
 const TITLEBARS: { value: TitleBarMode; label: string; help: string }[] = [
   {
     value: 'custom',
     label: 'Minimal in-app bar',
-    help: '26px strip with pin, dock-to-top, settings and window buttons. Frameless window.',
+    help: '26px strip with pin, dock-to-top, pop-out and window buttons. Frameless window.',
   },
   {
     value: 'system',
@@ -109,13 +112,15 @@ export function SettingsPanel({
   onPickFolder,
   active,
   loopbackSupported,
+  popoutOpen,
+  onTogglePopout,
 }: Props) {
   const [draft, setDraft] = useState<AppSettings>(settings);
   const [folderBusy, setFolderBusy] = useState(false);
   const templateRef = useRef<HTMLInputElement | null>(null);
   // Keys the user has touched in this panel but not saved yet. Everything else
   // tracks the live settings, so a change made elsewhere while the panel is
-  // open (the footer format picker, the quick menu, the tray)
+  // open (the footer format picker, the quick menu, the pop-out, the tray)
   // shows here — and Save only writes back what was actually edited instead of
   // clobbering those external changes with a stale whole-object snapshot.
   const dirty = useRef<Set<keyof AppSettings>>(new Set());
@@ -384,22 +389,6 @@ export function SettingsPanel({
           <label className="checkbox-row">
             <input
               type="checkbox"
-              checked={draft.showMidiLane}
-              onChange={(e) => applyNow({ showMidiLane: e.target.checked })}
-            />
-            <span>
-              <strong>Show the MIDI piano-roll lane</strong>
-              <em>
-                A strip under the History waveform drawing the transcribed
-                notes on the same time axis. Select a range in History and press
-                <b> m </b> (or the ♪ on the selection) to transcribe it and see
-                the melody. Nothing is drawn until you transcribe something.
-              </em>
-            </span>
-          </label>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
               checked={draft.showOscilloscopeOverlay}
               onChange={(e) => applyNow({ showOscilloscopeOverlay: e.target.checked })}
             />
@@ -618,8 +607,81 @@ export function SettingsPanel({
           </label>
           <small>
             Dock top spans the full width of the current monitor at the
-            window's present height. Shrink the window's height first for a slim strip across the top of the screen.
+            window's present height. Shrink the window's height first (or dock
+            the pop-out) for a slim strip across the top of the screen.
           </small>
+        </section>
+
+        <section>
+          <label>Pop-out visualizer</label>
+          <div className="preset-row">
+            <button type="button" className="primary" onClick={onTogglePopout}>
+              {popoutOpen ? 'Close pop-out' : 'Open pop-out'}
+            </button>
+          </div>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.popoutControls}
+              onChange={(e) => applyNow({ popoutControls: e.target.checked })}
+            />
+            <span>
+              <strong>Transport buttons inside the pop-out</strong>
+              <em>Start/stop, save and the visualizer modes, over the waveform. Fade in on hover.</em>
+            </span>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.popoutAlwaysOnTop}
+              onChange={(e) => applyNow({ popoutAlwaysOnTop: e.target.checked })}
+            />
+            <span>
+              <strong>Pop-out always on top</strong>
+              <em>Keeps the floating visualizer above other applications.</em>
+            </span>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.hideMainWhenPopped}
+              onChange={(e) => applyNow({ hideMainWhenPopped: e.target.checked })}
+            />
+            <span>
+              <strong>Hide the main window while popped out</strong>
+              <em>
+                Popping out moves the app into the monitor window instead of leaving two on
+                screen. Recording keeps running; the tray icon and the hotkey still work, and
+                closing the pop-out brings the main window back.
+              </em>
+            </span>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.hideBoardWhenPopped}
+              onChange={(e) => applyNow({ hideBoardWhenPopped: e.target.checked })}
+              disabled={draft.hideMainWhenPopped}
+            />
+            <span>
+              <strong>Hide only the main visualizer while popped out</strong>
+              <em>
+                Leaves the main window as controls only, so it can shrink much further. Has no
+                effect while the whole window is hidden.
+              </em>
+            </span>
+          </label>
+          <div className="slider-row">
+            <input
+              type="range"
+              min={20}
+              max={100}
+              step={5}
+              value={Math.round(draft.popoutOpacity * 100)}
+              onChange={(e) => applyNow({ popoutOpacity: Number(e.target.value) / 100 })}
+            />
+            <span>{Math.round(draft.popoutOpacity * 100)}% opacity</span>
+          </div>
         </section>
 
         <section>

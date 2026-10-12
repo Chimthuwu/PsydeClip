@@ -1,6 +1,7 @@
 import { Tray, Menu, nativeImage, BrowserWindow, app, shell } from 'electron';
 import { AppSettings } from '../shared/types';
 import { snapWindow } from './window-controls';
+import { createPopout, destroyPopout, isPopoutOpen } from './popout';
 import { resetWorkArea } from './appbar';
 import { ICON_16_DATA_URL, ICON_32_DATA_URL, ICON_256_DATA_URL } from './icon-assets';
 
@@ -23,6 +24,7 @@ let lastSaveFlashUntil = 0;
 let setSettingsRef: ((patch: Partial<AppSettings>) => AppSettings) | null = null;
 let getSettingsRef: (() => AppSettings) | null = null;
 let getWindowRef: (() => BrowserWindow | null) | null = null;
+let onPopoutClosedRef: (() => void) | null = null;
 
 const REC_RED = { r: 255, g: 93, b: 108 };
 
@@ -81,10 +83,12 @@ export function initTray(
   getWindow: () => BrowserWindow | null,
   getSettings: () => AppSettings,
   setSettings: (patch: Partial<AppSettings>) => AppSettings,
+  onPopoutClosed?: () => void,
 ): Tray {
   getWindowRef = getWindow;
   setSettingsRef = setSettings;
   getSettingsRef = getSettings;
+  onPopoutClosedRef = onPopoutClosed ?? null;
 
   if (!trayInstance) {
     trayInstance = new Tray(makeTrayIcon(false));
@@ -258,8 +262,18 @@ function buildMenu(): Electron.Menu {
       click: () => setAlwaysOnTop(!isAlwaysOnTop),
     },
     {
+      label: 'Pop-out visualizer',
+      type: 'checkbox',
+      checked: isPopoutOpen(),
+      click: () => togglePopoutFromTray(),
+    },
+    {
       label: 'Dock to top of screen',
-      // The MAIN window, matching the title bar's ⤒ and the quick menu.
+      // The MAIN window — deliberately NOT the title bar's ↥, which opens the
+      // pop-out and docks that instead. The asymmetry is intentional: the
+      // pop-out is the strip carrying the per-visualizer chips, so it is what
+      // the title bar's dock button is for; the tray docks the window you
+      // already have in front of you. Do not unify these two.
       click: () => {
         const win = getWindowRef?.();
         if (!win || win.isDestroyed()) return;
@@ -323,6 +337,17 @@ function setAlwaysOnTop(value: boolean) {
   isAlwaysOnTop = value;
   if (setSettingsRef) {
     try { setSettingsRef({ alwaysOnTop: value }); } catch { /* ignore */ }
+  }
+  refreshTray();
+}
+
+function togglePopoutFromTray() {
+  if (isPopoutOpen()) {
+    destroyPopout();
+    setSettingsRef?.({ popoutOpen: false });
+  } else {
+    createPopout(() => onPopoutClosedRef?.());
+    setSettingsRef?.({ popoutOpen: true });
   }
   refreshTray();
 }
