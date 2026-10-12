@@ -24,9 +24,11 @@
     "verify:midi-lane": "node scripts/verify-midi-lane-check.mjs",
     "verify:midi-grid": "node scripts/verify-midi-grid-draws.mjs",
     "test:packaged": "cross-env RECORDR_APP_DIR=release/win-unpacked electron scripts/transcribe-electron-check.js",
-    "package": "npm run build && electron-builder",
-    "package:dir": "npm run build && electron-builder --dir",
-    "start": "cross-env NODE_ENV=production electron ."
+    "package": "npm run build && npm run seed:wincodesign && electron-builder",
+    "package:dir": "npm run build && npm run seed:wincodesign && electron-builder --dir",
+    "start": "cross-env NODE_ENV=production electron .",
+    "seed:wincodesign": "node scripts/seed-wincodesign.mjs",
+    "verify:icon": "node scripts/verify-icon.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
