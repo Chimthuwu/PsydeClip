@@ -1,7 +1,7 @@
 {
-  "name": "recordr",
+  "name": "unrecordable",
   "version": "3.2.0",
-  "description": "Rolling Sampler-style audio recorder with oscilloscope/spectrogram visualizers",
+  "description": "Unrecordable \u2014 rolling-sampler system audio recorder with oscilloscope, spectrogram and MIDI visualizers",
   "main": "dist/main/index.js",
   "author": "Serge",
   "license": "MIT",
@@ -16,7 +16,7 @@
     "build:browser": "vite build --config vite.config.browser.ts",
     "build": "npm run build:main && npm run build:renderer",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "test": "npm run build:main && npm run build:tests && node --test \"dist/main/transcribe/*.test.js\" \"dist/renderer/lib/*.test.js\"",
+    "test": "npm run build:main && npm run build:tests && node --test \"dist/main/transcribe/*.test.js\" \"dist/renderer/lib/*.test.js\" \"dist/shared/*.test.js\"",
     "test:midi-grid": "npm run build:renderer && electron scripts/midi-grid-check.js",
     "test:electron": "npm run build && electron scripts/transcribe-electron-check.js",
     "verify:popout": "node scripts/verify-popout-check.mjs",
@@ -33,7 +33,8 @@
     "site:build": "npm --prefix marketing-site run build",
     "site:preview": "npm --prefix marketing-site run preview",
     "site:verify": "electron marketing-site/scripts/verify-landing.mjs",
-    "site:shoot": "electron marketing-site/scripts/shoot-landing.mjs"
+    "site:shoot": "electron marketing-site/scripts/shoot-landing.mjs",
+    "verify:shrink": "electron scripts/verify-shrink-popout.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
@@ -51,8 +52,8 @@
     "wait-on": "^7.2.0"
   },
   "build": {
-    "appId": "com.serge.recordr",
-    "productName": "Recordr",
+    "appId": "com.chimthuwu.unrecordable",
+    "productName": "Unrecordable",
     "files": [
       "dist/**/*",
       "package.json",
@@ -107,7 +108,7 @@
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
       "artifactName": "${productName} - Windows Setup v${version}.${ext}",
-      "shortcutName": "Recordr"
+      "shortcutName": "Unrecordable"
     }
   },
   "dependencies": {
