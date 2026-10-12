@@ -1,6 +1,7 @@
 node_modules/
 dist/
 release/
+release-*/
 *.log
 *.tsbuildinfo
 .DS_Store
