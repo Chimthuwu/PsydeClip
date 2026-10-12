@@ -1,6 +1,6 @@
 {
   "name": "recordr",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Rolling Sampler-style audio recorder with oscilloscope/spectrogram visualizers",
   "main": "dist/main/index.js",
   "author": "Serge",
@@ -81,13 +81,26 @@
       "output": "release"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "artifactName": "${productName} - Windows Setup v${version}.${ext}"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "artifactName": "${productName} - macOS v${version}.${ext}"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "artifactName": "${productName} - Linux v${version}.${ext}"
+    },
+    "nsis": {
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "artifactName": "${productName} - Windows Setup v${version}.${ext}",
+      "shortcutName": "Recordr"
     }
   },
   "dependencies": {
