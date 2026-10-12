@@ -439,6 +439,8 @@ export const IpcChannel = {
   windowState: 'window:state',
   contextMenu: 'window:context-menu',
   popoutToggle: 'popout:toggle',
+  /** Give one visualizer its own window (a pane's ⧉). */
+  popoutPane: 'popout:pane',
   popoutState: 'popout:state',
   vizFrame: 'viz:frame',
   vizState: 'viz:state',
@@ -539,7 +541,8 @@ export type VizCommand =
   | { type: 'discard-clip' }
   | { type: 'set-visualizer'; mode: VisualizerMode }
   | { type: 'set-override'; mode: VisualizerMode | null }
-  | { type: 'selection-change'; selection: [number, number] | null };
+  | { type: 'selection-change'; selection: [number, number] | null }
+  | { type: 'export-midi' };
 
 /** The clip window's two buttons, relayed to the main renderer. */
 export type ClipCommand = { type: 'toggle-clip' } | { type: 'discard-clip' };

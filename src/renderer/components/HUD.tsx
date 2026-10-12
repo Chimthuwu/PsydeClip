@@ -22,11 +22,9 @@ interface Props {
   clipActive?: boolean;
   /** Live seconds since the clip started (undefined when not recording). */
   clipElapsed?: number;
-  onToggleClip?: () => void;
   clipEnabled?: boolean;
-  /** Always-on-top MIDI toggle (todo.md §MIDI-1 UX fix) — not buried in Settings. */
-  midiOn?: boolean;
-  onToggleMidi?: () => void;
+  /** Toggle clip recording (used by Transport). */
+  onToggleClip?: () => void;
 }
 
 export function HUD({
@@ -45,8 +43,6 @@ export function HUD({
   clipElapsed,
   onToggleClip,
   clipEnabled,
-  midiOn,
-  onToggleMidi,
 }: Props) {
   const showBuffer = settings.showBuffer && settings.recordMode === 'rolling';
   const bufferFull = bufferedSeconds >= settings.bufferSeconds - 2;
@@ -79,20 +75,7 @@ export function HUD({
 
         {formatControl}
 
-        {onToggleMidi && (
-          <button
-            type="button"
-            className={`pill midi-toggle ${midiOn ? 'on' : 'off'}`}
-            onClick={onToggleMidi}
-            title={
-              midiOn
-                ? 'MIDI transcription ON — every save also writes a .mid beside the audio. Click to turn off.'
-                : 'MIDI transcription OFF — click to write a .mid beside every save. Costs roughly the clip\u2019s own length in CPU time; a 15-min buffer can take ~20 min.'
-            }
-          >
-            ♪ MIDI
-          </button>
-        )}
+
 
         {noSignal && !error && (
           <span
@@ -129,7 +112,6 @@ export function HUD({
           format={settings.recordingFormat}
         />
       </div>
-
       {error && <div className="hud-error">{error}</div>}
     </header>
   );
