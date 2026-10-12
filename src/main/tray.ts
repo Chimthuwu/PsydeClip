@@ -1,7 +1,7 @@
 import { Tray, Menu, nativeImage, BrowserWindow, app, shell } from 'electron';
 import { AppSettings } from '../shared/types';
-import { snapWindow } from './window-controls';
-import { createPopout, destroyPopout, isPopoutOpen } from './popout';
+// (snapWindow is no longer reached from the tray: docking goes through the pop-out.)
+import { createPopout, destroyPopout, handOverToPopout, isPopoutOpen } from './popout';
 import { resetWorkArea } from './appbar';
 import { ICON_16_DATA_URL, ICON_32_DATA_URL, ICON_256_DATA_URL } from './icon-assets';
 
@@ -221,7 +221,7 @@ function buildTooltip(): string {
     const elapsedSec = Math.floor(elapsedSecNow() / 1000);
     lines.push(`● Recording  ${formatMs(elapsedSec)}`);
   } else {
-    lines.push('Recordr — idle');
+    lines.push('Unrecordable — idle');
   }
   const settings = getSettingsRef?.();
   if (settings?.saveFolder) {
@@ -269,16 +269,18 @@ function buildMenu(): Electron.Menu {
     },
     {
       label: 'Dock to top of screen',
-      // The MAIN window — deliberately NOT the title bar's ↥, which opens the
-      // pop-out and docks that instead. The asymmetry is intentional: the
-      // pop-out is the strip carrying the per-visualizer chips, so it is what
-      // the title bar's dock button is for; the tray docks the window you
-      // already have in front of you. Do not unify these two.
+      // Docks the POP-OUT, same as the title bar's dock and the quick menu's.
+      // These used to disagree — the tray docked the main window — and the
+      // result was the thing the owner reported: a monitor-wide strip with no
+      // visualizer buttons, because the main window's HUD has no small form.
+      // A docked window is always the pop-out now (2026-10-12).
       click: () => {
-        const win = getWindowRef?.();
-        if (!win || win.isDestroyed()) return;
-        if (!win.isVisible()) win.show();
-        snapWindow(win, 'top');
+        handOverToPopout({
+          onClosed: () => onPopoutClosedRef?.(),
+          onSettingsChanged: (next) => setSettingsRef?.(next),
+          target: 'top',
+        });
+        refreshTray();
       },
     },
     // Crash recovery, not a feature: a force-killed instance can leave the
@@ -319,7 +321,7 @@ function buildMenu(): Electron.Menu {
       click: () => openSettings(),
     },
     { type: 'separator' },
-    { label: 'Quit Recordr', click: () => app.quit() },
+    { label: 'Quit Unrecordable', click: () => app.quit() },
   ]);
 }
 

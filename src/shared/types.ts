@@ -245,7 +245,22 @@ export interface AppSettings {
    * back — as does Show from the tray menu.
    */
   hideMainWhenPopped: boolean;
+  /**
+   * Shrink the main window past `AUTO_POPOUT_HEIGHT` and the pop-out takes
+   * over, at the same bounds. The main window has no good small form — below
+   * that height its HUD is a squashed strip with no way to change what it is
+   * showing — whereas the pop-out is exactly that: chips, transport, waveform.
+   * Closing the pop-out gives the main window back at a usable size.
+   */
+  autoPopoutWhenSmall: boolean;
 }
+
+/**
+ * Main-window height at or below which the pop-out takes over. The HUD's own
+ * breakpoints start dropping controls at 190px; below that there is nothing
+ * left worth looking at.
+ */
+export const AUTO_POPOUT_HEIGHT = 190;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   hotkey: 'Alt+R',
@@ -297,6 +312,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   popoutControls: true,
   hideBoardWhenPopped: false,
   hideMainWhenPopped: true,
+  autoPopoutWhenSmall: true,
 };
 
 /**

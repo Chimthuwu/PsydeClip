@@ -1,6 +1,7 @@
 import { ChangeEvent, useEffect, useState, useRef } from 'react';
 import {
   AppSettings,
+  AUTO_POPOUT_HEIGHT,
   CaptureBackend,
   Theme,
   THEMES,
@@ -639,6 +640,21 @@ export function SettingsPanel({
             <span>
               <strong>Pop-out always on top</strong>
               <em>Keeps the floating visualizer above other applications.</em>
+            </span>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.autoPopoutWhenSmall}
+              onChange={(e) => applyNow({ autoPopoutWhenSmall: e.target.checked })}
+            />
+            <span>
+              <strong>Shrink into the pop-out</strong>
+              <em>
+                Drag the window shorter than {AUTO_POPOUT_HEIGHT}px and the pop-out takes over
+                its place on screen — it is the one with the visualizer chips and its own
+                transport. Closing it gives the main window back at a usable size.
+              </em>
             </span>
           </label>
           <label className="checkbox-row">

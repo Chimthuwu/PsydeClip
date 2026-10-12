@@ -1,8 +1,8 @@
 import { BrowserWindow } from 'electron';
 import path from 'node:path';
-import { IpcChannel } from '../shared/types';
-import { readSettings } from './settings';
-import { handleWindowMoved, reapplyOnResize } from './window-controls';
+import { AppSettings, IpcChannel, SnapTarget } from '../shared/types';
+import { readSettings, writeSettings } from './settings';
+import { handleWindowMoved, reapplyOnResize, snapWindow } from './window-controls';
 import { appBarOwner, removeAppBar } from './appbar';
 
 /**
@@ -65,7 +65,7 @@ export function createPopout(onClosed?: () => void): BrowserWindow {
     resizable: true,
     maximizable: false,
     fullscreenable: false,
-    title: 'Recordr — Visualizer',
+    title: 'Unrecordable — Visualizer',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -107,6 +107,50 @@ export function createPopout(onClosed?: () => void): BrowserWindow {
   popoutWindow.on('resized', () => reapplyOnResize(getPopout()));
 
   return popoutWindow;
+}
+
+/**
+ * Hand the small-window case over to the pop-out.
+ *
+ * The main window has no good small form: below ~190px its HUD is a squashed
+ * strip with no way to change what it is showing. The pop-out IS that form —
+ * it carries the per-visualizer chips and its own transport — so every route
+ * that ends in a small window (the title bar's dock, the tray's dock, the
+ * quick menu's, and simply dragging the window short) funnels through here
+ * instead of leaving a squashed main window on screen.
+ *
+ * `target` null just opens the pop-out at its own size; a SnapTarget also
+ * docks it against that edge. `bounds` lets the pop-out take over the space
+ * the main window occupied, so shrinking reads as one window changing shape
+ * rather than another appearing elsewhere.
+ */
+export function handOverToPopout(opts: {
+  onClosed: () => void;
+  onSettingsChanged: (s: AppSettings) => void;
+  target?: SnapTarget | null;
+  bounds?: Electron.Rectangle | null;
+}): void {
+  const { onClosed, onSettingsChanged, target = null, bounds = null } = opts;
+  const alreadyOpen = isPopoutOpen();
+  if (!alreadyOpen) {
+    createPopout(onClosed);
+    onSettingsChanged(writeSettings({ ...readSettings(), popoutOpen: true }));
+  }
+
+  // A freshly created window is not done constructing; let it settle before
+  // moving it, exactly as the title bar's dock has always done.
+  const place = () => {
+    const popout = getPopout();
+    if (!popout || popout.isDestroyed()) return;
+    if (bounds) {
+      try { popout.setBounds(bounds); } catch { /* bounds off-screen; leave it */ }
+    }
+    if (target) snapWindow(popout, target);
+    popout.show();
+    popout.focus();
+  };
+  if (alreadyOpen) place();
+  else setTimeout(place, 100);
 }
 
 export function destroyPopout() {
