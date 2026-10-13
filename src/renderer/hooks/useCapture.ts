@@ -86,12 +86,18 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
   const [rms, setRms] = useState(0);
   const [noSignal, setNoSignal] = useState(false);
   const [liveNotes, setLiveNotes] = useState<LiveNoteTracker | null>(null);
-  // A bounded recording is in progress — the ONLY gate on live pitch tracking
-  // (todo.md §MIDI-1 Phase B). Computed here rather than passed in, because it is
-  // derived from this hook's own state: a clip, or a traditional-mode session.
-  // The rolling buffer is never "the recording", so it is never analysed
-  // continuously — that is the standing CPU cost this gate exists to prevent.
+  // A bounded recording is in progress. `recordingLive` gates the tracker's
+  // growth loop; `tracking` (also true whenever the MIDI visualizer is up)
+  // controls whether a tracker exists at all.
   const tracking = clipActive || (settings.recordMode === 'traditional' && capturing);
+  // Whether the push loop should actually find notes: while recording, always;
+  // otherwise only if the user is looking at the MIDI view right now.
+  const midiVisible = !settings.vizHidden.includes('midi');
+  const wantLive = tracking || midiVisible;
+  const recordingLive = tracking;
+  // Mirror of `liveNotes` for the idle-tracking effect below (state is stable
+  // per render, but the effect needs the CURRENT tracker, not its render's).
+  const liveNotesRef = useRef<LiveNoteTracker | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bufferedSeconds, setBufferedSeconds] = useState(0);
 
@@ -276,22 +282,24 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
   useEffect(() => {
     const an = analyser;
     if (!an) {
+      liveNotesRef.current = null;
       setLiveNotes(null);
       return;
     }
-    // Not recording: keep whatever preview is on screen, just stop pushing.
-    if (!tracking) return;
+    // Not recording: KEEP the tracker (a frozen preview stays on the grid) —
+    // the idle-tracking effect below decides whether to keep pushing.
+    if (!recordingLive) return;
 
     const ctx = an.analyser.context as AudioContext | undefined;
     const sampleRate = ctx?.sampleRate ?? 44100;
     const tracker = new LiveNoteTracker({ sampleRate });
+    liveNotesRef.current = tracker;
     setLiveNotes(tracker);
 
     // Session seconds for each window's LEADING edge — the analyser hands back
     // the last `frameSec` of audio, so the window began one frame ago. On the
     // same axis as the History waveform, so a live bar sits over the audio that
     // produced it.
-    const model = historyModelRef.current;
     const frameSec = an.timeData.length / sampleRate;
     // With no History model there is no session clock to join (nothing is being
     // peak-tracked), so this recording's own age is the axis — and the live grid
@@ -300,6 +308,7 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
 
     const id = setInterval(() => {
       an.analyser.getFloatTimeDomainData(an.timeData);
+      const model = historyModelRef.current;
       const leadSec = model ? model.newestSec - frameSec : (performance.now() - beganAt) / 1000;
       tracker.push(an.timeData, Math.max(0, leadSec));
     }, 50);
@@ -314,13 +323,74 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
       clearInterval(id);
       // Close whatever note was sounding so the last bar gets a real length
       // instead of hanging open for ever. The notes stay for the grid to draw.
+      const model = historyModelRef.current;
       tracker.finish(model ? model.newestSec : (performance.now() - beganAt) / 1000);
     };
     // historyModel is read through a ref, never a dep: it is restamped ~5x/s as
     // audio arrives, and depending on it would tear this interval down and
     // rebuild it dozens of times a second.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analyser, tracking]);
+  }, [analyser, recordingLive]);
+
+  // Idle tracking (owner, 2026-10-13): notes should appear whenever the MIDI
+  // visualizer is on screen, not only while the record button is down. So when
+  // a stream is live, nothing is recording, and the MIDI view is visible, this
+  // keeps a tracker warm too — reusing the tracker a finished recording left
+  // behind so idle notes continue the frozen preview on the same axis. The
+  // push is the same ~1 ms/20 Hz the recorder pays; the CPU the original gate
+  // avoided is only spent while the user can actually SEE the grid (hid the
+  // midi pane → `midiVisible` false → no timer at all).
+  useEffect(() => {
+    const an = analyser;
+    if (!an || recordingLive || !midiVisible) return;
+
+    const ctx = an.analyser.context as AudioContext | undefined;
+    const sampleRate = ctx?.sampleRate ?? 44100;
+    const frameSec = an.timeData.length / sampleRate;
+    const beganAt = performance.now();
+
+    if (!liveNotesRef.current) {
+      const tracker = new LiveNoteTracker({ sampleRate });
+      liveNotesRef.current = tracker;
+      setLiveNotes(tracker);
+      (window as unknown as { __recordrLiveNotes?: LiveNoteTracker }).__recordrLiveNotes = tracker;
+    }
+    const tracker = liveNotesRef.current;
+
+    const id = setInterval(() => {
+      an.analyser.getFloatTimeDomainData(an.timeData);
+      const model = historyModelRef.current;
+      const leadSec = model ? model.newestSec - frameSec : (performance.now() - beganAt) / 1000;
+      tracker?.push(an.timeData, Math.max(0, leadSec));
+    }, 50);
+
+    return () => {
+      clearInterval(id);
+      // Close the open note; the tracker itself survives for the grid.
+      const model = historyModelRef.current;
+      tracker?.finish(model ? model.newestSec : (performance.now() - beganAt) / 1000);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyser, midiVisible, recordingLive]);
+
+  /**
+   * Clear the rolling buffer (owner, 2026-10-13): drop every stored peak and
+   * the note preview with it, and restart the session clock at 0 — selections
+   * are absolute session seconds, so a wipe that kept the old clock would let
+   * a stale selection point at audio that no longer exists. A fresh buffer
+   * + fresh model does that exactly; and because the clear button lives next
+   * to record, it reads as "start the session over".
+   */
+  const clearBuffer = useCallback(() => {
+    if (!analyser) return;
+    const pb = new PeakBuffer(settings.bufferSeconds, 20);
+    liveNotesRef.current = null;
+    setLiveNotes(null);
+    setPeakBuffer(pb);
+    setHistoryModel(new HistoryModel(pb, 0));
+    // Note layers belong to App.tsx (transcription cache); its clear handler
+    // wipes those too.
+  }, [analyser, settings.bufferSeconds]);
 
   const refreshSources = useCallback(async () => {
     if (settings.captureBackend === 'loopback') {
@@ -359,6 +429,7 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
     } as CaptureState,
     refreshSources,
     stopStreamNow,
+    clearBuffer,
     beginClip,
     endClip,
     discardClip,

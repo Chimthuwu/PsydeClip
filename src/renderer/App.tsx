@@ -38,7 +38,7 @@ export default function App() {
   // Transient, not a setting — the pop-out normally mirrors the main window.
   const [popoutOverride, setPopoutOverride] = useState<VisualizerMode | null>(null);
   const capture = useCapture(settings, capturing);
-  const { state: cs, beginClip, endClip, discardClip } = capture;
+  const { state: cs, beginClip, endClip, discardClip, clearBuffer } = capture;
   // When the clip button was pressed (0 = no clip has been recorded in this
   // render). State, not a ref, so a change re-renders and feeds the live
   // elapsed-time display on the record button.
@@ -351,6 +351,20 @@ export default function App() {
   // seconds (todo.md §MIDI-1 Phase A). Null = no lane.
   const [noteLayer, setNoteLayer] = useState<NoteLayer | null>(null);
   const noteBusyRef = useRef(false);
+
+  /**
+   * Clear the rolling buffer AND everything derived from it (owner, 2026-10-13):
+   * peaks, session clock, note layers/preview, and the current selection (a
+   * selection into a wiped buffer is a lie). Runs from the main window's
+   * clear button and from the pop-out's over the command bus.
+   */
+  const clearBufferAll = useCallback(() => {
+    clearBuffer();
+    clearNoteLayers();
+    setNoteLayer(null);
+    void handleSelectionChange(null);
+    emitToast('saved', 'Buffer cleared.');
+  }, [clearBuffer, handleSelectionChange]);
 
   /**
    * What the grid actually draws: a real transcription when there is one, and
@@ -773,29 +787,43 @@ export default function App() {
   // Slower-moving state. bufferedSeconds is floored so this fires about once a
   // second instead of on every animation frame.
   const bufferedWhole = Math.floor(cs.bufferedSeconds);
+  // THROTTLED (owner, 2026-10-13: "popout frames lag when MIDI viz runs"):
+  // `cs.rms` changes EVERY animation frame, and it used to sit in the dep array
+  // — so this payload (with the whole growing pianoRoll notes array inside)
+  // was structured-cloned and IPC'd at frame rate, and every popout packet
+  // re-rendered the popout's React tree while the MIDI pane redrew. Now the
+  // packet is sent at most ~2×/s + on genuine state changes; RMS rides along
+  // at whatever the last send had (it only feeds a meter). The live canvas
+  // frames themselves stream on `viz:frame` untouched.
+  const lastVizStateSent = useRef(0);
+  const vizStatePayload = () => ({
+    capturing,
+    hasSource: !!cs.analyser,
+    canSave: canSaveNow,
+    clipActive: cs.clipActive,
+    clipStartedAt,
+    format: settings.recordingFormat,
+    bufferedSeconds: bufferedWhole,
+    bufferSeconds: settings.bufferSeconds,
+    recordMode: settings.recordMode,
+    theme: settings.theme,
+    visualizer: settings.visualizer,
+    overrideMode: popoutOverride,
+    rms: cs.rms,
+    pianoRoll: drawnLayer,
+  });
   useEffect(() => {
     if (!popoutOpen) return;
-    window.api.sendVizState({
-      capturing,
-      hasSource: !!cs.analyser,
-      canSave: canSaveNow,
-      clipActive: cs.clipActive,
-      clipStartedAt,
-      format: settings.recordingFormat,
-      bufferedSeconds: bufferedWhole,
-      bufferSeconds: settings.bufferSeconds,
-      recordMode: settings.recordMode,
-      theme: settings.theme,
-      visualizer: settings.visualizer,
-      overrideMode: popoutOverride,
-      rms: cs.rms,
-      pianoRoll: drawnLayer,
-    });
+    const now = performance.now();
+    if (now - lastVizStateSent.current < 500) return;
+    lastVizStateSent.current = now;
+    window.api.sendVizState(vizStatePayload());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     popoutOpen, capturing, canSaveNow, bufferedWhole, cs.analyser, cs.clipActive, clipStartedAt,
     settings.bufferSeconds, settings.recordMode, settings.theme, settings.visualizer,
-    settings.recordingFormat, popoutOverride,
-  ]); // eslint-disable-line react-hooks/exhaustive-deps
+    settings.recordingFormat, popoutOverride, cs.rms,
+  ]);
 
   // The pop-out has no buffer of its own — its history pane is fed from the
   // main window's peak track, and its spectrogram pane needs the same time
@@ -827,6 +855,8 @@ export default function App() {
     handleSelectionChange,
     toggleClipRecording,
     discardClipRecording,
+    exportMidi,
+    clearBufferAll,
   });
   cmdRef.current = {
     toggleCapture,
@@ -835,6 +865,8 @@ export default function App() {
     handleSelectionChange,
     toggleClipRecording,
     discardClipRecording,
+    exportMidi,
+    clearBufferAll,
   };
   useEffect(
     () =>
@@ -846,6 +878,8 @@ export default function App() {
           handleSelectionChange: hsc,
           toggleClipRecording: tcr,
           discardClipRecording: dcr,
+          exportMidi: em,
+          clearBufferAll: cb,
         } = cmdRef.current;
         if (c.type === 'toggle-capture') tc();
         else if (c.type === 'save') void ps();
@@ -856,6 +890,10 @@ export default function App() {
         else if (c.type === 'set-visualizer') void up({ visualizer: c.mode });
         else if (c.type === 'set-override') setPopoutOverride(c.mode);
         else if (c.type === 'selection-change') hsc(c.selection);
+        // The pop-out has no note layers of its own (they live in this
+        // window's recorder/history), so its ⇩ .mid buttons ask here.
+        else if (c.type === 'export-midi') void em();
+        else if (c.type === 'clear-buffer') clearBufferAll();
       }),
     [exportMidi],
   );
@@ -1014,6 +1052,7 @@ export default function App() {
         clipElapsed={cs.clipActive ? clipElapsed : undefined}
         clipEnabled={!!cs.stream && !!settings.saveFolder}
         onToggleClip={toggleClipRecording}
+        onClearBuffer={clearBufferAll}
       />
       {showBoard && (
         <main className={`board ${cs.clipActive || (settings.recordMode === 'traditional' && capturing) ? 'is-capturing' : ''}`}>
@@ -1034,7 +1073,7 @@ export default function App() {
                     onSelectionChange={handleSelectionChange}
                     onDragNotReady={() => emitToast('error', 'Snippet still preparing — give it a second, then drag.')}
                   />
-                  {m === 'midi' && exportableLayer && exportableLayer.notes.length > 0 && (
+                  {m === 'midi' && (
                     <button
                       type="button"
                       className="viz-pane-export"
@@ -1082,7 +1121,7 @@ export default function App() {
                 onSelectionChange={handleSelectionChange}
                 onDragNotReady={() => emitToast('error', 'Snippet still preparing — give it a second, then drag.')}
               />
-              {visibleModes[0] === 'midi' && exportableLayer && exportableLayer.notes.length > 0 && (
+              {visibleModes[0] === 'midi' && (
                 <button
                   type="button"
                   className="viz-pane-export board-export"
