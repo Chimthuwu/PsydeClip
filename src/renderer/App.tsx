@@ -789,6 +789,7 @@ export default function App() {
       visualizer: settings.visualizer,
       overrideMode: popoutOverride,
       rms: cs.rms,
+      pianoRoll: drawnLayer,
     });
   }, [
     popoutOpen, capturing, canSaveNow, bufferedWhole, cs.analyser, cs.clipActive, clipStartedAt,
@@ -1033,7 +1034,7 @@ export default function App() {
                     onSelectionChange={handleSelectionChange}
                     onDragNotReady={() => emitToast('error', 'Snippet still preparing — give it a second, then drag.')}
                   />
-                  {exportableLayer && exportableLayer.notes.length > 0 && (
+                  {m === 'midi' && exportableLayer && exportableLayer.notes.length > 0 && (
                     <button
                       type="button"
                       className="viz-pane-export"
@@ -1081,7 +1082,7 @@ export default function App() {
                 onSelectionChange={handleSelectionChange}
                 onDragNotReady={() => emitToast('error', 'Snippet still preparing — give it a second, then drag.')}
               />
-              {exportableLayer && exportableLayer.notes.length > 0 && (
+              {visibleModes[0] === 'midi' && exportableLayer && exportableLayer.notes.length > 0 && (
                 <button
                   type="button"
                   className="viz-pane-export board-export"

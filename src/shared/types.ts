@@ -384,6 +384,28 @@ export interface TranscribeJobState {
   error?: string;
 }
 
+/** Note layer to be displayed in the piano-roll lane. */
+export interface NoteLayer {
+  /** Session seconds of the slice's first sample — note times are relative to this. */
+  startSec: number;
+  /** Length of the transcribed slice in seconds. */
+  durationSec: number;
+  notes: TranscribedNote[];
+  /** Short range label for the lane's corner, e.g. `12.4–18.9s`. */
+  label: string;
+  /**
+   * True while these notes come from the live YIN tracker rather than a Basic
+   * Pitch transcription (todo.md §MIDI-1 Phase B).
+   *
+   * The distinction is shown rather than hidden: live notes draw in a dim tint
+   * and a layer stays `live` until a real transcription replaces it. A YIN
+   * estimate is monophonic and cheap, so drawing it identically to a
+   * transcription would claim a precision it does not have — which is also why
+   * it is kept out of the `.mid` export.
+   */
+  live?: boolean;
+}
+
 /** Channels used on the IPC bus. */
 export const IpcChannel = {
   settingsGet: 'settings:get',
@@ -512,6 +534,8 @@ export interface VizState {
    */
   overrideMode: VisualizerMode | null;
   rms: number;
+  /** MIDI notes to be displayed in the piano-roll lane when the visualizer is 'midi'. */
+  pianoRoll?: NoteLayer | null;
 }
 
 /**

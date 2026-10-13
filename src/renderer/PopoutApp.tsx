@@ -124,6 +124,7 @@ export default function PopoutApp() {
   const overrideMode = state.overrideMode ?? null;
   const vizMode = overrideMode ?? state.visualizer ?? settings.visualizer;
   const forcedSingle = overrideMode !== null;
+  const pianoRoll = state.pianoRoll;
   const showControls = settings.popoutControls;
   // The recording ring only means something for *bounded* recordings: a clip
   // being captured, or an explicit traditional-mode session. The always-on
@@ -174,6 +175,9 @@ export default function PopoutApp() {
         <span className="popout-title">{state.capturing ? 'recording' : 'monitor'}</span>
         {/* The pop-out IS the docked view, so it carries the quick knobs too. */}
         <TitleKnobs settings={settings} />
+        {pianoRoll && pianoRoll.notes.length > 0 && (
+          <button type="button" className="tb-btn" title="Export MIDI notes" onClick={() => window.api.sendVizCommand({ type: 'export-midi' })}>⇩ .mid</button>
+        )}
         {forcedSingle && (
           <button
             type="button"
@@ -232,7 +236,19 @@ export default function PopoutApp() {
                       : undefined
                   }
                   isPopout={true}
+                  pianoRoll={m === 'midi' ? pianoRoll : null}
                 />
+                {pianoRoll && pianoRoll.notes.length > 0 && (
+                  <button
+                    type="button"
+                    className="viz-pane-export"
+                    title="Export the current MIDI notes as a .mid file"
+                    aria-label="Export MIDI"
+                    onClick={() => window.api.sendVizCommand({ type: 'export-midi' })}
+                  >
+                    ⇩ .mid
+                  </button>
+                )}
                 <button
                   type="button"
                   className="viz-pane-pop"
@@ -270,7 +286,19 @@ export default function PopoutApp() {
                 window.api.sendVizCommand({ type: 'selection-change', selection: sel });
               }}
               isPopout={true}
+              pianoRoll={(forcedSingle ? vizMode : visibleModes[0]) === 'midi' ? pianoRoll : null}
             />
+            {pianoRoll && pianoRoll.notes.length > 0 && (
+              <button
+                type="button"
+                className="viz-pane-export board-export"
+                title="Export the current MIDI notes as a .mid file"
+                aria-label="Export MIDI"
+                onClick={() => window.api.sendVizCommand({ type: 'export-midi' })}
+              >
+                ⇩ .mid
+              </button>
+            )}
             <span className="board-mode-tag" aria-hidden="true">
               {VISUALIZER_LABELS[forcedSingle ? vizMode : visibleModes[0]]}
             </span>
@@ -314,7 +342,7 @@ export default function PopoutApp() {
                   }
                   onClick={() => toggleMode(m)}
                 >
-                  {m === 'oscilloscope' ? '∿' : m === 'spectrum' ? '▥' : m === 'spectrogram' ? '▦' : '◷'}
+                  {m === 'oscilloscope' ? '∿' : m === 'spectrum' ? '▥' : m === 'spectrogram' ? '▦' : m === 'midi' ? '🎹' : '◷'}
                 </button>
               );
             })}
