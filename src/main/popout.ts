@@ -1,9 +1,10 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, nativeImage } from 'electron';
 import path from 'node:path';
 import { AppSettings, IpcChannel, SnapTarget } from '../shared/types';
 import { readSettings, writeSettings } from './settings';
 import { handleWindowMoved, reapplyOnResize, snapWindow } from './window-controls';
 import { appBarOwner, removeAppBar } from './appbar';
+import { ICON_256_DATA_URL } from './icon-assets';
 
 /**
  * The pop-out visualizer: a second, frameless, always-on-top window that shows
@@ -66,6 +67,7 @@ export function createPopout(onClosed?: () => void): BrowserWindow {
     maximizable: false,
     fullscreenable: false,
     title: 'Unrecordable — Visualizer',
+    icon: nativeImage.createFromDataURL(ICON_256_DATA_URL),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

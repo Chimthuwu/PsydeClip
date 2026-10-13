@@ -40,7 +40,7 @@ export function TitleBar({
   return (
     <div className={`titlebar ${children ? 'has-inline' : ''}`}>
       <span className={`tb-dot ${capturing ? 'on' : ''}`} aria-hidden="true" />
-      <span className="tb-name">recordr</span>
+      <span className="tb-name">Unrecordable</span>
 
       {children ? <div className="tb-inline">{children}</div> : <div className="tb-spacer" />}
 

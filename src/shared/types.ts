@@ -566,7 +566,8 @@ export type VizCommand =
   | { type: 'set-visualizer'; mode: VisualizerMode }
   | { type: 'set-override'; mode: VisualizerMode | null }
   | { type: 'selection-change'; selection: [number, number] | null }
-  | { type: 'export-midi' };
+  | { type: 'export-midi' }
+  | { type: 'clear-buffer' };
 
 /** The clip window's two buttons, relayed to the main renderer. */
 export type ClipCommand = { type: 'toggle-clip' } | { type: 'discard-clip' };

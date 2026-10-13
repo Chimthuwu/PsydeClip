@@ -972,7 +972,27 @@ function drawHistory(
     }
     ctx.closePath();
 
-    ctx.fillStyle = p.wave;
+    // Fill: themes whose spectrum bars carry a vertical gradient (kawaii,
+    // modern) give the history envelope the SAME treatment, so the grid reads
+    // as one coherent theme instead of flat wave vs gradient bars
+    // (owner, 2026-10-13). Same stops, same bottom→top direction as
+    // drawSpectrum. Stroke stays p.wave so the envelope edge keeps its theme
+    // identity; flat-fill themes are untouched.
+    if (theme === 'kawaii' || theme === 'modern') {
+      const g = ctx.createLinearGradient(0, plotH, 0, 0);
+      if (theme === 'kawaii') {
+        g.addColorStop(0, '#7fe7dc');
+        g.addColorStop(0.5, '#b39dff');
+        g.addColorStop(1, '#ff5fa2');
+      } else {
+        g.addColorStop(0, '#7df9ff');
+        g.addColorStop(0.6, '#b48bff');
+        g.addColorStop(1, '#ff8df0');
+      }
+      ctx.fillStyle = g;
+    } else {
+      ctx.fillStyle = p.wave;
+    }
     ctx.globalAlpha = 0.5;
     ctx.fill();
 
@@ -1078,28 +1098,44 @@ export function drawPianoRollLane(
   }
   ctx.stroke();
 
-  // Notes. Fixed, theme-independent colour deliberately — the note bars need
-  // to read clearly against every grid/background theme, and reusing p.wave
-  // (the oscilloscope/history colour) made them nearly invisible on themes
-  // where grid and wave sit in the same hue family (todo.md MIDI contrast
-  // complaint, 2026-10-07). A thin dark outline keeps it legible even on the
-  // brightest themes (kawaii, monochrome). Velocity -> alpha, so dynamics are
-  // visible without a legend.
-  const NOTE_FILL = '#ff2fd0';
+  // Note colour. Fixed hot-magenta BY DEFAULT — the note bars need to read
+  // clearly against every grid/background theme, and reusing p.wave (the
+  // oscilloscope/history colour) made them nearly invisible on themes where
+  // grid and wave sit in the same hue family (todo.md MIDI contrast complaint,
+  // 2026-10-07). The one light/pastel theme (kawaii) overrides to its own wave
+  // colour with a soft white outline: on a near-white canvas the dark outline
+  // + neon magenta looked bruised, while the theme's pink notes are exactly how
+  // every other kawaii visualizer reads (owner, 2026-10-13). Velocity -> alpha,
+  // so dynamics are visible without a legend.
+  const kawaiiNote = theme === 'kawaii' && !opts.live;
+  const NOTE_FILL = kawaiiNote ? p.wave : '#ff2fd0';
+  // OUTLINE (owner, 2026-10-13: "still hard to see in the grid — outline them
+  // with another neon colour"): every note gets a stroke in the theme's
+  // second neon hue (p.spike — periwinkle/mint/ice…), so a bar pops against
+  // both the grid stripes and neighbouring fills. Live bars outline in
+  // p.wave instead — a third hue, so provisional notes stay distinguishable
+  // from transcribed ones at a glance. Replaces the old near-black stroke,
+  // which read as a bruise on kawaii and as nothing at all on dark grids.
   // Live-tracked notes (todo.md §MIDI-1 Phase B) draw in the theme's own accent
-  // instead, tinted toward the background: they read as provisional next to the
-  // flat hot-magenta of a real transcription without inventing a second fixed
-  // hue that could clash on a theme whose grid is itself magenta (sakura).
-  // Alpha is held down too — two signals, so "which of these is the real answer"
-  // is legible at a glance.
-  const liveFill = mixHex(p.accent, p.bg, 0.45);
+  // instead, so they read as provisional next to the flat note colour of a real
+  // transcription without inventing a second fixed hue that could clash on a
+  // theme whose grid is itself magenta (sakura).
+  //
+  // NEON, not pastel (owner, 2026-10-13: "they must always be clearly
+  // visible"): the old 45% background-mix plus a 0.3 alpha floor made live
+  // bars ghostly on every theme — barely there against both the sakura and
+  // black-ice grids. Now they carry the accent hue nearly pure with a small
+  // background touch, and the alpha floor is raised to match real notes
+  // (0.55 + velocity). Provisional-vs-real still reads at a glance, because
+  // the two differ in HUE and in the "live preview" caption — not by dimness.
+  const liveFill = mixHex(p.accent, p.bg, 0.15);
   const fill = opts.live ? liveFill : NOTE_FILL;
-  const NOTE_STROKE = 'rgba(0,0,0,0.55)';
+  const NOTE_STROKE = opts.live ? p.wave : p.spike;
   const inset = laneH >= 4 ? 1 : 0;
   const radius = Math.min(3, Math.max(0, (laneH - inset * 2) / 2));
   const canRound = typeof (ctx as { roundRect?: unknown }).roundRect === 'function';
   for (const r of layout.rects) {
-    ctx.globalAlpha = opts.live ? 0.3 + 0.4 * r.velocity : 0.55 + 0.45 * r.velocity;
+    ctx.globalAlpha = opts.live ? 0.55 + 0.35 * r.velocity : 0.55 + 0.45 * r.velocity;
     ctx.fillStyle = fill;
     ctx.strokeStyle = NOTE_STROKE;
     ctx.lineWidth = 1;
@@ -1128,16 +1164,14 @@ export function drawPianoRollLane(
   ctx.textBaseline = 'top';
   ctx.fillStyle = p.gridStrong;
   ctx.globalAlpha = 0.9;
-  ctx.fillText(text, 4, 3);
-  // Right-aligned second caption: the "preview, not the real answer" status is
-  // carried by the caption as well as the colour, because colour alone is lost
-  // to anyone who cannot separate the two hues.
-  if (count && opts.live) {
-    ctx.textAlign = 'right';
-    ctx.fillStyle = p.accent;
-    ctx.globalAlpha = 0.95;
-    ctx.fillText('live preview', w - 4, 3);
-  }
+  // Captions live along the BOTTOM edge now: the top-left corner is the export
+  // chip's home (owner, 2026-10-13 moved the button to the top of the pane),
+  // and the top-right carries the ⧉/✕ cluster — a caption under either read
+  // as scratched-out text.
+  ctx.fillText(text, 4, h - 13);
+  // The old right-aligned "live preview" badge is gone (owner, 2026-10-13):
+  // the count caption already carries the "live" word, and the label sat under
+  // the ⧉/✕ cluster after the export chip moved to the top-left.
   ctx.textAlign = 'left';
   ctx.globalAlpha = 1;
 }

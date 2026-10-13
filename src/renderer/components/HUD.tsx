@@ -25,6 +25,8 @@ interface Props {
   clipEnabled?: boolean;
   /** Toggle clip recording (used by Transport). */
   onToggleClip?: () => void;
+  /** Wipe the rolling buffer + notes (owner, 2026-10-13). */
+  onClearBuffer?: () => void;
 }
 
 export function HUD({
@@ -43,6 +45,7 @@ export function HUD({
   clipElapsed,
   onToggleClip,
   clipEnabled,
+  onClearBuffer,
 }: Props) {
   const showBuffer = settings.showBuffer && settings.recordMode === 'rolling';
   const bufferFull = bufferedSeconds >= settings.bufferSeconds - 2;
@@ -94,6 +97,17 @@ export function HUD({
       )}
 
       <div className="hud-actions">
+        {onClearBuffer && (
+          <button
+            type="button"
+            className="ghost"
+            title="Clear the rolling buffer, notes and session clock — start the session over"
+            aria-label="Clear buffer"
+            onClick={onClearBuffer}
+          >
+            ⌫
+          </button>
+        )}
         {!hideSettingsButton && (
           <button type="button" className="ghost" onClick={onOpenSettings} title="Settings">⚙</button>
         )}
