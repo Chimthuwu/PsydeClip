@@ -171,50 +171,25 @@ export default function PopoutApp() {
       }}
     >
       <div className="popout-drag">
-        <span className={`tb-dot ${state.capturing ? 'on' : ''}`} aria-hidden="true" />
-        <span className="popout-title">{state.capturing ? 'recording' : 'monitor'}</span>
-        {/* The pop-out IS the docked view, so it carries the quick knobs too. */}
         <TitleKnobs settings={settings} />
+        <Transport
+          capturing={state.capturing}
+          canSaveNow={state.canSave}
+          recordMode={state.recordMode}
+          bufferSeconds={state.bufferSeconds}
+          labelMode={settings.labelMode}
+          onToggleCapture={() => window.api.sendVizCommand({ type: 'toggle-capture' })}
+          onManualSave={() => window.api.sendVizCommand({ type: 'save' })}
+          clipActive={state.clipActive}
+          clipElapsed={state.clipActive ? clipElapsed : undefined}
+          onToggleClip={() => window.api.sendVizCommand({ type: 'toggle-clip' })}
+          clipEnabled={state.hasSource}
+          format={state.format}
+          tight
+        />
         {pianoRoll && pianoRoll.notes.length > 0 && (
           <button type="button" className="tb-btn" title="Export MIDI notes" onClick={() => window.api.sendVizCommand({ type: 'export-midi' })}>⇩ .mid</button>
         )}
-        {forcedSingle && (
-          <button
-            type="button"
-            className="tb-btn"
-            title="Back to all views"
-            onClick={() => window.api.sendVizCommand({ type: 'set-override', mode: null })}
-          >
-            ⊟
-          </button>
-        )}
-        {/* Docking is the whole point of a monitor window — it wants to live
-            along the top edge of a display. `windowSnap` routes to whichever
-            window sent it, so this parks the pop-out, not the main window. */}
-        <button
-          type="button"
-          className="tb-btn"
-          title="Dock to top of screen"
-          onClick={() => window.api.snapWindow('top')}
-        >
-          ⤒
-        </button>
-        <button
-          type="button"
-          className="tb-btn"
-          title="Quick settings"
-          onClick={() => window.api.showContextMenu()}
-        >
-          ⋯
-        </button>
-        <button
-          type="button"
-          className="tb-btn tb-close"
-          title="Close pop-out"
-          onClick={() => void window.api.togglePopout(false)}
-        >
-          ✕
-        </button>
       </div>
 
       <div className="popout-board">
@@ -238,7 +213,7 @@ export default function PopoutApp() {
                   isPopout={true}
                   pianoRoll={m === 'midi' ? pianoRoll : null}
                 />
-                {pianoRoll && pianoRoll.notes.length > 0 && (
+                {m === 'midi' && pianoRoll && pianoRoll.notes.length > 0 && (
                   <button
                     type="button"
                     className="viz-pane-export"
