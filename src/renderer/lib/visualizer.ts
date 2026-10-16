@@ -309,6 +309,16 @@ function palette(theme: Theme) {
         spike: '#a8f0d8',
         accent: '#7fe3f5',
       };
+    case 'permafrost':
+      return {
+        bg: '#000000',
+        grid: 'rgba(168,240,255,0.05)',
+        gridStrong: 'rgba(168,240,255,0.13)',
+        wave: '#c4f4fc',
+        bar: '#c4f4fc',
+        spike: '#ffcc7a',
+        accent: '#7fe3f5',
+      };
     case 'classic':
       return {
         bg: '#000000',
@@ -430,7 +440,7 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, the
     grad.addColorStop(1, '#0e0a1c');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
-  } else if (theme === 'black-ice') {
+  } else if (theme === 'black-ice' || theme === 'permafrost') {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
     const glow = ctx.createRadialGradient(w * 0.42, h * 0.34, 0, w * 0.42, h * 0.34, Math.max(w, h) * 0.55);
@@ -529,6 +539,13 @@ function drawSpectrum(
       g.addColorStop(0, '#7fe7dc');
       g.addColorStop(0.5, '#b39dff');
       g.addColorStop(1, '#ff5fa2');
+      grad = g;
+    } else if (theme === 'permafrost') {
+      // Ice at the floor, amber on the peaks: the highlight colour.
+      const g = ctx.createLinearGradient(0, h, 0, 0);
+      g.addColorStop(0, '#7fe3f5');
+      g.addColorStop(0.6, '#c4f4fc');
+      g.addColorStop(1, '#ffcc7a');
       grad = g;
     }
     ctx.fillStyle = grad;
@@ -845,6 +862,13 @@ const RAMPS: Record<Theme, Ramp> = {
     [0.88, 200, 245, 251],
     [1.0, 240, 253, 255],
   ],
+  permafrost: [
+    [0.0, 0, 0, 0],
+    [0.35, 14, 46, 52],
+    [0.65, 127, 227, 245],
+    [0.88, 255, 204, 122],
+    [1.0, 255, 240, 200],
+  ],
   nocturnal: [
     [0.0, 14, 10, 28],
     [0.3, 30, 26, 72],
@@ -978,12 +1002,16 @@ function drawHistory(
     // (owner, 2026-10-13). Same stops, same bottom→top direction as
     // drawSpectrum. Stroke stays p.wave so the envelope edge keeps its theme
     // identity; flat-fill themes are untouched.
-    if (theme === 'kawaii' || theme === 'modern') {
+    if (theme === 'kawaii' || theme === 'modern' || theme === 'permafrost') {
       const g = ctx.createLinearGradient(0, plotH, 0, 0);
       if (theme === 'kawaii') {
         g.addColorStop(0, '#7fe7dc');
         g.addColorStop(0.5, '#b39dff');
         g.addColorStop(1, '#ff5fa2');
+      } else if (theme === 'permafrost') {
+        g.addColorStop(0, '#7fe3f5');
+        g.addColorStop(0.6, '#c4f4fc');
+        g.addColorStop(1, '#ffcc7a');
       } else {
         g.addColorStop(0, '#7df9ff');
         g.addColorStop(0.6, '#b48bff');

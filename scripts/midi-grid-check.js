@@ -203,9 +203,18 @@ async function main() {
   );
 
   // ---- THE CPU GATE -------------------------------------------------------
-  // Stop, then watch the grid while the (still loud) synthetic melody plays on.
-  // If analysis kept running, bars would keep appearing and the hash would keep
-  // moving; the whole point of gating on a real recording is that it must not.
+  // The contract has two halves since the idle tracker landed (owner,
+  // 2026-10-13: "notes should appear whenever the MIDI visualizer is on screen,
+  // not only while the record button is down"):
+  //
+  //   recording             → always tracking
+  //   stopped, pane visible → tracking too, continuing the frozen preview
+  //   stopped, pane hidden   → NO timer alive at all
+  //
+  // The last one is the gate that matters (it is the standing CPU cost the gate
+  // exists to avoid), and until 2026-10-13 no harness could reach it — this
+  // section asserted the FIRST half as "no new notes while not recording",
+  // which the idle tracker deliberately made false.
   await ev(CLICK_RECORD);
   await sleep(800);
   const justStopped = await canvasStats(win);
@@ -214,14 +223,14 @@ async function main() {
     !!justStopped && justStopped.lit > 0,
     `lit=${justStopped?.lit}`,
   );
-  // Two independent gates, because a canvas that has stopped moving can be
-  // frozen for reasons that have nothing to do with the CPU gate (an emptied
-  // window, a redraw that happened to match). The first is the strong one and
-  // it is asserted FIRST, so a canvas-only pass cannot hide a broken gate.
-  //
-  // Read the tracker the app is actually holding. A fresh recording creates a
-  // NEW tracker whose note count restarts near zero; if the old one were still
-  // being fed, its count would keep climbing while the recording was stopped.
+  check(
+    'and they are still the preview colour, not a transcription',
+    !!justStopped && justStopped.magenta === 0,
+    `magenta=${justStopped?.magenta}`,
+  );
+  // Read the tracker the app is actually holding — a canvas that has stopped
+  // moving can be frozen for reasons that have nothing to do with the gate, so
+  // the note count is the primary evidence and it is asserted first.
   const NOTES_NOW =
     '(window.__recordrLiveNotes ? window.__recordrLiveNotes.noteCount : null)';
   check(
@@ -229,39 +238,105 @@ async function main() {
     (await ev(NOTES_NOW)) !== null,
     `noteCount=${await ev(NOTES_NOW)}`,
   );
+
   const g1 = await ev(NOTES_NOW);
   await sleep(3000);
   const g2 = await ev(NOTES_NOW);
   check(
-    'GATE: no new notes are detected while no recording is running',
-    g1 !== null && g2 !== null && g1 === g2,
-    `note count ${g1} -> ${g2} over 3s of live audio (this check fails if the gate is removed)`,
+    'the idle grid keeps finding notes while the MIDI pane is on screen',
+    g1 !== null && g2 !== null && g2 > g1,
+    `note count ${g1} -> ${g2} over 3s of live audio`,
   );
 
-  const c = await canvasStats(win);
-  await sleep(2500);
-  const laterIdle = await canvasStats(win);
+  // Half two: take the pane off screen. Nothing is watching any more, so the
+  // timer must stop dead — and the audio does NOT stop, which is what makes
+  // "the count is frozen" mean the gate rather than a silent source.
+  await ev(`window.__midiStub.setVizHidden(['midi'])`);
+  await sleep(1000);
+  const h1 = await ev(NOTES_NOW);
+  await sleep(3000);
+  const h2 = await ev(NOTES_NOW);
   check(
-    'GATE: the drawn grid also stops changing once the recording stops',
-    !!laterIdle && !!c && laterIdle.hash === c.hash,
-    `hash ${c?.hash} -> ${laterIdle?.hash} over 2.5s of live audio`,
+    'GATE: hiding the MIDI pane stops the tracker dead',
+    h1 !== null && h2 !== null && h1 === h2,
+    `note count ${h1} -> ${h2} over 3s of live audio with the pane hidden`,
   );
+
+  await ev(`window.__midiStub.setVizHidden(['oscilloscope', 'spectrum', 'spectrogram', 'history'])`);
+  await sleep(1000);
+  const s1 = await ev(NOTES_NOW);
+  await sleep(2500);
+  const s2 = await ev(NOTES_NOW);
   check(
-    'and the frozen notes are still the preview colour, not a transcription',
-    !!laterIdle && laterIdle.magenta === 0,
-    `magenta=${laterIdle?.magenta}`,
+    'and showing the pane again starts the tracking back up',
+    s1 !== null && s2 !== null && s2 > s1,
+    `note count ${s1} -> ${s2} over 2.5s of live audio`,
   );
 
   // ---- A new recording starts a fresh tracker, not an append. -------------
+  const frozen = await canvasStats(win);
   await ev(CLICK_RECORD);
   await sleep(2500);
   const restarted = await canvasStats(win);
   check(
     'a NEW recording starts a fresh tracker rather than appending',
-    !!restarted && !!laterIdle && restarted.hash !== laterIdle.hash,
-    `before=${laterIdle?.hash} after=${restarted?.hash}`,
+    !!restarted && !!frozen && restarted.hash !== frozen.hash,
+    `before=${frozen?.hash} after=${restarted?.hash}`,
   );
   check('and the fresh recording is drawing again', !!restarted && restarted.lit > 0, `lit=${restarted?.lit}`);
+
+  // ---- CLEAR BUFFER must not silence the grid (owner, 2026-10-13) ---------
+  // "when i pressed clear buffer the midi notes stopped appearing afterwards".
+  // The wipe nulled the live tracker and counted on an effect to rebuild one;
+  // neither tracking effect depends on anything a wipe changes, so no new
+  // tracker was ever made and the grid stayed blank until the MIDI pane was
+  // toggled — which re-ran the idle effect and rebuilt what the wipe dropped.
+  //
+  // Why the obvious check would NOT have caught it: under the bug the recording
+  // interval keeps feeding the tracker object it captured, so `noteCount`
+  // happily keeps climbing on a grid that draws nothing. The count is measured
+  // anyway (it should RESTART), but the check that actually discriminates is
+  // the note TIMELINE: the wipe restarts the session clock at 0, so the newest
+  // note must land near 0 again. Under the bug the orphan tracker keeps
+  // stamping the pre-wipe clock (~16 s by here) for ever.
+  const LAST_START =
+    '(function(){const t=window.__recordrLiveNotes;return t&&t.notes.length?t.notes[t.notes.length-1].startSec:null;})()';
+  const CLEAR_BTN = '.hud-actions button[aria-label="Clear buffer"]';
+  check(
+    'the HUD clear-buffer button is there to press',
+    await ev(`!!document.querySelector('${CLEAR_BTN}')`),
+  );
+
+  const preClearCount = await ev(NOTES_NOW);
+  const preClearStart = await ev(LAST_START);
+  await ev(`document.querySelector('${CLEAR_BTN}').click()`);
+  await sleep(400);
+  const postClearCount = await ev(NOTES_NOW);
+  await sleep(3000);
+  const postClearGrowth = await ev(NOTES_NOW);
+  const postClearStart = await ev(LAST_START);
+
+  check(
+    'clearing empties the note list',
+    preClearCount > 0 && postClearCount < preClearCount,
+    `${preClearCount} -> ${postClearCount}`,
+  );
+  check(
+    'notes keep being detected after a buffer clear',
+    postClearGrowth > postClearCount,
+    `note count ${postClearCount} -> ${postClearGrowth} over 3s of live audio`,
+  );
+  check(
+    'the restarted notes are stamped on the NEW session clock, not the old one',
+    postClearStart !== null && postClearStart < 4,
+    `newest note at ${postClearStart?.toFixed?.(2)}s after the wipe (was ${preClearStart?.toFixed?.(2)}s before)`,
+  );
+  const afterClear = await canvasStats(win);
+  check(
+    'and the grid is still drawing (its content keeps changing)',
+    !!afterClear && afterClear.hash !== restarted?.hash,
+    `hash ${restarted?.hash} -> ${afterClear?.hash}`,
+  );
 
   console.log(`\n  ${results.filter((r) => r.ok).length}/${results.length} checks passed`);
   if (errors.length) {

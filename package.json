@@ -108,7 +108,9 @@
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
       "artifactName": "${productName}-Windows-Setup-v${version}.${ext}",
-      "shortcutName": "Unrecordable"
+      "shortcutName": "Unrecordable",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   },
   "dependencies": {

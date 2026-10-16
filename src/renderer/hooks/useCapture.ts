@@ -98,6 +98,15 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
   // Mirror of `liveNotes` for the idle-tracking effect below (state is stable
   // per render, but the effect needs the CURRENT tracker, not its render's).
   const liveNotesRef = useRef<LiveNoteTracker | null>(null);
+  /**
+   * Bumped by `clearBuffer`. The peak-tracking effect below lists it as a
+   * dependency, so a wipe tears the buffer + session clock down and rebuilds
+   * them together. Without that, clearing swapped in fresh objects while the
+   * 20 Hz interval kept pushing into the ones it had captured, and the new
+   * (empty) peak buffer was never fed again — the History waveform stayed
+   * blank for the rest of the session.
+   */
+  const [sessionEpoch, setSessionEpoch] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [bufferedSeconds, setBufferedSeconds] = useState(0);
 
@@ -230,6 +239,11 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
   }, [analyser, recorder]);
   // 4. Peak tracking for the historical waveform overview.
   // Runs on a setInterval because requestAnimationFrame pauses when hidden.
+  //
+  // `sessionEpoch` is a dependency so a buffer clear rebuilds this loop rather
+  // than leaving it sampling into the buffer the clear replaced (see
+  // `clearBuffer`). It is also why the wipe does not set these two states
+  // itself: this effect owns them, and there is now exactly one writer.
   useEffect(() => {
     if (!analyser || !capturing) {
       setPeakBuffer(null);
@@ -260,7 +274,7 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
       }
     }, 20);
     return () => clearInterval(id);
-  }, [analyser, capturing, settings.bufferSeconds]);
+  }, [analyser, capturing, settings.bufferSeconds, sessionEpoch]);
 
     // 5. Live pitch tracking for the MIDI grid (todo.md §MIDI-1 Phase B).
   //
@@ -377,20 +391,36 @@ export function useCapture(settings: AppSettings, capturing: boolean) {
    * Clear the rolling buffer (owner, 2026-10-13): drop every stored peak and
    * the note preview with it, and restart the session clock at 0 — selections
    * are absolute session seconds, so a wipe that kept the old clock would let
-   * a stale selection point at audio that no longer exists. A fresh buffer
-   * + fresh model does that exactly; and because the clear button lives next
-   * to record, it reads as "start the session over".
+   * a stale selection point at audio that no longer exists. And because the
+   * clear button lives next to record, it reads as "start the session over":
+   * the buffer must start filling again from the next sample.
+   *
+   * Clearing is done by asking each owner to rebuild, not by swapping its
+   * objects out from under it. Two things broke when it did the latter:
+   *
+   *  - The MIDI grid went permanently blank (owner, 2026-10-13: "when i
+   *    pressed clear buffer the midi notes stopped appearing afterwards",
+   *    fixed by toggling the MIDI pane — which re-ran the idle-tracker effect
+   *    and rebuilt what the wipe had thrown away). The tracker is the grid's
+   *    only note source; nulling it there was the end of it, because both
+   *    tracking effects key off [analyser, midiVisible, recordingLive] and a
+   *    wipe changes none of those, so nothing ever made a new one.
+   *  - The History waveform never came back either, for the same reason: the
+   *    peak interval captures its PeakBuffer in a closure, so the fresh empty
+   *    buffer became purely decorative — the sampled audio kept landing in the
+   *    orphan and the waveform stayed flat until capture was restarted.
+   *
+   * So: `reset()` the tracker IN PLACE (same object the loops already push
+   * into, same identity the board reads `notes` from by reference) — and bump
+   * the epoch so the peak effect tears down and re-arms against a buffer it
+   * actually feeds. Note layers belong to App.tsx (transcription cache); its
+   * clear handler wipes those too.
    */
   const clearBuffer = useCallback(() => {
     if (!analyser) return;
-    const pb = new PeakBuffer(settings.bufferSeconds, 20);
-    liveNotesRef.current = null;
-    setLiveNotes(null);
-    setPeakBuffer(pb);
-    setHistoryModel(new HistoryModel(pb, 0));
-    // Note layers belong to App.tsx (transcription cache); its clear handler
-    // wipes those too.
-  }, [analyser, settings.bufferSeconds]);
+    liveNotesRef.current?.reset();
+    setSessionEpoch((n) => n + 1);
+  }, [analyser]);
 
   const refreshSources = useCallback(async () => {
     if (settings.captureBackend === 'loopback') {

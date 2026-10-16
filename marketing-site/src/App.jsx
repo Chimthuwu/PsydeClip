@@ -1,12 +1,13 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Download, Radio, Music, Check, Keyboard, History, Volume2, Scissors } from 'lucide-react';
+import VisualizerStage from './components/VisualizerStage.jsx';
 
-const REPO = 'https://github.com/Chimthuwu/recordr';
+const REPO = 'https://github.com/Chimthuwu/PsydeClip';
 const RELEASE = REPO + '/releases/latest';
 /** Stable across versions: the release carries a versionless copy of the installer. */
 const SETUP = REPO + '/releases/latest/download/Unrecordable-Windows-Setup.exe';
-const VERSION = '3.2.0';
+const VERSION = '4.1.2';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -54,7 +55,7 @@ const FEATURES = [
     icon: Radio,
     accent: 'magenta',
     title: 'Rolling buffer',
-    body: 'Always recording into memory — 15 minutes by default, configurable. Save writes that slice to disk as WebM/Opus, WAV or MP3, so you never lose the take you did not know you wanted.',
+    body: 'Always recording into memory — 5 minutes by default, configurable. Save writes that slice to disk as WebM/Opus, WAV or MP3, so you never lose the take you did not know you wanted.',
   },
   {
     icon: History,
@@ -117,6 +118,9 @@ function Nav() {
           <a href="#features" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
             Features
           </a>
+          <a href="#visualizers" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
+            Visualizers
+          </a>
           <a href="#themes" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
             Themes
           </a>
@@ -141,9 +145,40 @@ function Nav() {
 }
 
 /**
- * The app window, drawn rather than screenshotted: the real captures are of an
- * idle app with a flat board, and a still frame cannot show a moving trace.
- * The chrome, chips and status line mirror the real UI.
+ * The hero shows a REAL capture now (owner-supplied screenshots, 2026-10-13):
+ * five live visualizer panes — oscilloscope, spectrogram and the MIDI grid
+ * with live-tracked notes. The old drawn mockup is retired in favour of it;
+ * the title bar is cropped so the site's own chrome carries the branding.
+ */
+function HeroShot() {
+  return (
+    <div className="max-w-5xl mx-auto px-4 mt-20 [perspective:1200px]">
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.4 }}
+        className="group rounded-2xl border border-white/10 bg-[#0A0A0F] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_80px_rgba(255,0,255,0.15)] [transform:rotateX(5deg)] hover:[transform:rotateX(0deg)_translateY(-10px)] transition-transform duration-500"
+      >
+        <div className="h-10 bg-[#12121A] border-b border-white/5 flex items-center px-4 gap-2">
+          <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+          <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+          <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
+          <span className="mx-auto text-xs text-gray-500 font-mono">unrecordable</span>
+        </div>
+        <img
+          src="/shots-user/hero-modern.png"
+          alt="Unrecordable capturing system audio: oscilloscope, spectrogram and the live MIDI piano-roll grid"
+          className="block w-full"
+        />
+      </motion.div>
+    </div>
+  );
+}
+
+/**
+ * The app window, drawn rather than screenshotted: superseded by HeroShot
+ * (a real owner-supplied capture). Kept until the shots prove out so the
+ * revert is one line.
  */
 function AppMockup() {
   return (
@@ -240,7 +275,7 @@ function Hero() {
 
           <motion.p variants={fadeIn} className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-10">
             A rolling-sampler system audio recorder for Windows. It is always quietly recording into memory — press{' '}
-            <strong className="text-white">Save</strong> to write the last 15 minutes, or however long you buffered, to
+            <strong className="text-white">Save</strong> to write the last 5 minutes, or however long you buffered, to
             disk.
           </motion.p>
 
@@ -267,7 +302,7 @@ function Hero() {
         </motion.div>
       </div>
 
-      <AppMockup />
+      <HeroShot />
     </section>
   );
 }
@@ -317,6 +352,64 @@ function Features() {
               </motion.div>
             );
           })}
+        </motion.div>
+
+        {/* Real captures, owner-supplied (2026-10-13): the hero shows the app
+            working; this strip names the themes the gallery only thumbnails. */}
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={staggerContainer}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12"
+        >
+          {[
+            { src: '/shots-user/kawaii-grid.png', title: 'Hyper kawaii ✿', body: 'Four panes mid-recording, live notes pouring into the MIDI grid.' },
+            { src: '/shots-user/bloodred-grid.png', title: 'Blood red', body: 'The whole board tinted, MIDI grid tracking bars in real time.' },
+            { src: '/shots-user/modern-midi.png', title: 'Single MIDI view', body: 'Pinned to just the piano roll — export the notes with ⇩ .mid.' },
+          ].map(({ src, title, body }) => (
+            <motion.figure key={src} variants={fadeIn} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-white/20 transition-colors">
+              <img src={src} alt={`Unrecordable — ${title}`} loading="lazy" className="rounded-lg border border-white/10 w-full block mb-4" />
+              <figcaption className="font-bold mb-1">{title}</figcaption>
+              <p className="text-gray-400 text-sm">{body}</p>
+            </motion.figure>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The visualizer demo. The stage is its own component — it owns a canvas and a
+ * rAF loop — while the section wrapper lives here with the others so it picks
+ * up the same heading rhythm and reveal animation.
+ */
+function Visualizers() {
+  return (
+    <section id="visualizers" className="py-24 relative border-t border-white/5 bg-white/[0.01]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeIn}
+          className="text-center mb-12"
+        >
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
+            Watch it{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-cyan to-neon-magenta">
+              draw.
+            </span>
+          </h2>
+          <p className="text-gray-400 max-w-2xl mx-auto">
+            All five visualizers, restyled by whichever of the twelve themes is active. One pinned
+            full-frame, or the split view with them all on the board at once.
+          </p>
+        </motion.div>
+
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
+          <VisualizerStage />
         </motion.div>
       </div>
     </section>
@@ -387,7 +480,7 @@ function TechStack() {
 
 function Roadmap() {
   return (
-    <section className="py-24">
+    <section id="roadmap" className="py-24">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial="hidden"
@@ -467,6 +560,7 @@ export default function App() {
       <Nav />
       <Hero />
       <Features />
+      <Visualizers />
       <Themes />
       <TechStack />
       <Roadmap />
