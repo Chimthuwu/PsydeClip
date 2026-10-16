@@ -13,7 +13,8 @@ export type Theme =
   | 'lime'
   | 'blood-red'
   | 'nocturnal'
-  | 'black-ice';
+  | 'black-ice'
+  | 'permafrost';
 
 /** Every theme, in menu order. The one list both the Settings panel and the
  *  right-click quick menu read from, so they can't drift apart. */
@@ -30,6 +31,7 @@ export const THEMES: readonly { value: Theme; label: string; swatch: string }[] 
   { value: 'blood-red', label: 'Blood red', swatch: '#ff1024' },
   { value: 'nocturnal', label: 'Nocturnal', swatch: '#6a8dff' },
   { value: 'black-ice', label: 'Black ice', swatch: '#7fe3f5' },
+  { value: 'permafrost', label: 'Permafrost', swatch: '#7fe3f5' },
 ];
 
 export type VisualizerMode = 'oscilloscope' | 'spectrum' | 'spectrogram' | 'history' | 'midi';
@@ -269,13 +271,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sourceId: null,
   loopbackDeviceId: null,
   recordMode: 'rolling',
-  theme: 'modern',
+  theme: 'permafrost',
   visualizer: 'oscilloscope',
   // Everything except the primary mode starts hidden → a single board.
   vizHidden: ['spectrum', 'spectrogram', 'history', 'midi'],
   vizGain: 1,
   showOscilloscopeOverlay: false,
-  bufferSeconds: 15 * 60,
+  bufferSeconds: 5 * 60,
   bitrateKbps: 96,
   recordingFormat: 'webm',
     alwaysOnTop: false,

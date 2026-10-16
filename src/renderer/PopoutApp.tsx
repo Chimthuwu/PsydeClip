@@ -16,7 +16,7 @@ const DEFAULT_STATE: VizState = {
   clipStartedAt: 0,
   format: 'webm',
   bufferedSeconds: 0,
-  bufferSeconds: 900,
+  bufferSeconds: 300,
   recordMode: 'rolling',
   theme: 'modern',
   visualizer: 'oscilloscope',

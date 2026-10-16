@@ -7,6 +7,7 @@ import { SourcePicker } from './components/SourcePicker';
 import { FormatPicker } from './components/FormatPicker';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ToastStack } from './components/ToastStack';
+import { VizIcon } from './components/VizIcon';
 import { encodeFromBlob, encodeFromPcm } from './lib/encode';
 import { transcribeSavedRecording } from './lib/transcribe';
 import {
@@ -1000,7 +1001,7 @@ export default function App() {
         const only = active && visibleModes.length === 1;
         return (
           <button
-            key={m === 'oscilloscope' ? '∿' : m === 'spectrum' ? '▥' : m === 'spectrogram' ? '▦' : m === 'history' ? '◷' : m === 'midi' ? '🎹' : '◷'}
+            key={m}
             type="button"
             className={`chip ${active ? 'on' : ''}`}
             aria-pressed={active}
@@ -1013,7 +1014,7 @@ export default function App() {
             }
             onClick={() => toggleMode(m)}
           >
-            {m === 'oscilloscope' ? '∿' : m === 'spectrum' ? '▥' : m === 'spectrogram' ? '▦' : m === 'history' ? '◷' : m === 'midi' ? '🎹' : '◷'}
+            <VizIcon mode={m} />
           </button>
         );
       })}

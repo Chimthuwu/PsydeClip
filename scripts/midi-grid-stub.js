@@ -69,45 +69,74 @@ setInterval(emitFrames, 20);
 
 const noop = () => () => {};
 
+/**
+ * The settings this fake bridge serves. Mutable — `setSettings` merges into it,
+ * exactly as main's real handler does (see the note on `setSettings` below).
+ */
+/** `onSettingsChanged` listeners, fed by `setSettings` / `__midiStub.setVizHidden`. */
+const settingsSubs = [];
+
+const settings = {
+  hotkey: 'Alt+R',
+  saveFolder: '',
+  captureBackend: 'loopback',
+  loopbackDeviceId: 'fake-dev',
+  sourceId: null,
+  // 'traditional' makes App's `capturing=true` mean "a bounded recording is
+  // running", which is what arms live tracking. With 'rolling', capturing is
+  // the always-on monitor and must NOT arm it — a check that passed there
+  // would prove nothing about the gate.
+  recordMode: 'traditional',
+  transcribeOnSave: false,
+  theme: 'modern',
+  visualizer: 'midi',
+  // Only the MIDI board on screen. The default is a 5-pane mosaic whose first
+  // <canvas> is the OSCILLOSCOPE — a harness sampling that reports "no notes
+  // drawn" no matter what the grid was doing.
+  vizHidden: ['oscilloscope', 'spectrum', 'spectrogram', 'history'],
+  vizGain: 1,
+  showOscilloscopeOverlay: false,
+  bitrateKbps: 128,
+  bufferSeconds: 300,
+  recordingFormat: 'webm',
+  showVizChips: true,
+  showSourcePicker: false,
+  uiLayout: 'full',
+  titleBarMode: 'custom',
+  fileNameTemplate: 'recordr_{date}_{time}',
+  showBuffer: true,
+  magneticSnap: true,
+  dockReservesSpace: false,
+  showHint: true,
+  labelMode: 'auto',
+  alwaysOnTop: false,
+  startHidden: false,
+};
+
 const api = {
-  getSettings: async () => ({
-    hotkey: 'Alt+R',
-    saveFolder: '',
-    captureBackend: 'loopback',
-    loopbackDeviceId: 'fake-dev',
-    sourceId: null,
-    // 'traditional' makes App's `capturing=true` mean "a bounded recording is
-    // running", which is what arms live tracking. With 'rolling', capturing is
-    // the always-on monitor and must NOT arm it — a check that passed there
-    // would prove nothing about the gate.
-    recordMode: 'traditional',
-    transcribeOnSave: false,
-    theme: 'modern',
-    visualizer: 'midi',
-    // Only the MIDI board on screen. The default is a 5-pane mosaic whose first
-    // <canvas> is the OSCILLOSCOPE — a harness sampling that reports "no notes
-    // drawn" no matter what the grid was doing.
-    vizHidden: ['oscilloscope', 'spectrum', 'spectrogram', 'history'],
-    vizGain: 1,
-    showOscilloscopeOverlay: false,
-    bitrateKbps: 128,
-    bufferSeconds: 300,
-    recordingFormat: 'webm',
-    showVizChips: true,
-    showSourcePicker: false,
-    uiLayout: 'full',
-    titleBarMode: 'custom',
-    fileNameTemplate: 'recordr_{date}_{time}',
-    showBuffer: true,
-    magneticSnap: true,
-    dockReservesSpace: false,
-    showHint: true,
-    labelMode: 'auto',
-    alwaysOnTop: false,
-    startHidden: false,
-  }),
-  setSettings: async (patch) => patch,
-  onSettingsChanged: noop,
+  getSettings: async () => ({ ...settings }),
+  // MERGE and return the whole object, the way main's `setSettings` IPC handler
+  // does. This stub used to echo the patch straight back, and `useSettings`
+  // stores whatever it gets verbatim — so the first settings write anywhere in
+  // App (any `update({...})`, e.g. picking a device) replaced the app's settings
+  // with a one-key object. The next read of any other key threw, React unmounted
+  // the renderer, and EVERY check in midi-grid-check.js reported zero on a
+  // perfectly good build (found 2026-10-13: `settings.vizHidden.includes(...)`
+  // in useCapture, "Cannot read properties of undefined (reading 'includes')").
+  setSettings: async (patch) => {
+    Object.assign(settings, patch);
+    for (const fn of settingsSubs.slice()) fn({ ...settings });
+    return { ...settings };
+  },
+  // Real subscriptions, not `noop`: the harness flips `vizHidden` to test the
+  // other half of the CPU gate, and App only learns about that over this channel.
+  onSettingsChanged: (fn) => {
+    settingsSubs.push(fn);
+    return () => {
+      const i = settingsSubs.indexOf(fn);
+      if (i >= 0) settingsSubs.splice(i, 1);
+    };
+  },
   listLoopbackDevices: async () => [{ id: 'fake-dev', name: 'Fake Speakers', sampleRate: SR }],
   listSources: async () => [],
   // The synthesised-audio seam. Shape matches src/main/wasapi.ts's contract:
@@ -179,6 +208,15 @@ globalThis.api = api;
 globalThis.__midiStub = {
   setAudio(on) {
     audioRunning = on;
+  },
+  /**
+   * Hide/show visualizer panes and broadcast it, exactly as a Settings toggle
+   * does. The only way to exercise the CPU gate's other half from out here:
+   * with the MIDI pane off screen there must be no pitch timer alive at all.
+   */
+  setVizHidden(hidden) {
+    settings.vizHidden = [...hidden];
+    for (const fn of settingsSubs.slice()) fn({ ...settings });
   },
   subscriberCount() {
     return sampleSubs.length;

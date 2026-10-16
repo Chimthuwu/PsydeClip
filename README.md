@@ -3,16 +3,16 @@
 # 🎙️ Recordr
 
 **A Rolling Sampler–style system audio recorder for Windows.**  
-Always quietly recording in memory — press **Save** to write the last 15 minutes (or however long you buffered) to disk.
+Always quietly recording in memory — press **Save** to write the last 5 minutes (or however long you buffered) to disk.
 
-[![platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/Chimthuwu/recordr)
+[![platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/Chimthuwu/PsydeClip)
 [![electron](https://img.shields.io/badge/Electron-30-47848F?logo=electron&logoColor=white)](https://www.electronjs.org)
 [![react](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![typescript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
 [![naudio](https://img.shields.io/badge/NAudio-WASAPI-9933CC?logo=.net&logoColor=white)](https://github.com/naudio/NAudio)
 [![webm](https://img.shields.io/badge/codec-WebM%20%2F%20Opus-16213A)](https://www.opus-codec.org)
-[![status](https://img.shields.io/badge/status-WIP%20%2F%20pre--alpha-yellow)](https://github.com/Chimthuwu/recordr/issues)
+[![status](https://img.shields.io/badge/status-WIP%20%2F%20pre--alpha-yellow)](https://github.com/Chimthuwu/PsydeClip/issues)
 [![license](https://img.shields.io/badge/license-MIT-green)](#license)
 
 *The dashboard, the spectrogram, and the source picker. The tray icon overlays a red REC dot while capturing (Windows).*
@@ -113,7 +113,7 @@ flowchart LR
 
 1. App boots. Pick a source (a screen / window) or a loopback device (Speakers / Headphones / VoiceMeeter / …).
 2. A `MediaStream` opens against the chosen audio path. In *desktop* mode we go through Chromium's loopback mixer; in *loopback* mode the `.exe` helper pumps Float32-LE samples back over IPC into an in-DOM `AudioWorkletProcessor`, which exposes a `MediaStreamDestination` so the visualizer and `MediaRecorder` see the same node graph.
-3. `MediaRecorder` emits ~1 s Opus chunks to a **rolling ring buffer** capped at `bufferSeconds` (default 900s / 15 min). Older chunks are pruned in O(1).
+3. `MediaRecorder` emits ~1 s Opus chunks to a **rolling ring buffer** capped at `bufferSeconds` (default 300s / 5 min). Older chunks are pruned in O(1).
 4. **Save** → the renderer concatenates the current buffer into one `Blob`, sends the bytes to the main process over IPC, `saveWebm()` writes them with the substituted filename template, and `tray.notifySaveCompleted()` pushes the file into the recent-saves ring buffer. (The hotkey is a separate path: in rolling mode it starts/stops a **clip**, which streams to a temp file and never touches the rolling buffer.)
 
 ---
@@ -123,7 +123,7 @@ flowchart LR
 You need **Node ≥ 18**, **Rust-free environment** (no native module rebuild needed for the WASAPI helper), **Windows 10 or 11** (loopback backend; desktop backend works everywhere Electron 30 ships).
 
 ```bash
-git clone https://github.com/Chimthuwu/recordr
+git clone https://github.com/Chimthuwu/PsydeClip
 cd recordr
 npm install
 npm run dev
@@ -136,7 +136,7 @@ When the window opens:
 1. Click ⚙ **Settings** → **Pick folder** → choose where recordings land
 2. Bottom dropdown → pick a screen/window (Spotify, Bitwig, …) **or** switch the **Capture backend** radio to **Per-output device (WASAPI)** and pick your speakers
 3. Hit **Start** (or press <kbd>Alt</kbd>+<kbd>R</kbd> to cut a clip on its own)
-4. Play something; the visualizer fills in. **Save last 15 min** writes the rolling buffer to disk — toast confirms. The hotkey records a *clip* instead, leaving the rolling buffer untouched.
+4. Play something; the visualizer fills in. **Save last 5 min** writes the rolling buffer to disk — toast confirms. The hotkey records a *clip* instead, leaving the rolling buffer untouched.
 
 ---
 

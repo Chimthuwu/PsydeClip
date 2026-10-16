@@ -516,6 +516,45 @@
   --panel-blur: 0px;
 }
 
+/* --- Permafrost: Black ice's cold base with a warm amber signal highlight.
+   The default theme for new installs. Amber is the highlight colour: it marks
+   the spectrum and history peaks and the MIDI note outlines. */
+.theme-permafrost {
+  --bg-app: #000000;
+  --bg-surface: #050708;
+  --bg-surface-elevated: #080b0d;
+  --bg-gradient:
+    radial-gradient(ellipse at 30% 14%, rgba(168, 240, 255, 0.06), transparent 60%),
+    var(--bg-app);
+
+  --text-primary: #eafaff;
+  --text-secondary: #a9cdd6;
+  --text-muted: #6f929b;
+
+  --accent: #7fe3f5;
+  --accent-bright: #c4f4fc;
+  --accent-soft: #ffcc7a;
+
+  --border: rgba(168, 240, 255, 0.16);
+  --border-soft: rgba(168, 240, 255, 0.05);
+  --border-active: rgba(255, 204, 122, 0.5);
+
+  --waveform: #c4f4fc;
+  --grid-major: rgba(168, 240, 255, 0.1);
+  --grid-minor: rgba(168, 240, 255, 0.04);
+
+  --success: #7fe3f5;
+  --warning: #ffcc7a;
+  --danger: #ff6b8e;
+  --rec: #7fe3f5;
+
+  --glow: 0.35;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --panel-blur: 0px;
+}
+
 /* --- Legacy aliases ------------------------------------------------------
    The original token names, expressed in terms of the semantic ones. This is
    what lets the token layer land without touching 1800 lines of rules in the
@@ -534,6 +573,7 @@
 .theme-blood-red,
 .theme-nocturnal,
 .theme-black-ice,
+.theme-permafrost,
 :root {
   --bg: var(--bg-app);
   --bg-2: var(--bg-surface-elevated);
