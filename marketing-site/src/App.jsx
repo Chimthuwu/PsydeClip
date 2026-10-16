@@ -6,7 +6,7 @@ import VisualizerStage from './components/VisualizerStage.jsx';
 const REPO = 'https://github.com/Chimthuwu/PsydeClip';
 const RELEASE = REPO + '/releases/latest';
 /** Stable across versions: the release carries a versionless copy of the installer. */
-const SETUP = REPO + '/releases/latest/download/Unrecordable-Windows-Setup.exe';
+const SETUP = REPO + '/releases/latest/download/PsydeClip-Windows-Setup.exe';
 const VERSION = '4.1.2';
 
 const fadeIn = {
@@ -112,7 +112,7 @@ function Nav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <a href="#top" className="flex items-center gap-2.5">
           <span className="w-2.5 h-2.5 rounded-full bg-neon-magenta animate-pulse-dot" />
-          <span className="font-extrabold text-xl tracking-tight">unrecordable</span>
+          <span className="font-extrabold text-xl tracking-tight">psydeclip</span>
         </a>
         <div className="flex items-center gap-6">
           <a href="#features" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
@@ -163,11 +163,11 @@ function HeroShot() {
           <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
           <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
           <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
-          <span className="mx-auto text-xs text-gray-500 font-mono">unrecordable</span>
+          <span className="mx-auto text-xs text-gray-500 font-mono">psydeclip</span>
         </div>
         <img
           src="/shots-user/hero-modern.png"
-          alt="Unrecordable capturing system audio: oscilloscope, spectrogram and the live MIDI piano-roll grid"
+          alt="PsydeClip capturing system audio: oscilloscope, spectrogram and the live MIDI piano-roll grid"
           className="block w-full"
         />
       </motion.div>
@@ -193,7 +193,7 @@ function AppMockup() {
           <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
           <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
           <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
-          <span className="mx-auto text-xs text-gray-500 font-mono">unrecordable</span>
+          <span className="mx-auto text-xs text-gray-500 font-mono">psydeclip</span>
         </div>
 
         <div className="p-5 flex flex-col gap-4 bg-[#05050A]">
@@ -369,7 +369,7 @@ function Features() {
             { src: '/shots-user/modern-midi.png', title: 'Single MIDI view', body: 'Pinned to just the piano roll — export the notes with ⇩ .mid.' },
           ].map(({ src, title, body }) => (
             <motion.figure key={src} variants={fadeIn} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-white/20 transition-colors">
-              <img src={src} alt={`Unrecordable — ${title}`} loading="lazy" className="rounded-lg border border-white/10 w-full block mb-4" />
+              <img src={src} alt={`PsydeClip — ${title}`} loading="lazy" className="rounded-lg border border-white/10 w-full block mb-4" />
               <figcaption className="font-bold mb-1">{title}</figcaption>
               <p className="text-gray-400 text-sm">{body}</p>
             </motion.figure>
@@ -444,7 +444,7 @@ function Themes() {
             >
               <img
                 src={`/shots/main-${slug}.png`}
-                alt={`Unrecordable in the ${label} theme`}
+                alt={`PsydeClip in the ${label} theme`}
                 loading="lazy"
                 className="rounded-lg border border-white/10 w-full block mb-4"
               />

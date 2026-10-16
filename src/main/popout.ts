@@ -66,7 +66,7 @@ export function createPopout(onClosed?: () => void): BrowserWindow {
     resizable: true,
     maximizable: false,
     fullscreenable: false,
-    title: 'Unrecordable — Visualizer',
+    title: 'PsydeClip — Visualizer',
     icon: nativeImage.createFromDataURL(ICON_256_DATA_URL),
     show: false,
     webPreferences: {

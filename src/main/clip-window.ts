@@ -53,7 +53,7 @@ function create(): BrowserWindow {
     // on appear; clicking Stop/✕ will briefly focus it, which is fine for a
     // deliberate action. (focusable:false on Windows can eat button clicks.)
     alwaysOnTop: true,
-    title: 'Unrecordable — Recording clip',
+    title: 'PsydeClip — Recording clip',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

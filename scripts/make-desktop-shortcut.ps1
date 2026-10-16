@@ -8,8 +8,8 @@
 # it uses the correct icon this time").
 $desktop = [Environment]::GetFolderPath('Desktop')
 $root = Split-Path -Parent $PSScriptRoot
-$exe = Join-Path $root 'release\win-unpacked\Unrecordable.exe'
-$lnkPath = Join-Path $desktop 'Unrecordable.lnk'
+$exe = Join-Path $root 'release\win-unpacked\PsydeClip.exe'
+$lnkPath = Join-Path $desktop 'PsydeClip.lnk'
 $ws = New-Object -ComObject WScript.Shell
 $lnk = $ws.CreateShortcut($lnkPath)
 $lnk.TargetPath = $exe

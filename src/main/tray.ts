@@ -221,7 +221,7 @@ function buildTooltip(): string {
     const elapsedSec = Math.floor(elapsedSecNow() / 1000);
     lines.push(`● Recording  ${formatMs(elapsedSec)}`);
   } else {
-    lines.push('Unrecordable — idle');
+    lines.push('PsydeClip — idle');
   }
   const settings = getSettingsRef?.();
   if (settings?.saveFolder) {
@@ -321,7 +321,7 @@ function buildMenu(): Electron.Menu {
       click: () => openSettings(),
     },
     { type: 'separator' },
-    { label: 'Quit Unrecordable', click: () => app.quit() },
+    { label: 'Quit PsydeClip', click: () => app.quit() },
   ]);
 }
 

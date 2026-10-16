@@ -6,12 +6,14 @@ import { AppSettings, DEFAULT_SETTINGS, VISUALIZER_MODES } from '../shared/types
 const SETTINGS_FILENAME = 'recordr-settings.json';
 
 /**
- * The app was called Recordr until 2026-10-12. `userData` is derived from the
- * product name, so the rename moved it from %APPDATA%/Recordr to
- * %APPDATA%/Unrecordable and would have silently reset everybody's save
- * folder, theme and hotkey. The file name inside it is deliberately unchanged.
+ * The app was called Recordr until 2026-10-12, then Unrecordable, then
+ * PsydeClip. `userData` is derived from the product name, so each rename moved
+ * it (%APPDATA%/Recordr → Unrecordable → PsydeClip) and would otherwise have
+ * silently reset everybody's save folder, theme and hotkey. The file name
+ * inside it is deliberately unchanged. Both old folders are checked, newest
+ * first.
  */
-const LEGACY_USER_DATA_DIR = 'Recordr';
+const LEGACY_USER_DATA_DIRS = ['Unrecordable', 'Recordr'];
 
 function settingsPath(): string {
   return path.join(app.getPath('userData'), SETTINGS_FILENAME);
@@ -25,8 +27,10 @@ function migrateLegacySettings(): void {
   const current = settingsPath();
   if (fs.existsSync(current)) return;
   try {
-    const legacy = path.join(app.getPath('appData'), LEGACY_USER_DATA_DIR, SETTINGS_FILENAME);
-    if (!fs.existsSync(legacy)) return;
+    const legacy = LEGACY_USER_DATA_DIRS.map((dir) =>
+      path.join(app.getPath('appData'), dir, SETTINGS_FILENAME),
+    ).find((candidate) => fs.existsSync(candidate));
+    if (!legacy) return;
     fs.mkdirSync(path.dirname(current), { recursive: true });
     fs.copyFileSync(legacy, current);
     console.log('[settings] carried over pre-rename settings from', legacy);

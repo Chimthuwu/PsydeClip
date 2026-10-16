@@ -15,7 +15,7 @@ const { app } = require('electron');
 
 // Its own userData dir, so a running copy of the app is left alone (and the
 // single-instance lock does not shoot this down).
-const tmpUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'unrecordable-shrink-'));
+const tmpUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'psydeclip-shrink-'));
 app.setPath('userData', tmpUserData);
 
 // Closing the pop-out at the end would otherwise quit the app before the
