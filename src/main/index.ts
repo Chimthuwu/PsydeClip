@@ -70,7 +70,7 @@ function createWindow(bounds?: Electron.Rectangle) {
     // frameless window itself).
     frame: settings.titleBarMode !== 'custom',
     transparent: settings.titleBarMode === 'custom',
-    title: 'Unrecordable',
+    title: 'PsydeClip',
     backgroundColor: settings.titleBarMode === 'custom' ? '#00000000' : '#070a1c',
     autoHideMenuBar: true,
     show: false, // show after ready-to-show
@@ -358,7 +358,7 @@ function ensureDesktopRecoveryTask(): void {
     app.getPath('appData'),
     'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup',
   );
-  const vbsPath = path.join(startUpDir, 'Unrecordable Desktop Recovery.vbs');
+  const vbsPath = path.join(startUpDir, 'PsydeClip Desktop Recovery.vbs');
   // The app was called Recordr until 2026-10-12; that launcher points at an exe
   // path that no longer exists, so clear it rather than leaving two behind.
   const legacyVbsPath = path.join(startUpDir, 'Recordr Desktop Recovery.vbs');
@@ -384,7 +384,7 @@ function buildRecoveryLauncher(exePath: string): string {
   // literals would eat `\r`/`\u`… out of a Windows path — double them first.
   const vbs = (p: string) => p.replace(/\\/g, '\\\\').replace(/"/g, '""');
   return [
-    `' Unrecordable desktop recovery: reclaims the top-of-screen strip an`,
+    `' PsydeClip desktop recovery: reclaims the top-of-screen strip an`,
     `' unexpected exit can leave reserved. Generated at startup; safe to delete.`,
     `On Error Resume Next`,
     `Set fso = CreateObject("Scripting.FileSystemObject")`,

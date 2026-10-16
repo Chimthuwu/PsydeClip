@@ -111,7 +111,7 @@ app.whenReady().then(async () => {
   // drawn mockup with a real capture, so that assertion had been failing since.
   check('the hero is a real capture', result.heroCapture !== 'absent' && !/^0x/.test(result.heroCapture), result.heroCapture);
   check('the theme screenshots loaded', result.themeShot !== 'absent' && !/^0x/.test(result.themeShot), result.themeShot);
-  check('the brand reads Unrecordable', result.brandName === 'unrecordable', result.brandName);
+  check('the brand reads PsydeClip', result.brandName === 'psydeclip', result.brandName);
   check('no stray "Recordr" in the copy', result.brandHits === 0, `${result.brandHits} hits`);
   check('no broken images', result.brokenImages.length === 0, result.brokenImages.join(', ') || 'none');
   check('Tailwind is applied', result.bodyBg === 'rgb(5, 5, 10)', `body bg ${result.bodyBg}`);

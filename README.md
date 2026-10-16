@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎙️ Recordr
+# 🎙️ PsydeClip
 
 **A Rolling Sampler–style system audio recorder for Windows.**  
 Always quietly recording in memory — press **Save** to write the last 5 minutes (or however long you buffered) to disk.
@@ -86,7 +86,7 @@ flowchart LR
     Helper[("recordr-loopback.exe<br/>NAudio · WasapiLoopbackCapture")]
     Save["saveWebm()<br/>formatFileName()"]
     Tray["Tray · recent-saves<br/>elapsed-time ticker"]
-    Settings[("JSON settings<br/>%APPDATA%/Recordr")]
+    Settings[("JSON settings<br/>%APPDATA%/PsydeClip")]
     Hotkey["globalShortcut"]
   end
 
@@ -146,7 +146,7 @@ When the window opens:
 npm run package
 ```
 
-Outputs to `release/`. The unpacked Windows app lives in `release/win-unpacked/Recordr.exe`. To re-pack the asar manually (skipping the winCodeSign symlink-privilege rodeo on some boxes):
+Outputs to `release/`. The unpacked Windows app lives in `release/win-unpacked/PsydeClip.exe`. To re-pack the asar manually (skipping the winCodeSign symlink-privilege rodeo on some boxes):
 
 ```bash
 npm run build
@@ -223,7 +223,7 @@ Recent saves ▸
 ─────
 Settings…
 ─────
-Quit Recordr
+Quit PsydeClip
 ```
 
 **Filename template** — Settings modal has a text input plus token chips. Hit a chip and it inserts at the caret:
@@ -257,7 +257,7 @@ OS-illegal chars (`/\:*?"<>|`) are stripped and run-together `_` collapsed befor
 | Capture — desktop | **`desktopCapturer` → `getUserMedia`** | First-party Chromium path |
 | Capture — loopback | **NAudio `WasapiLoopbackCapture` via a .NET 8 helper** | Single-purpose, no Electron rebuild needed |
 | IPC serialization | **`Uint8Array` for PCM, primitives for everything else** | Zero-copy transport via Electron's structured clone |
-| Settings store | **JSON in `%APPDATA%/Recordr`** | No deps, debuggable in Notepad if needed |
+| Settings store | **JSON in `%APPDATA%/PsydeClip`** | No deps, debuggable in Notepad if needed |
 | Iconography | **Procedurally drawn RGBA buffers** | No PNG assets to ship |
 
 </div>
@@ -271,7 +271,7 @@ The list below is what an external user would hit if they pulled the repo right 
 - ✅ **Renderer crash on Start — fixed.** Chromium used to kill the whole renderer (`bad_message.cc(29) … reason 263`) when a *window* source or a stale `sourceId` reached `getUserMedia({chromeMediaSource:'desktop',…})`. A pre-flight guard in `useCapture` now rejects anything that isn't a live `screen:*` id and surfaces it as an ordinary error line.
 - ✅ **White-on-white dropdown — fixed.** The picker is an in-DOM listbox, and `color-scheme: dark` is set on `:root` so the native `<select>`s that remain in Settings follow the OS theme.
 - 🟢 **`npm run package` post-extract step fails on locked-down boxes** — `winCodeSign` archive contains macOS symlinks (`libcrypto.dylib`, `libssl.dylib`) that 7-Zip needs admin to recreate on Windows. Either run `electron-builder` in `--dir` mode, or pre-extract the archive and `touch marker.file` to short-circuit the hash re-download. The unpacked `release/win-unpacked/` is unaffected and fully usable.
-- 🟢 **No code signing** — `Recordr.exe` is unsigned, so SmartScreen warns the first time on most installs. Click *More info → Run anyway* until a real cert is wired up.
+- 🟢 **No code signing** — `PsydeClip.exe` is unsigned, so SmartScreen warns the first time on most installs. Click *More info → Run anyway* until a real cert is wired up.
 - 🟢 **Default save folder is empty** — first-launch UX asks the user to pick before any recording. This is intentional but might frustrate power users; an `~/Recordings` default is on the roadmap.
 
 See [`todo.md`](./todo.md) for the full deep-dive.
