@@ -436,17 +436,17 @@ function Themes() {
           <p className="text-gray-400">Twelve themes, every card a real screenshot of the running app.</p>
         </motion.div>
 
-        <div className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {THEMES.map(({ slug, label }) => (
             <figure
               key={slug}
-              className="min-w-[280px] md:min-w-[520px] snap-center rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-white/20 transition-colors"
+              className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-white/20 transition-colors"
             >
               <img
                 src={`/shots/main-${slug}.png`}
                 alt={`PsydeClip in the ${label} theme`}
                 loading="lazy"
-                className="rounded-lg border border-white/10 w-full block mb-4"
+                className="rounded-lg border border-white/10 w-full h-auto block mb-4"
               />
               <figcaption className="font-bold text-center">{label}</figcaption>
             </figure>
