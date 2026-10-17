@@ -319,15 +319,15 @@ function palette(theme: Theme) {
         spike: '#ff3df5',
         accent: '#00e5ff',
       };
-    case 'permafrost':
+    case 'aurora':
       return {
-        bg: '#000000',
-        grid: 'rgba(168,240,255,0.05)',
-        gridStrong: 'rgba(168,240,255,0.13)',
-        wave: '#c4f4fc',
-        bar: '#c4f4fc',
-        spike: '#ffcc7a',
-        accent: '#ffcc7a',
+        bg: '#04090d',
+        grid: 'rgba(94,242,214,0.05)',
+        gridStrong: 'rgba(94,242,214,0.13)',
+        wave: '#b9fff1',
+        bar: '#b9fff1',
+        spike: '#8f7bff',
+        accent: '#5ef2d6',
       };
     case 'classic':
       return {
@@ -450,7 +450,7 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, the
     grad.addColorStop(1, '#0e0a1c');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
-  } else if (theme === 'black-ice' || theme === 'permafrost') {
+  } else if (theme === 'black-ice' || theme === 'aurora') {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
     const glow = ctx.createRadialGradient(w * 0.42, h * 0.34, 0, w * 0.42, h * 0.34, Math.max(w, h) * 0.55);
@@ -556,11 +556,11 @@ function drawSpectrum(
       g.addColorStop(0.6, '#ff3df5');
       g.addColorStop(1, '#00e5ff');
       grad = g;
-    } else if (theme === 'permafrost') {
+    } else if (theme === 'aurora') {
       // Ice at the floor, amber on the peaks: the highlight colour.
       const g = ctx.createLinearGradient(0, h, 0, 0);
-      g.addColorStop(0, '#7fe3f5');
-      g.addColorStop(0.6, '#c4f4fc');
+      g.addColorStop(0, '#5ef2d6');
+      g.addColorStop(0.6, '#b9fff1');
       g.addColorStop(1, '#ffcc7a');
       grad = g;
     }
@@ -885,12 +885,12 @@ const RAMPS: Record<Theme, Ramp> = {
     [0.9, 255, 61, 245],
     [1.0, 255, 255, 255],
   ],
-  permafrost: [
+  aurora: [
     [0.0, 0, 0, 0],
-    [0.35, 14, 46, 52],
-    [0.65, 127, 227, 245],
-    [0.88, 255, 204, 122],
-    [1.0, 255, 240, 200],
+    [0.35, 22, 60, 58],
+    [0.65, 94, 242, 214],
+    [0.88, 143, 123, 255],
+    [1.0, 230, 255, 250],
   ],
   nocturnal: [
     [0.0, 14, 10, 28],
@@ -1025,16 +1025,16 @@ function drawHistory(
     // (owner, 2026-10-13). Same stops, same bottom→top direction as
     // drawSpectrum. Stroke stays p.wave so the envelope edge keeps its theme
     // identity; flat-fill themes are untouched.
-    if (theme === 'kawaii' || theme === 'modern' || theme === 'permafrost') {
+    if (theme === 'kawaii' || theme === 'modern' || theme === 'aurora') {
       const g = ctx.createLinearGradient(0, plotH, 0, 0);
       if (theme === 'kawaii') {
         g.addColorStop(0, '#7fe7dc');
         g.addColorStop(0.5, '#b39dff');
         g.addColorStop(1, '#ff5fa2');
-      } else if (theme === 'permafrost') {
-        g.addColorStop(0, '#7fe3f5');
-        g.addColorStop(0.6, '#c4f4fc');
-        g.addColorStop(1, '#ffcc7a');
+      } else if (theme === 'aurora') {
+        g.addColorStop(0, '#5ef2d6');
+        g.addColorStop(0.6, '#b9fff1');
+        g.addColorStop(1, '#8f7bff');
       } else {
         g.addColorStop(0, '#7df9ff');
         g.addColorStop(0.6, '#b48bff');

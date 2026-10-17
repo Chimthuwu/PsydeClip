@@ -14,7 +14,7 @@ export type Theme =
   | 'blood-red'
   | 'nocturnal'
   | 'black-ice'
-  | 'permafrost'
+  | 'aurora'
   | 'future';
 
 /** Every theme, in menu order. The one list both the Settings panel and the
@@ -32,7 +32,7 @@ export const THEMES: readonly { value: Theme; label: string; swatch: string }[] 
   { value: 'blood-red', label: 'Blood red', swatch: '#ff1024' },
   { value: 'nocturnal', label: 'Nocturnal', swatch: '#6a8dff' },
   { value: 'black-ice', label: 'Black ice', swatch: '#7fe3f5' },
-  { value: 'permafrost', label: 'Permafrost', swatch: '#ffcc7a' },
+  { value: 'aurora', label: 'Aurora', swatch: '#5ef2d6' },
   { value: 'future', label: 'Future', swatch: '#ff3df5' },
 ];
 
@@ -273,7 +273,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sourceId: null,
   loopbackDeviceId: null,
   recordMode: 'rolling',
-  theme: 'permafrost',
+  theme: 'aurora',
   visualizer: 'oscilloscope',
   // Everything except the primary mode starts hidden → a single board.
   vizHidden: ['spectrum', 'spectrogram', 'history', 'midi'],

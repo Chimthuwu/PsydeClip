@@ -516,43 +516,43 @@
   --panel-blur: 0px;
 }
 
-/* --- Permafrost: Black ice's cold base with a warm amber signal highlight.
-   The default theme for new installs. Amber is the highlight colour: it marks
-   the spectrum and history peaks and the MIDI note outlines. */
-.theme-permafrost {
-  --bg-app: #000000;
-  --bg-surface: #050708;
-  --bg-surface-elevated: #080b0d;
+/* --- Aurora: the default. Deep night teal with soft violet, a calmer cousin of
+   Future. Glow is kept low so buttons read as lit, not neon. */
+.theme-aurora {
+  --bg-app: #04090d;
+  --bg-surface: #07111a;
+  --bg-surface-elevated: #0b1a26;
   --bg-gradient:
-    radial-gradient(ellipse at 30% 14%, rgba(168, 240, 255, 0.06), transparent 60%),
+    radial-gradient(ellipse at 25% 10%, rgba(94, 242, 214, 0.07), transparent 60%),
+    radial-gradient(ellipse at 80% 90%, rgba(143, 123, 255, 0.06), transparent 55%),
     var(--bg-app);
 
-  --text-primary: #eafaff;
-  --text-secondary: #a9cdd6;
-  --text-muted: #6f929b;
+  --text-primary: #e8fbf6;
+  --text-secondary: #9fcfc6;
+  --text-muted: #5f8a84;
 
-  --accent: #ffcc7a;
-  --accent-bright: #ffe2ad;
-  --accent-soft: #ff9f5a;
+  --accent: #5ef2d6;
+  --accent-bright: #b9fff1;
+  --accent-soft: #8f7bff;
 
-  --border: rgba(168, 240, 255, 0.16);
-  --border-soft: rgba(168, 240, 255, 0.05);
-  --border-active: rgba(255, 204, 122, 0.5);
+  --border: rgba(94, 242, 214, 0.18);
+  --border-soft: rgba(94, 242, 214, 0.06);
+  --border-active: rgba(94, 242, 214, 0.55);
 
-  --waveform: #c4f4fc;
-  --grid-major: rgba(168, 240, 255, 0.1);
-  --grid-minor: rgba(168, 240, 255, 0.04);
+  --waveform: #5ef2d6;
+  --grid-major: rgba(94, 242, 214, 0.1);
+  --grid-minor: rgba(94, 242, 214, 0.04);
 
-  --success: #7fe3f5;
-  --warning: #ffcc7a;
+  --success: #5ef2d6;
+  --warning: #ffd27a;
   --danger: #ff6b8e;
-  --rec: #ffcc7a;
+  --rec: #5ef2d6;
 
-  --glow: 0.35;
-  --radius: 8px;
-  --radius-lg: 12px;
+  --glow: 0.25;
+  --radius: 10px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
-  --panel-blur: 0px;
+  --panel-blur: 8px;
 }
 
 /* --- Future: a test theme. Hot magenta and acid lime on near-black, so it is
@@ -586,7 +586,7 @@
   --danger: #ff4d6d;
   --rec: #39ff14;
 
-  --glow: 0.9;
+  --glow: 0.3;
   --radius: 4px;
   --radius-lg: 6px;
   --radius-pill: 999px;
@@ -611,8 +611,8 @@
 .theme-blood-red,
 .theme-nocturnal,
 .theme-black-ice,
-.theme-permafrost,
 .theme-future,
+.theme-aurora,
 :root {
   --bg: var(--bg-app);
   --bg-2: var(--bg-surface-elevated);
