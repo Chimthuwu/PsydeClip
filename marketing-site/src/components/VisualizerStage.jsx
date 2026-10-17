@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 
 /**
  * The visualizer demo the owner supplied (2026-10-13) as a standalone
@@ -68,6 +69,11 @@ const MODES = [
     meta: 'live pitch track · .mid export',
   },
 ];
+
+/** How long each view holds before the stage moves on by itself. */
+const CYCLE_MS = 6000;
+/** After someone picks a view by hand, auto-cycling waits this long to resume. */
+const RESUME_MS = 12000;
 
 /**
  * Deterministic 0..1 hash. Stands in for Math.random() so a given beat always
@@ -283,8 +289,80 @@ function drawFrame(ctx, w, h, t, mode, st) {
   }
 }
 
+/**
+ * The History view's feature, shown on a loop: highlight a stretch of the
+ * waveform, drag it out, and it lands on the desktop as a WAV. Every frame of
+ * this is decorative, so it is aria-hidden and ignores the pointer.
+ */
+function DragToDesktop() {
+  const loop = { duration: 6, repeat: Infinity, ease: 'easeInOut' };
+  return (
+    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+      <span className="absolute left-5 top-4 font-mono text-[11px] tracking-wide text-neon-cyan/80">
+        highlight, then drag out as WAV
+      </span>
+
+      {/* The highlighted stretch of the waveform. */}
+      <motion.div
+        className="absolute top-[14%] bottom-[14%] border-x border-neon-cyan/70 bg-neon-cyan/10"
+        style={{ left: '22%' }}
+        initial={{ width: '0%', opacity: 0 }}
+        animate={{ width: ['0%', '30%', '30%', '30%', '30%'], opacity: [0, 1, 1, 0, 0] }}
+        transition={{ ...loop, times: [0, 0.14, 0.6, 0.62, 1] }}
+      />
+
+      {/* The clip being dragged, with a pointer. */}
+      <motion.div
+        className="absolute flex items-center gap-2 rounded-lg border border-neon-cyan/60 bg-[#0A0A0F] px-3 py-1.5 font-mono text-[11px] text-neon-cyan shadow-[0_6px_20px_-6px_rgba(0,243,255,0.5)]"
+        initial={{ left: '36%', top: '50%', opacity: 0 }}
+        animate={{
+          left: ['36%', '36%', '36%', '76%', '76%'],
+          top: ['50%', '50%', '50%', '64%', '64%'],
+          opacity: [0, 0, 1, 1, 0],
+        }}
+        transition={{ ...loop, times: [0, 0.56, 0.62, 0.86, 0.92] }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 2l14 9-6 1.5L9 20z" fill="currentColor" />
+        </svg>
+        clip_00-12.wav
+      </motion.div>
+
+      {/* The desktop it is dropped onto. */}
+      <motion.div
+        className="absolute right-[5%] bottom-[8%] w-[34%] h-[40%] rounded-xl border border-dashed border-neon-cyan/40"
+        initial={{ backgroundColor: 'rgba(0,243,255,0)' }}
+        animate={{
+          backgroundColor: [
+            'rgba(0,243,255,0)',
+            'rgba(0,243,255,0)',
+            'rgba(0,243,255,0.12)',
+            'rgba(0,243,255,0.12)',
+            'rgba(0,243,255,0)',
+          ],
+        }}
+        transition={{ ...loop, times: [0, 0.6, 0.7, 0.9, 1] }}
+      >
+        <span className="absolute left-3 top-2 font-mono text-[10px] text-gray-500">Desktop</span>
+        <motion.div
+          className="absolute left-1/2 top-[52%] -translate-x-1/2 -translate-y-1/2 rounded-md border border-neon-cyan/50 bg-[#0A0A0F] px-2 py-1 font-mono text-[10px] text-neon-cyan whitespace-nowrap"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0, 1, 1, 0] }}
+          transition={{ ...loop, times: [0, 0.84, 0.9, 0.97, 1] }}
+        >
+          clip_00-12.wav
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function VisualizerStage() {
   const [mode, setMode] = useState('oscilloscope');
+  const [inView, setInView] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [userHold, setUserHold] = useState(false);
+  const holdTimer = useRef(0);
   const canvasRef = useRef(null);
   const modeRef = useRef(mode);
   const repaintRef = useRef(() => {});
@@ -366,6 +444,7 @@ export default function VisualizerStage() {
     const io = new IntersectionObserver(
       ([entry]) => {
         onScreen = entry.isIntersecting;
+        setInView(entry.isIntersecting);
         if (onScreen) {
           size();
           paint();
@@ -397,6 +476,30 @@ export default function VisualizerStage() {
     };
   }, []);
 
+  // Picking a view by hand holds it for a while, then auto-cycling resumes.
+  const pickMode = (id) => {
+    setMode(id);
+    setUserHold(true);
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => setUserHold(false), RESUME_MS);
+  };
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
+
+  // Auto-cycle: advance after CYCLE_MS while on screen and not held. Keyed on
+  // the mode, so every view gets its full time.
+  const holding = hovered || userHold;
+  const cycling = inView && !holding;
+  useEffect(() => {
+    if (!cycling) return undefined;
+    const id = setTimeout(() => {
+      setMode((cur) => {
+        const i = MODES.findIndex((m) => m.id === cur);
+        return MODES[(i + 1) % MODES.length].id;
+      });
+    }, CYCLE_MS);
+    return () => clearTimeout(id);
+  }, [cycling, mode]);
+
   // Left/right/Home/End move between tabs, the way a real tablist behaves.
   const onTabKeyDown = (event) => {
     const i = MODES.findIndex((m) => m.id === mode);
@@ -407,14 +510,14 @@ export default function VisualizerStage() {
     else if (event.key === 'End') next = MODES.length - 1;
     if (next === null) return;
     event.preventDefault();
-    setMode(MODES[next].id);
+    pickMode(MODES[next].id);
     tabRefs.current[next]?.focus();
   };
 
   const active = MODES.find((m) => m.id === mode) ?? MODES[0];
 
   return (
-    <div>
+    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       <div
         role="tablist"
         aria-label="Visualizer mode"
@@ -432,7 +535,7 @@ export default function VisualizerStage() {
               role="tab"
               aria-selected={selected}
               tabIndex={selected ? 0 : -1}
-              onClick={() => setMode(m.id)}
+              onClick={() => pickMode(m.id)}
               onKeyDown={onTabKeyDown}
               className={`px-5 py-2.5 rounded-full border font-mono text-[13px] transition-all duration-200 ${
                 selected
@@ -446,12 +549,21 @@ export default function VisualizerStage() {
         })}
       </div>
 
+      <div className="h-0.5 mb-3 rounded-full bg-white/10 overflow-hidden" aria-hidden="true">
+        {cycling && (
+          <div key={mode} className="cycle-bar h-full bg-neon-cyan origin-left" />
+        )}
+      </div>
+
       <div className="rounded-[28px] overflow-hidden border border-white/10 bg-[#0A0A0F] shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
-        <canvas
-          ref={canvasRef}
-          aria-label={`${active.label} visualizer, illustrated with a simulated signal`}
-          className="block w-full h-[220px] sm:h-[340px]"
-        />
+        <div className="relative">
+          <canvas
+            ref={canvasRef}
+            aria-label={`${active.label} visualizer, illustrated with a simulated signal`}
+            className="block w-full h-[220px] sm:h-[340px]"
+          />
+          {active.id === 'history' && <DragToDesktop />}
+        </div>
         <div className="px-6 py-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-400">
           <span>
             <strong className="text-white font-semibold">{active.label}</strong> — {active.desc}

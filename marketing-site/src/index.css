@@ -130,3 +130,17 @@ body {
   display: none;
 }
 
+
+/* Auto-cycle progress: fills over one view's hold time. Re-keyed per view. */
+@keyframes cycleFill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.cycle-bar {
+  animation: cycleFill 6s linear forwards;
+}
