@@ -309,6 +309,16 @@ function palette(theme: Theme) {
         spike: '#a8f0d8',
         accent: '#7fe3f5',
       };
+    case 'future':
+      return {
+        bg: '#07000f',
+        grid: 'rgba(255,61,245,0.12)',
+        gridStrong: 'rgba(255,61,245,0.3)',
+        wave: '#39ff14',
+        bar: '#39ff14',
+        spike: '#ff3df5',
+        accent: '#00e5ff',
+      };
     case 'permafrost':
       return {
         bg: '#000000',
@@ -539,6 +549,12 @@ function drawSpectrum(
       g.addColorStop(0, '#7fe7dc');
       g.addColorStop(0.5, '#b39dff');
       g.addColorStop(1, '#ff5fa2');
+      grad = g;
+    } else if (theme === 'future') {
+      const g = ctx.createLinearGradient(0, h, 0, 0);
+      g.addColorStop(0, '#39ff14');
+      g.addColorStop(0.6, '#ff3df5');
+      g.addColorStop(1, '#00e5ff');
       grad = g;
     } else if (theme === 'permafrost') {
       // Ice at the floor, amber on the peaks: the highlight colour.
@@ -861,6 +877,13 @@ const RAMPS: Record<Theme, Ramp> = {
     [0.65, 127, 227, 245],
     [0.88, 200, 245, 251],
     [1.0, 240, 253, 255],
+  ],
+  future: [
+    [0.0, 7, 0, 15],
+    [0.35, 60, 0, 90],
+    [0.7, 57, 255, 20],
+    [0.9, 255, 61, 245],
+    [1.0, 255, 255, 255],
   ],
   permafrost: [
     [0.0, 0, 0, 0],

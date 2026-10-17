@@ -14,7 +14,8 @@ export type Theme =
   | 'blood-red'
   | 'nocturnal'
   | 'black-ice'
-  | 'permafrost';
+  | 'permafrost'
+  | 'future';
 
 /** Every theme, in menu order. The one list both the Settings panel and the
  *  right-click quick menu read from, so they can't drift apart. */
@@ -31,7 +32,8 @@ export const THEMES: readonly { value: Theme; label: string; swatch: string }[] 
   { value: 'blood-red', label: 'Blood red', swatch: '#ff1024' },
   { value: 'nocturnal', label: 'Nocturnal', swatch: '#6a8dff' },
   { value: 'black-ice', label: 'Black ice', swatch: '#7fe3f5' },
-  { value: 'permafrost', label: 'Permafrost', swatch: '#7fe3f5' },
+  { value: 'permafrost', label: 'Permafrost', swatch: '#ffcc7a' },
+  { value: 'future', label: 'Future', swatch: '#ff3df5' },
 ];
 
 export type VisualizerMode = 'oscilloscope' | 'spectrum' | 'spectrogram' | 'history' | 'midi';
