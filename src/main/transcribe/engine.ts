@@ -265,7 +265,8 @@ export function notesToMidiBytes(notes: NoteEvent[], bpm = 120): Uint8Array {
       midi: n.pitchMidi,
       time: n.startTimeSeconds,
       duration: n.durationSeconds,
-      velocity: Math.max(1, Math.min(127, Math.round((n.amplitude ?? 1) * 127))),
+      // @tonejs/midi takes velocity as 0..1 and scales it to 0..127 itself.
+      velocity: Math.max(1 / 127, Math.min(1, n.amplitude ?? 1)),
     });
   }
   return new Uint8Array(midi.toArray());

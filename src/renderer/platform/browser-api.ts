@@ -302,7 +302,7 @@ export function createBrowserApi(storage: KeyValueStore = defaultStorage()): Api
           midi: note.pitch,
           time: note.startSec,
           duration: note.durationSec,
-          velocity: Math.max(1, Math.min(127, Math.round(note.velocity * 127))),
+          velocity: Math.max(1 / 127, Math.min(1, note.velocity)),
         });
       }
       return new Uint8Array(midi.toArray());
