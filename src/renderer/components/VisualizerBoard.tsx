@@ -90,10 +90,17 @@ function timelineView(
   model: HistoryModel,
   viewport: ViewportState | null,
   mode: VisualizerMode,
+  lane: NoteLayer | null,
 ): [number, number] {
   if (mode === 'spectrogram') {
     const end = model.newestSec;
     return [Math.max(0, end - SPECTRO_VISIBLE_SEC), end];
+  }
+  // The standalone MIDI view draws over the note layer's own time range, not
+  // the History viewport, so a selection there has to map onto that range.
+  if (mode === 'midi') {
+    const start = lane?.startSec ?? 0;
+    return [start, start + Math.max(1, lane?.durationSec ?? 1)];
   }
   return model.effectiveViewport(viewport);
 }
@@ -183,7 +190,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
     if (target.classList.contains('left')) type = 'left';
     else if (target.classList.contains('right')) type = 'right';
 
-    const v = timelineView(historyModel, viewport, mode);
+    const v = timelineView(historyModel, viewport, mode, pianoRoll);
     const startSec = historyModel.clampSec(v[0] + x * (v[1] - v[0]));
     dragState.current = {
       type,
@@ -212,7 +219,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
     if (!dragState.current) return;
     const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const { type, startSec, initialSelection } = dragState.current;
-    const v = timelineView(historyModel, viewport, mode);
+    const v = timelineView(historyModel, viewport, mode, pianoRoll);
     const sec = historyModel.clampSec(v[0] + x * (v[1] - v[0]));
 
     if (type === 'new') {
@@ -236,7 +243,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
       // A drag smaller than 0.1% of the visible span is a click, not a
       // selection — the same threshold the fractional code used, now relative
       // to the zoomed viewport so tiny selections stay possible when zoomed in.
-      const v = timelineView(historyModel, viewport, mode);
+      const v = timelineView(historyModel, viewport, mode, pianoRoll);
       const minSel = 0.001 * Math.max(1e-6, v[1] - v[0]);
       if (currentSel && currentSel[1] - currentSel[0] < minSel) {
         emitSelection(null);
@@ -249,7 +256,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!isTimeline || !historyModel) return;
-    const v = timelineView(historyModel, viewport, mode);
+    const v = timelineView(historyModel, viewport, mode, pianoRoll);
     const span = v[1] - v[0];
 
     // Zoom around the selection when one exists (RS: "make a selection and
@@ -408,7 +415,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
         // Resolve the visible time window fresh every frame: a `following`
         // history viewport (and the spectrogram's fixed window) both slide with
         // the live edge even though React state only changes on gestures.
-        const v = model ? timelineView(model, viewportRef.current, mode) : null;
+        const v = model ? timelineView(model, viewportRef.current, mode, pianoRollRef.current) : null;
         drawVisualizer(
           {
             ctx: ctx as unknown as CanvasRenderingContext2D,
@@ -506,7 +513,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
   // renders as the view slides or zooms.
   let overlayStyle: React.CSSProperties | undefined;
   if (selection && historyModel) {
-    const v = timelineView(historyModel, viewport, mode);
+    const v = timelineView(historyModel, viewport, mode, pianoRoll);
     const span = v[1] - v[0];
     const f0 = span > 0 ? (selection[0] - v[0]) / span : 0;
     const f1 = span > 0 ? (selection[1] - v[0]) / span : 0;
