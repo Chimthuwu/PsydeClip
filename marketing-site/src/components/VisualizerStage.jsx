@@ -254,6 +254,47 @@ function drawMidi(ctx, w, h, t) {
   ctx.stroke();
 }
 
+/**
+ * History: the rolling buffer as a filled, mirrored envelope with a playhead,
+ * not a single trace, so it reads as a scrubbable buffer rather than a scope.
+ */
+function drawEnvelope(ctx, w, h, t, opts) {
+  const mid = h / 2;
+  const s = h / 340;
+  const value = (p, tt) =>
+    Math.sin(p * opts.freqA + tt * 2.0) * opts.ampA +
+    Math.sin(p * opts.freqB + tt * 3.1) * opts.ampB +
+    Math.sin(p * opts.freqC + tt * 1.3) * opts.ampC +
+    (Math.sin(p * 617 + tt * 21) + Math.sin(p * 1043 + tt * 33)) * opts.noise;
+
+  const cols = Math.max(60, Math.min(160, Math.round(w / 5)));
+  const cw = w / cols;
+  const grad = ctx.createLinearGradient(0, h, 0, 0);
+  grad.addColorStop(0, ACCENT_3);
+  grad.addColorStop(0.5, ACCENT);
+  grad.addColorStop(1, ACCENT_2);
+  ctx.fillStyle = grad;
+  ctx.globalAlpha = 0.85;
+  for (let c = 0; c < cols; c++) {
+    const p = c / cols;
+    const amp = Math.max(Math.abs(value(p, t)), Math.abs(value(p, t + 0.05)) * 0.8);
+    const half = Math.max(1, opts.env(p) * amp * s);
+    ctx.fillRect(c * cw, mid - half, Math.max(1, cw - 1.5), half * 2);
+  }
+  ctx.globalAlpha = 1;
+
+  // Playhead at the live edge, glowing.
+  ctx.strokeStyle = ACCENT_2;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = ACCENT_2;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(w - 2, 8);
+  ctx.lineTo(w - 2, h - 8);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
 function drawFrame(ctx, w, h, t, mode, st) {
   ctx.clearRect(0, 0, w, h);
   if (mode === 'oscilloscope') {
@@ -270,7 +311,7 @@ function drawFrame(ctx, w, h, t, mode, st) {
     });
   } else if (mode === 'history') {
     drawGrid(ctx, w, h, 12, 6);
-    drawWaveform(ctx, w, h, t, {
+    drawEnvelope(ctx, w, h, t, {
       env: (p) => Math.sin(p * Math.PI * 1.4) * (0.7 + 0.3 * Math.sin(p * 12 + t * 0.5)),
       freqA: 34,
       freqB: 81,

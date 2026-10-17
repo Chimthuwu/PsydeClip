@@ -317,7 +317,7 @@ function palette(theme: Theme) {
         wave: '#c4f4fc',
         bar: '#c4f4fc',
         spike: '#ffcc7a',
-        accent: '#7fe3f5',
+        accent: '#ffcc7a',
       };
     case 'classic':
       return {

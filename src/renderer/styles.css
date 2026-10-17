@@ -531,9 +531,9 @@
   --text-secondary: #a9cdd6;
   --text-muted: #6f929b;
 
-  --accent: #7fe3f5;
-  --accent-bright: #c4f4fc;
-  --accent-soft: #ffcc7a;
+  --accent: #ffcc7a;
+  --accent-bright: #ffe2ad;
+  --accent-soft: #ff9f5a;
 
   --border: rgba(168, 240, 255, 0.16);
   --border-soft: rgba(168, 240, 255, 0.05);
@@ -546,7 +546,7 @@
   --success: #7fe3f5;
   --warning: #ffcc7a;
   --danger: #ff6b8e;
-  --rec: #7fe3f5;
+  --rec: #ffcc7a;
 
   --glow: 0.35;
   --radius: 8px;
