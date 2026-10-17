@@ -73,7 +73,8 @@ interface Props {
   showOscilloscopeOverlay?: boolean;
   /** Shown as a ♪ affordance on the selection; absent = no button. */
   onTranscribeSelection?: () => void;
-  onSelectionChange?: (sel: [number, number] | null) => void;
+  /** `mode` is the view the selection was made in, so App can export the right thing. */
+  onSelectionChange?: (sel: [number, number] | null, mode: VisualizerMode) => void;
   onDragExport?: (sel: [number, number]) => void;
   /** Called when the user tries to drag before the snippet is prepared. */
   onDragNotReady?: () => void;
@@ -136,7 +137,11 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
   // History and the (time-based) spectrogram both carry a real time axis, so
   // both get the highlight + drag-out selection layer. Only history is
   // zoom/pan-able — the spectrogram has no data outside its visible window.
-  const isTimeline = mode === 'history' || mode === 'spectrogram';
+  // The MIDI view has a time axis too, so a stretch of notes can be highlighted
+  // and dragged out as a .mid the same way.
+  const isTimeline = mode === 'history' || mode === 'spectrogram' || mode === 'midi';
+
+  const emitSelection = (sel: [number, number] | null) => onSelectionChange?.(sel, modeRef.current);
 
   const handleDragStart = (e: React.DragEvent) => {
     e.preventDefault(); // crucial for electron drag
@@ -234,10 +239,10 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
       const v = timelineView(historyModel, viewport, mode);
       const minSel = 0.001 * Math.max(1e-6, v[1] - v[0]);
       if (currentSel && currentSel[1] - currentSel[0] < minSel) {
-        onSelectionChange?.(null);
+        emitSelection(null);
         return null;
       }
-      onSelectionChange?.(currentSel);
+      emitSelection(currentSel);
       return currentSel;
     });
   };
@@ -274,7 +279,7 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
       const diff = selection[0] - newLeft;
       const newSel: [number, number] = [newLeft, historyModel.clampSec(selection[1] - diff)];
       setSelection(newSel);
-      onSelectionChange?.(newSel);
+      emitSelection(newSel);
       e.preventDefault();
     } else if (e.key === 'ArrowRight') {
       const shift = e.shiftKey ? nudge * 5 : nudge;
@@ -282,11 +287,11 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
       const diff = newRight - selection[1];
       const newSel: [number, number] = [historyModel.clampSec(selection[0] + diff), newRight];
       setSelection(newSel);
-      onSelectionChange?.(newSel);
+      emitSelection(newSel);
       e.preventDefault();
     } else if (e.key === 'Escape') {
       setSelection(null);
-      onSelectionChange?.(null);
+      emitSelection(null);
       e.preventDefault();
     }
   };

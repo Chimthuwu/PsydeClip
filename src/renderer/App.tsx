@@ -24,6 +24,7 @@ import { useRecorderEvents } from './hooks/useRecorderEvents';
 import { SMOOTHING_FOR_MODE } from './lib/visualizer';
 import { AppSettings, VisualizerMode, VISUALIZER_MODES, VISUALIZER_LABELS } from '../shared/types';
 import { CLIP_STOP_PROMPT } from '../shared/utils';
+import { visibleNotes } from '../shared/piano-roll';
 
 const LOOPBACK_SUPPORTED_PLATFORMS = new Set(['win32']);
 
@@ -320,14 +321,46 @@ export default function App() {
   const [dragReady, setDragReady] = useState(false);
   const dragSeqRef = useRef(0);
 
-  const handleSelectionChange = useCallback(async (sel: [number, number] | null) => {
+  // The note layer the MIDI view is drawing, mirrored into a ref so the
+  // selection handler (declared above the layer state) can read it.
+  const midiLayerRef = useRef<NoteLayer | null>(null);
+
+  const handleSelectionChange = useCallback(async (sel: [number, number] | null, selMode: VisualizerMode = 'history') => {
     selectionRef.current = sel;
     // Tell main, so the native quick menu can offer "Save selection (Ns)" from
     // either window — including the pop-out, where the main window is hidden.
     window.api.selectionChanged(sel);
     const seq = ++dragSeqRef.current;
     setDragReady(false);
-    if (!sel || !cs.recorder || !cs.historyModel) return;
+    if (!sel) return;
+    if (selMode === 'midi') {
+      // A stretch of notes, rebased so the .mid starts at zero, dragged out as MIDI.
+      const [s0, s1] = sel;
+      const layer = midiLayerRef.current;
+      const notes = layer
+        ? visibleNotes(layer.notes, s0, s1).map((n) => {
+            const start = Math.max(n.startSec, s0);
+            const end = Math.min(n.startSec + n.durationSec, s1);
+            return { ...n, startSec: start - s0, durationSec: end - start };
+          })
+        : [];
+      if (seq !== dragSeqRef.current) return;
+      if (notes.length === 0) {
+        emitToast('error', 'No notes in that range — try a wider selection.');
+        return;
+      }
+      try {
+        const bytes = await window.api.notesToMidi(notes);
+        if (seq !== dragSeqRef.current) return;
+        window.api.prepareDragFile({ bytes, ext: 'mid' });
+        setDragReady(true);
+      } catch (e: any) {
+        console.error('Failed to prepare MIDI drag file:', e);
+        emitToast('error', `Couldn't prepare those notes: ${e?.message ?? e}`);
+      }
+      return;
+    }
+    if (!cs.recorder || !cs.historyModel) return;
     try {
       const { exportSelection } = await import('./lib/export-engine');
       // What gets dragged OUT is always WAV: it's the only sample-accurate
@@ -408,6 +441,7 @@ export default function App() {
   // Real notes take precedence: that is the "colour change on stop".
   const drawnLayer = noteLayer ?? liveLayer;
   const exportableLayer = noteLayer ?? liveLayer;
+  midiLayerRef.current = exportableLayer;
 
   /**
    * Transcribe the current History selection and show its notes in the
