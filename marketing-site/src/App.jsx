@@ -31,63 +31,9 @@ function GithubMark({ size = 16 }) {
   );
 }
 
-/** Mirrors THEMES in src/shared/types.ts — same order, same labels. */
-const THEMES = [
-  { slug: 'modern', label: 'Modern neon' },
-  { slug: 'classic', label: 'Classic green' },
-  { slug: 'cyberpunk', label: 'Cyberpunk' },
-  { slug: 'synthwave', label: 'Synthwave' },
-  { slug: 'monochrome', label: 'Monochrome' },
-  { slug: 'kawaii', label: 'Hyper kawaii ✿' },
-  { slug: 'aqua', label: 'Aqua' },
-  { slug: 'sakura', label: 'Sakura' },
-  { slug: 'lime', label: 'Lime green' },
-  { slug: 'blood-red', label: 'Blood red' },
-  { slug: 'nocturnal', label: 'Nocturnal' },
-  { slug: 'black-ice', label: 'Black ice' },
-];
-
 /** Mirrors VISUALIZER_LABELS in src/shared/types.ts. */
 const MODES = ['Oscilloscope', 'Spectrum', 'Spectrogram', 'History', 'MIDI'];
 
-const FEATURES = [
-  {
-    icon: Radio,
-    accent: 'magenta',
-    title: 'Rolling buffer',
-    body: 'Always recording into memory — 5 minutes by default, configurable. Save writes that slice to disk as WebM/Opus, WAV or MP3, so you never lose the take you did not know you wanted.',
-  },
-  {
-    icon: History,
-    accent: 'cyan',
-    title: 'Five visualizers',
-    body: 'Oscilloscope, spectrum, scrolling spectrogram, a scrubbable History waveform and a MIDI piano roll. Split view shows them at once, in a mosaic that always fills the board.',
-  },
-  {
-    icon: Volume2,
-    accent: 'purple',
-    title: 'True WASAPI loopback',
-    body: 'Capture one output device — speakers, headphones, a virtual cable — through a native NAudio helper, instead of whatever the browser layer hands you for the whole system mix.',
-  },
-  {
-    icon: Scissors,
-    accent: 'cyan',
-    title: 'Clips and selections',
-    body: 'A dedicated record button streams a short clip straight to disk, never through RAM. In History, select a region and drag it out as a WAV, or crop and save it with one key.',
-  },
-  {
-    icon: Music,
-    accent: 'magenta',
-    title: 'Audio to MIDI',
-    body: 'Turn on Transcribe on save and a .mid lands beside the audio, via Basic Pitch on CPU. While you record, a live pitch tracker sketches the melody straight onto the grid.',
-  },
-  {
-    icon: Keyboard,
-    accent: 'purple',
-    title: 'Hotkeys and tray',
-    body: 'Alt+R records a clip from anywhere. The tray icon carries a live recording badge, the elapsed time in its title, and a recent-saves submenu.',
-  },
-];
 
 const ROADMAP = [
   { done: true, text: 'Renderer crash on capture start (bad_message.cc 263)' },
@@ -115,14 +61,8 @@ function Nav() {
           <span className="font-extrabold text-xl tracking-tight">psydeclip</span>
         </a>
         <div className="flex items-center gap-6">
-          <a href="#features" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
-            Features
-          </a>
           <a href="#visualizers" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
             Visualizers
-          </a>
-          <a href="#themes" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
-            Themes
           </a>
           <a
             href={REPO}
@@ -144,111 +84,6 @@ function Nav() {
   );
 }
 
-/**
- * The hero shows a REAL capture now (owner-supplied screenshots, 2026-10-13):
- * five live visualizer panes — oscilloscope, spectrogram and the MIDI grid
- * with live-tracked notes. The old drawn mockup is retired in favour of it;
- * the title bar is cropped so the site's own chrome carries the branding.
- */
-function HeroShot() {
-  return (
-    <div className="max-w-5xl mx-auto px-4 mt-20 [perspective:1200px]">
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
-        className="group rounded-2xl border border-white/10 bg-[#0A0A0F] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_80px_rgba(255,0,255,0.15)] [transform:rotateX(5deg)] hover:[transform:rotateX(0deg)_translateY(-10px)] transition-transform duration-500"
-      >
-        <div className="h-10 bg-[#12121A] border-b border-white/5 flex items-center px-4 gap-2">
-          <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-          <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-          <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
-          <span className="mx-auto text-xs text-gray-500 font-mono">psydeclip</span>
-        </div>
-        <img
-          src="/shots-user/hero-modern.png"
-          alt="PsydeClip capturing system audio: oscilloscope, spectrogram and the live MIDI piano-roll grid"
-          className="block w-full"
-        />
-      </motion.div>
-    </div>
-  );
-}
-
-/**
- * The app window, drawn rather than screenshotted: superseded by HeroShot
- * (a real owner-supplied capture). Kept until the shots prove out so the
- * revert is one line.
- */
-function AppMockup() {
-  return (
-    <div className="max-w-5xl mx-auto px-4 mt-20 [perspective:1200px]">
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
-        className="group rounded-2xl border border-white/10 bg-[#0A0A0F] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_80px_rgba(255,0,255,0.15)] [transform:rotateX(5deg)] hover:[transform:rotateX(0deg)_translateY(-10px)] transition-transform duration-500"
-      >
-        <div className="h-10 bg-[#12121A] border-b border-white/5 flex items-center px-4 gap-2">
-          <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-          <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-          <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
-          <span className="mx-auto text-xs text-gray-500 font-mono">psydeclip</span>
-        </div>
-
-        <div className="p-5 flex flex-col gap-4 bg-[#05050A]">
-          <div className="flex justify-between items-center flex-wrap gap-3">
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan font-mono text-xs">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse-dot" />
-              LIVE 04:49 / 15:00
-            </div>
-            <div className="flex gap-2">
-              {['WebM', 'WAV', 'MP3'].map((f) => (
-                <span
-                  key={f}
-                  className={`px-3 py-1.5 rounded-md border font-mono text-[11px] ${
-                    f === 'MP3'
-                      ? 'bg-neon-magenta/20 border-neon-magenta text-neon-magenta'
-                      : 'bg-white/5 border-white/10 text-gray-400'
-                  }`}
-                >
-                  {f}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative h-[220px] rounded-xl border border-white/10 bg-[#0A0A0F] overflow-hidden">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:30px_30px]" />
-            <svg className="relative z-10 w-full h-full" viewBox="0 0 800 200" preserveAspectRatio="none">
-              <path
-                className="wave-path"
-                d="M0,100 Q50,20 100,100 T200,100 T300,100 T400,100 T500,100 T600,100 T700,100 T800,100"
-              />
-              <path
-                className="wave-path wave-path--alt"
-                d="M0,100 Q50,180 100,100 T200,100 T300,100 T400,100 T500,100 T600,100 T700,100 T800,100"
-              />
-            </svg>
-          </div>
-
-          <div className="flex justify-between items-center gap-3 flex-wrap pt-2 border-t border-white/10 font-mono text-[11px] text-gray-400">
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10">
-              <Volume2 size={12} /> Speakers (Corsair HS55 SURROUND)
-            </span>
-            <span className="flex gap-3 uppercase tracking-wide">
-              {MODES.map((m) => (
-                <span key={m} className={m === 'Spectrum' ? 'text-neon-cyan' : ''}>
-                  {m}
-                </span>
-              ))}
-            </span>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
 
 function Hero() {
   return (
@@ -287,10 +122,10 @@ function Hero() {
               <Download size={20} /> Download for Windows
             </a>
             <a
-              href="#features"
+              href="#visualizers"
               className="px-8 py-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:-translate-y-0.5 transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
             >
-              Explore features
+              See the views
             </a>
           </motion.div>
 
@@ -299,81 +134,6 @@ function Hero() {
             is in progress, so the download needs access, and the installer is unsigned — SmartScreen will warn on first
             run.
           </motion.p>
-        </motion.div>
-      </div>
-
-      <HeroShot />
-    </section>
-  );
-}
-
-function Features() {
-  return (
-    <section id="features" className="py-24 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeIn}
-          className="text-center mb-16"
-        >
-          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
-            Packed with{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-cyan to-neon-magenta">
-              power.
-            </span>
-          </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto">
-            Everything you need to capture, watch and keep system audio without interrupting what you were doing.
-          </p>
-        </motion.div>
-
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={staggerContainer}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          {FEATURES.map(({ icon: Icon, accent, title, body }) => {
-            const a = ACCENTS[accent];
-            return (
-              <motion.div
-                key={title}
-                variants={fadeIn}
-                className={`card-sweep relative overflow-hidden p-8 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/5 hover:-translate-y-1.5 transition-all duration-300 group ${a.ring}`}
-              >
-                <div className={`w-12 h-12 rounded-xl ${a.bg} ${a.fg} flex items-center justify-center mb-5`}>
-                  <Icon size={24} />
-                </div>
-                <h3 className="text-xl font-bold mb-3">{title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{body}</p>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-
-        {/* Real captures, owner-supplied (2026-10-13): the hero shows the app
-            working; this strip names the themes the gallery only thumbnails. */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={staggerContainer}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12"
-        >
-          {[
-            { src: '/shots-user/kawaii-grid.png', title: 'Hyper kawaii ✿', body: 'Four panes mid-recording, live notes pouring into the MIDI grid.' },
-            { src: '/shots-user/bloodred-grid.png', title: 'Blood red', body: 'The whole board tinted, MIDI grid tracking bars in real time.' },
-            { src: '/shots-user/modern-midi.png', title: 'Single MIDI view', body: 'Pinned to just the piano roll — export the notes with ⇩ .mid.' },
-          ].map(({ src, title, body }) => (
-            <motion.figure key={src} variants={fadeIn} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-white/20 transition-colors">
-              <img src={src} alt={`PsydeClip — ${title}`} loading="lazy" className="rounded-lg border border-white/10 w-full block mb-4" />
-              <figcaption className="font-bold mb-1">{title}</figcaption>
-              <p className="text-gray-400 text-sm">{body}</p>
-            </motion.figure>
-          ))}
         </motion.div>
       </div>
     </section>
@@ -403,55 +163,14 @@ function Visualizers() {
             </span>
           </h2>
           <p className="text-gray-400 max-w-2xl mx-auto">
-            All five visualizers, restyled by whichever of the twelve themes is active. One pinned
-            full-frame, or the split view with them all on the board at once.
+            Five views that cycle on their own. Highlight a stretch of History, the spectrogram or the
+            MIDI notes, and drag it straight onto your desktop as a WAV or a .mid.
           </p>
         </motion.div>
 
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
           <VisualizerStage />
         </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function Themes() {
-  return (
-    <section id="themes" className="py-20 overflow-hidden border-y border-white/5 bg-white/[0.01]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeIn}
-          className="text-center mb-10"
-        >
-          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
-            Make it{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-purple to-neon-magenta">
-              yours.
-            </span>
-          </h2>
-          <p className="text-gray-400">Twelve themes, every card a real screenshot of the running app.</p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {THEMES.map(({ slug, label }) => (
-            <figure
-              key={slug}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-white/20 transition-colors"
-            >
-              <img
-                src={`/shots/main-${slug}.png`}
-                alt={`PsydeClip in the ${label} theme`}
-                loading="lazy"
-                className="rounded-lg border border-white/10 w-full h-auto block mb-4"
-              />
-              <figcaption className="font-bold text-center">{label}</figcaption>
-            </figure>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -559,9 +278,7 @@ export default function App() {
       <div className="glow-orb glow-2" aria-hidden="true" />
       <Nav />
       <Hero />
-      <Features />
       <Visualizers />
-      <Themes />
       <TechStack />
       <Roadmap />
       <Footer />

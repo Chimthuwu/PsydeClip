@@ -51,27 +51,27 @@ const MODES = [
     meta: '1024 bins · log-freq ramp',
   },
   {
-    id: 'spectrogram',
-    label: 'Spectrogram',
-    desc: 'scrolling waterfall of that spectrum over time',
-    meta: 'frequency on Y · time on X',
-  },
-  {
     id: 'history',
     label: 'History',
     desc: 'scrubbable waveform of everything still in the rolling buffer',
     meta: 'drag a region out as WAV',
   },
   {
+    id: 'spectrogram',
+    label: 'Spectrogram',
+    desc: 'scrolling waterfall of that spectrum over time',
+    meta: 'highlight a region · drag out as WAV',
+  },
+  {
     id: 'midi',
     label: 'MIDI',
     desc: 'live pitch-tracked notes on a piano-roll grid, exportable as a .mid',
-    meta: 'live pitch track · .mid export',
+    meta: 'highlight notes · drag out as .mid',
   },
 ];
 
 /** How long each view holds before the stage moves on by itself. */
-const CYCLE_MS = 6000;
+const CYCLE_MS = 4000;
 /** After someone picks a view by hand, auto-cycling waits this long to resume. */
 const RESUME_MS = 12000;
 
@@ -294,12 +294,12 @@ function drawFrame(ctx, w, h, t, mode, st) {
  * waveform, drag it out, and it lands on the desktop as a WAV. Every frame of
  * this is decorative, so it is aria-hidden and ignores the pointer.
  */
-function DragToDesktop() {
+function DragToDesktop({ label, fileName }) {
   const loop = { duration: 6, repeat: Infinity, ease: 'easeInOut' };
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden="true">
       <span className="absolute left-5 top-4 font-mono text-[11px] tracking-wide text-neon-cyan/80">
-        highlight, then drag out as WAV
+        highlight, then drag out as {label}
       </span>
 
       {/* The highlighted stretch of the waveform. */}
@@ -325,7 +325,7 @@ function DragToDesktop() {
         <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 2l14 9-6 1.5L9 20z" fill="currentColor" />
         </svg>
-        clip_00-12.wav
+        {fileName}
       </motion.div>
 
       {/* The desktop it is dropped onto. */}
@@ -350,7 +350,7 @@ function DragToDesktop() {
           animate={{ opacity: [0, 0, 1, 1, 0] }}
           transition={{ ...loop, times: [0, 0.84, 0.9, 0.97, 1] }}
         >
-          clip_00-12.wav
+          {fileName}
         </motion.div>
       </motion.div>
     </div>
@@ -562,7 +562,9 @@ export default function VisualizerStage() {
             aria-label={`${active.label} visualizer, illustrated with a simulated signal`}
             className="block w-full h-[220px] sm:h-[340px]"
           />
-          {active.id === 'history' && <DragToDesktop />}
+          {active.id === 'history' && <DragToDesktop label="WAV" fileName="clip_00-12.wav" />}
+          {active.id === 'spectrogram' && <DragToDesktop label="WAV" fileName="clip_00-12.wav" />}
+          {active.id === 'midi' && <DragToDesktop label=".mid" fileName="clip_00-12.mid" />}
         </div>
         <div className="px-6 py-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-400">
           <span>
@@ -573,8 +575,7 @@ export default function VisualizerStage() {
       </div>
 
       <p className="mt-3 text-xs text-gray-500">
-        Drawn with a simulated signal so the demo can idle in a browser — the hero capture above is
-        the app running for real.
+        Drawn with a simulated signal so the demo can idle in a browser.
       </p>
     </div>
   );
