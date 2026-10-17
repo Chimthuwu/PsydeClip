@@ -260,10 +260,10 @@ export default function PopoutApp() {
                   gain={settings.vizGain}
                   idleText={state.hasSource ? 'waiting for audio' : 'no source selected'}
                   historyModel={historyModelRef.current}
-                  interactive={m === 'history' || m === 'spectrogram'}
+                  interactive={m === 'history' || m === 'spectrogram' || m === 'midi'}
                   onSelectionChange={
-                    m === 'history' || m === 'spectrogram'
-                      ? (sel) => window.api.sendVizCommand({ type: 'selection-change', selection: sel })
+                    m === 'history' || m === 'spectrogram' || m === 'midi'
+                      ? (sel, selMode) => window.api.sendVizCommand({ type: 'selection-change', selection: sel, mode: selMode })
                       : undefined
                   }
                   isPopout={true}
@@ -305,8 +305,8 @@ export default function PopoutApp() {
               gain={settings.vizGain}
               idleText={state.hasSource ? 'waiting for audio' : 'no source selected'}
               historyModel={historyModelRef.current}
-              onSelectionChange={(sel) => {
-                window.api.sendVizCommand({ type: 'selection-change', selection: sel });
+              onSelectionChange={(sel, selMode) => {
+                window.api.sendVizCommand({ type: 'selection-change', selection: sel, mode: selMode });
               }}
               isPopout={true}
               pianoRoll={(forcedSingle ? vizMode : visibleModes[0]) === 'midi' ? pianoRoll : null}

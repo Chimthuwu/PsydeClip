@@ -567,7 +567,7 @@ export type VizCommand =
   | { type: 'discard-clip' }
   | { type: 'set-visualizer'; mode: VisualizerMode }
   | { type: 'set-override'; mode: VisualizerMode | null }
-  | { type: 'selection-change'; selection: [number, number] | null }
+  | { type: 'selection-change'; selection: [number, number] | null; mode?: VisualizerMode }
   | { type: 'export-midi' }
   | { type: 'clear-buffer' };
 
