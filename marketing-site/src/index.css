@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The page is dark by design. Say so to the browser, so a system or
+   extension "dark mode" leaves the colours alone instead of inverting them. */
+:root {
+  color-scheme: dark;
+}
+
 body {
   background-color: #05050a;
   color: #ffffff;
