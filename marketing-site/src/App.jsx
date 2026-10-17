@@ -7,7 +7,7 @@ const REPO = 'https://github.com/Chimthuwu/PsydeClip';
 const RELEASE = REPO + '/releases/latest';
 /** Stable across versions: the release carries a versionless copy of the installer. */
 const SETUP = REPO + '/releases/latest/download/PsydeClip-Windows-Setup.exe';
-const VERSION = '4.1.2';
+const VERSION = '4.2.1';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -130,9 +130,8 @@ function Hero() {
           </motion.div>
 
           <motion.p variants={fadeIn} className="mt-5 text-xs text-gray-500 max-w-xl mx-auto">
-            v{VERSION} · 83 MB installer, ~330 MB installed · Windows 10 or later. The repository is private while this
-            is in progress, so the download needs access, and the installer is unsigned — SmartScreen will warn on first
-            run.
+            v{VERSION} · 83 MB installer, ~330 MB installed · Windows 10 or later. The installer is unsigned, so
+            SmartScreen will warn on first run.
           </motion.p>
         </motion.div>
       </div>
