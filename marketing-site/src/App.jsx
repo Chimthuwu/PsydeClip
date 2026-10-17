@@ -7,7 +7,7 @@ const REPO = 'https://github.com/Chimthuwu/PsydeClip';
 const RELEASE = REPO + '/releases/latest';
 /** Stable across versions: the release carries a versionless copy of the installer. */
 const SETUP = REPO + '/releases/latest/download/PsydeClip-Windows-Setup.exe';
-const VERSION = '4.2.1';
+const VERSION = '4.3.0';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
