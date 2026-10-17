@@ -1,6 +1,6 @@
 {
   "name": "psydeclip",
-  "version": "4.3.0",
+  "version": "4.3.1",
   "description": "PsydeClip \u2014 rolling-sampler system audio recorder with oscilloscope, spectrogram and MIDI visualizers",
   "main": "dist/main/index.js",
   "author": "Serge",
