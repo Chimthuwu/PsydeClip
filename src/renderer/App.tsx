@@ -22,9 +22,22 @@ import { useSettings } from './hooks/useSettings';
 import { useCapture } from './hooks/useCapture';
 import { useRecorderEvents } from './hooks/useRecorderEvents';
 import { SMOOTHING_FOR_MODE } from './lib/visualizer';
-import { AppSettings, VisualizerMode, VISUALIZER_MODES, VISUALIZER_LABELS } from '../shared/types';
+import { AppSettings, TranscribedNote, VisualizerMode, VISUALIZER_MODES, VISUALIZER_LABELS } from '../shared/types';
 import { CLIP_STOP_PROMPT } from '../shared/utils';
 import { visibleNotes } from '../shared/piano-roll';
+
+/**
+ * Transcription reports note times from the start of the clip it was given.
+ * Layers carry session time, so shift the notes onto it.
+ */
+function toSessionNotes(notes: TranscribedNote[], clipStartSec: number): TranscribedNote[] {
+  return notes.map((n) => ({ ...n, startSec: n.startSec + clipStartSec }));
+}
+
+/** Back to clip-relative times, so an exported .mid starts at zero. */
+function toClipNotes(notes: TranscribedNote[], clipStartSec: number): TranscribedNote[] {
+  return notes.map((n) => ({ ...n, startSec: n.startSec - clipStartSec }));
+}
 
 const LOOPBACK_SUPPORTED_PLATFORMS = new Set(['win32']);
 
@@ -110,7 +123,7 @@ export default function App() {
             emitToast,
             onSettled: (state) => {
               if (state.status !== 'done' || !state.notes?.length) return;
-              const layer: NoteLayer = { startSec, durationSec, notes: state.notes, label };
+              const layer: NoteLayer = { startSec, durationSec, notes: toSessionNotes(state.notes, startSec), label };
               setNoteLayer(layer);
             },
           },
@@ -503,7 +516,7 @@ export default function App() {
             const layer: NoteLayer = {
               startSec: mono.startSec,
               durationSec: mono.durationSec,
-              notes: state.notes,
+              notes: toSessionNotes(state.notes, mono.startSec),
               label,
             };
             putNoteLayer(key, layer);
@@ -537,7 +550,7 @@ export default function App() {
       return;
     }
     try {
-      const bytes = await window.api.notesToMidi(layer.notes);
+      const bytes = await window.api.notesToMidi(toClipNotes(layer.notes, layer.startSec));
       const res = await window.api.saveRecording({
         folder: settings.saveFolder,
         bytes,
