@@ -924,7 +924,7 @@ export default function App() {
         else if (c.type === 'discard-clip') void dcr();
         else if (c.type === 'set-visualizer') void up({ visualizer: c.mode });
         else if (c.type === 'set-override') setPopoutOverride(c.mode);
-        else if (c.type === 'selection-change') hsc(c.selection);
+        else if (c.type === 'selection-change') hsc(c.selection, c.mode ?? 'history');
         // The pop-out has no note layers of its own (they live in this
         // window's recorder/history), so its ⇩ .mid buttons ask here.
         else if (c.type === 'export-midi') void em();
