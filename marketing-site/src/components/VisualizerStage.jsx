@@ -601,7 +601,7 @@ export default function VisualizerStage() {
           <canvas
             ref={canvasRef}
             aria-label={`${active.label} visualizer, illustrated with a simulated signal`}
-            className="block w-full h-[220px] sm:h-[340px]"
+            className="block w-full h-[170px] sm:h-[240px]"
           />
           {active.id === 'history' && <DragToDesktop label="WAV" fileName="clip_00-12.wav" />}
           {active.id === 'spectrogram' && <DragToDesktop label="WAV" fileName="clip_00-12.wav" />}

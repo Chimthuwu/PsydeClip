@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Download, Radio, Music, Check, Keyboard, History, Volume2, Scissors } from 'lucide-react';
+import { Download, Radio, Music, Keyboard, History, Volume2, Scissors } from 'lucide-react';
 import VisualizerStage from './components/VisualizerStage.jsx';
 
 const REPO = 'https://github.com/Chimthuwu/PsydeClip';
@@ -8,6 +8,8 @@ const RELEASE = REPO + '/releases/latest';
 /** Stable across versions: the release carries a versionless copy of the installer. */
 const SETUP = REPO + '/releases/latest/download/PsydeClip-Windows-Setup.exe';
 const VERSION = '4.3.1';
+/** Demo video. The no-cookie domain is YouTube's privacy-enhanced embed. */
+const VIDEO_ID = 'bFeG41zjfh4';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -34,17 +36,6 @@ function GithubMark({ size = 16 }) {
 /** Mirrors VISUALIZER_LABELS in src/shared/types.ts. */
 const MODES = ['Oscilloscope', 'Spectrum', 'Spectrogram', 'History', 'MIDI'];
 
-
-const ROADMAP = [
-  { done: true, text: 'Renderer crash on capture start (bad_message.cc 263)' },
-  { done: true, text: 'Custom dropdowns — no more white text on white' },
-  { done: true, text: 'Pop-out visualizer window, dockable across a monitor' },
-  { done: true, text: 'MIDI grid with live pitch tracking while recording' },
-  { done: false, text: 'By-ear accuracy baseline for audio to MIDI, in a DAW' },
-  { done: false, text: 'A signed installer, so SmartScreen stays quiet' },
-  { done: false, text: 'Optional mic capture through the same WASAPI helper' },
-  { done: false, text: 'An Android build — last item on the list, deliberately' },
-];
 
 const ACCENTS = {
   magenta: { ring: 'hover:border-neon-magenta/50', bg: 'bg-neon-magenta/10', fg: 'text-neon-magenta' },
@@ -146,29 +137,64 @@ function Hero() {
  */
 function Visualizers() {
   return (
-    <section id="visualizers" className="py-24 relative border-t border-white/5 bg-white/[0.01]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="visualizers" className="py-16 relative border-t border-white/5 bg-white/[0.01]">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeIn}
-          className="text-center mb-12"
+          className="text-center mb-8"
         >
-          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
-            Watch it{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-cyan to-neon-magenta">
-              draw.
-            </span>
-          </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto">
-            Five views that cycle on their own. Highlight a stretch of History, the spectrogram or the
-            MIDI notes, and drag it straight onto your desktop as a WAV or a .mid.
+          <h2 className="text-xl md:text-2xl font-bold mb-2">Five views</h2>
+          <p className="text-sm text-gray-400 max-w-xl mx-auto">
+            Highlight a stretch of History, the spectrogram or the MIDI notes, and drag it straight onto your
+            desktop as a WAV or a .mid.
           </p>
         </motion.div>
 
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
           <VisualizerStage />
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/** Real captures of the app, not mockups. */
+const SHOTS = [
+  { src: 'shots-user/bloodred-grid.png', alt: 'PsydeClip in the Blood Red theme with the grid view', w: 1074, h: 553 },
+  { src: 'shots-user/kawaii-grid.png', alt: 'PsydeClip in the Kawaii theme with the grid view', w: 836, h: 410 },
+  { src: 'shots-user/modern-midi.png', alt: 'PsydeClip MIDI view in the Modern theme', w: 1074, h: 575 },
+  { src: 'shots-user/red-midi.png', alt: 'PsydeClip MIDI view in the Blood Red theme', w: 1074, h: 575 },
+];
+
+function Screenshots() {
+  return (
+    <section id="screenshots" className="py-20 border-t border-white/5">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
+          <img
+            src="shots-user/hero-modern.png"
+            alt="The PsydeClip main window"
+            width={1254}
+            height={681}
+            loading="lazy"
+            className="w-full rounded-2xl border border-white/10 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]"
+          />
+          <div className="grid sm:grid-cols-2 gap-4 mt-4">
+            {SHOTS.map((s) => (
+              <img
+                key={s.src}
+                src={s.src}
+                alt={s.alt}
+                width={s.w}
+                height={s.h}
+                loading="lazy"
+                className="w-full rounded-xl border border-white/10"
+              />
+            ))}
+          </div>
         </motion.div>
       </div>
     </section>
@@ -196,49 +222,43 @@ function TechStack() {
   );
 }
 
-function Roadmap() {
+/** The demo video, embedded at 16:9 and loaded only when the section is near the viewport. */
+function Video() {
   return (
-    <section id="roadmap" className="py-24">
+    <section id="video" className="py-24 border-t border-white/5">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeIn}
-          className="text-center mb-14"
+          className="text-center mb-12"
         >
           <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
-            The{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-magenta to-neon-purple">
-              roadmap
+            See it{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-cyan to-neon-magenta">
+              in action.
             </span>
           </h2>
-          <p className="text-gray-400">Where it is, and where it goes next.</p>
         </motion.div>
 
-        <div className="space-y-4">
-          {ROADMAP.map((item, i) => (
-            <motion.div
-              key={item.text}
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ delay: Math.min(i, 5) * 0.08 }}
-              viewport={{ once: true }}
-              className={`flex items-center gap-4 p-4 rounded-xl border ${
-                item.done ? 'border-neon-cyan/30 bg-neon-cyan/5' : 'border-white/10 bg-white/[0.03]'
-              }`}
-            >
-              <span
-                className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center border ${
-                  item.done ? 'bg-neon-cyan border-neon-cyan text-black' : 'border-gray-600'
-                }`}
-              >
-                {item.done && <Check size={14} strokeWidth={3} />}
-              </span>
-              <span className={item.done ? 'text-gray-400' : 'text-white'}>{item.text}</span>
-            </motion.div>
-          ))}
-        </div>
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeIn}
+          className="relative w-full aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black shadow-[0_0_40px_rgba(0,255,255,0.08)]"
+        >
+          <iframe
+            className="absolute inset-0 w-full h-full"
+            src={`https://www.youtube-nocookie.com/embed/${VIDEO_ID}`}
+            title="PsydeClip demo video"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </motion.div>
       </div>
     </section>
   );
@@ -277,9 +297,10 @@ export default function App() {
       <div className="glow-orb glow-2" aria-hidden="true" />
       <Nav />
       <Hero />
+      <Video />
       <Visualizers />
+      <Screenshots />
       <TechStack />
-      <Roadmap />
       <Footer />
     </div>
   );
