@@ -1389,6 +1389,46 @@ option {
   justify-content: flex-end;
   min-width: 0;
 }
+/* View-switch chips: same opaque-centre / gradient-ring treatment as the
+   title-bar buttons (see .tb-btn) so they read as neon outlines at rest and
+   fill solid on hover/active, consistently with the rest of the chrome. The
+   icon itself is sized off font-size (VizIcon is `1em`), so bumping it here
+   makes the glyphs legible without touching every other `button.chip` user
+   (Settings' theme grid, filename-token chips, etc). */
+.viz-buttons .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 18px;
+  padding: 7px 11px;
+  background:
+    linear-gradient(var(--bg-app), var(--bg-app)) padding-box,
+    linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft)) border-box;
+  border: 1.5px solid transparent;
+  color: var(--accent-bright);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.viz-buttons .chip:hover,
+.viz-buttons .chip.on {
+  background: linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft));
+  color: var(--bg-app, #05070f);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-bright) 60%, transparent);
+}
+.viz-chip-label {
+  font-size: 12px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+/* Icon-only below this width — there isn't room for five full labels plus
+   the device picker that now lives in the same footer row. */
+@media (max-width: 900px) {
+  .viz-chip-label {
+    display: none;
+  }
+  .viz-buttons .chip {
+    padding: 7px 9px;
+  }
+}
 
 /* Buttons --------------------------------------------------------------- */
 
@@ -2703,8 +2743,11 @@ small {
   overflow: hidden;
 }
 .popout-drag .tb-btn {
-  height: 18px;
-  width: 22px;
+  height: 19px;
+  min-width: 22px;
+  width: auto;
+  padding: 0 5px;
+  white-space: nowrap;
 }
 /* ANY button parked in the drag strip must opt out of window-dragging —
    the strip is `-webkit-app-region: drag`, and a region with that set eats
@@ -2792,8 +2835,8 @@ small {
   margin-left: auto;
 }
 .popout-chips .chip {
-  padding: 2px 7px;
-  font-size: 12px;
+  padding: 3px 9px;
+  font-size: 14px;
   line-height: 1.2;
 }
 .popout.theme-kawaii .popout-controls {
@@ -2929,8 +2972,11 @@ small {
   overflow: hidden;
 }
 .popout-drag .tb-btn {
-  height: 18px;
-  width: 22px;
+  height: 19px;
+  min-width: 22px;
+  width: auto;
+  padding: 0 5px;
+  white-space: nowrap;
 }
 /* ANY button parked in the drag strip must opt out of window-dragging —
    the strip is `-webkit-app-region: drag`, and a region with that set eats
@@ -3019,8 +3065,8 @@ small {
   margin-left: auto;
 }
 .popout-chips .chip {
-  padding: 2px 7px;
-  font-size: 12px;
+  padding: 3px 9px;
+  font-size: 14px;
   line-height: 1.2;
 }
 .popout.theme-kawaii .popout-controls {

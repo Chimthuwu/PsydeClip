@@ -1062,6 +1062,7 @@ export default function App() {
             onClick={() => toggleMode(m)}
           >
             <VizIcon mode={m} />
+            <span className="viz-chip-label">{VISUALIZER_LABELS[m]}</span>
           </button>
         );
       })}
