@@ -1,13 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Download, Radio, Music, Keyboard, History, Volume2, Scissors } from 'lucide-react';
-import VisualizerStage from './components/VisualizerStage.jsx';
+import { Download, Radio, Music, History, Volume2, Scissors, Palette } from 'lucide-react';
 
 const REPO = 'https://github.com/Chimthuwu/PsydeClip';
 const RELEASE = REPO + '/releases/latest';
 /** Stable across versions: the release carries a versionless copy of the installer. */
 const SETUP = REPO + '/releases/latest/download/PsydeClip-Windows-Setup.exe';
-const VERSION = '4.3.1';
+const VERSION = '4.4.0';
 /** Demo video. The no-cookie domain is YouTube's privacy-enhanced embed. */
 const VIDEO_ID = 'bFeG41zjfh4';
 
@@ -33,129 +32,233 @@ function GithubMark({ size = 16 }) {
   );
 }
 
-/** Mirrors VISUALIZER_LABELS in src/shared/types.ts. */
-const MODES = ['Oscilloscope', 'Spectrum', 'Spectrogram', 'History', 'MIDI'];
+/** A section kicker: small mono label with a signal-coloured tick, used in
+ *  place of gradient-clip headline text — one considered accent move instead
+ *  of colour everywhere. */
+function Kicker({ children }) {
+  return (
+    <div className="flex items-center justify-center gap-2 mb-4">
+      <span className="w-1.5 h-1.5 bg-signal-teal" aria-hidden="true" />
+      <span className="font-mono text-xs uppercase tracking-[0.25em] text-white/50">{children}</span>
+    </div>
+  );
+}
 
-
-const ACCENTS = {
-  magenta: { ring: 'hover:border-neon-magenta/50', bg: 'bg-neon-magenta/10', fg: 'text-neon-magenta' },
-  cyan: { ring: 'hover:border-neon-cyan/50', bg: 'bg-neon-cyan/10', fg: 'text-neon-cyan' },
-  purple: { ring: 'hover:border-neon-purple/50', bg: 'bg-neon-purple/10', fg: 'text-neon-purple' },
-};
+/** Wraps a screenshot in the app's own title-bar language (dot + lowercase
+ *  mono wordmark) — real captures of the app, framed to look like the app,
+ *  rather than a bare bordered <img>. */
+function AppFrame({ title = 'psydeclip', live, children, className = '' }) {
+  return (
+    <div className={`rounded-xl overflow-hidden border border-white/10 bg-ink-900 ${className}`}>
+      <div className="flex items-center gap-2.5 h-9 px-3.5 bg-[#0a0a10] border-b border-white/5">
+        <span
+          className={`w-2 h-2 rounded-full ${live ? 'bg-emerald-400 animate-pulse-dot' : 'bg-white/20'}`}
+          aria-hidden="true"
+        />
+        <span className="font-mono text-[11px] tracking-wide text-white/40 lowercase">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 function Nav() {
   return (
-    <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-[#05050A]/70 backdrop-blur-xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-[#07070b]/80 backdrop-blur-xl overflow-hidden">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <a href="#top" className="flex items-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-neon-magenta animate-pulse-dot" />
-          <span className="font-extrabold text-xl tracking-tight">psydeclip</span>
+          <span className="w-2 h-2 rounded-full bg-signal-teal animate-pulse-dot" />
+          <span className="font-mono font-semibold text-lg tracking-tight lowercase">psydeclip</span>
         </a>
-        <div className="flex items-center gap-6">
-          <a href="#visualizers" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
-            Visualizers
+        <div className="flex items-center gap-7">
+          <a href="#features" className="hidden sm:block text-sm text-white/50 hover:text-white transition-colors">
+            Features
+          </a>
+          <a href="#gallery" className="hidden sm:block text-sm text-white/50 hover:text-white transition-colors">
+            Gallery
           </a>
           <a
             href={REPO}
             target="_blank"
             rel="noreferrer"
-            className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5"
+            className="text-sm text-white/50 hover:text-white transition-colors flex items-center gap-1.5"
           >
-            <GithubMark size={16} /> GitHub
+            <GithubMark size={16} /> <span className="hidden sm:inline">GitHub</span>
           </a>
           <a
             href={SETUP}
-            className="hidden sm:flex text-sm px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:-translate-y-0.5 transition-all"
+            className="hidden sm:flex text-sm font-medium px-4 py-2 rounded-md border border-signal-teal/40 text-signal-teal hover:bg-signal-teal/10 hover:border-signal-teal transition-colors"
           >
             Download
           </a>
         </div>
       </div>
+      <span className="nav-trace" aria-hidden="true" />
     </nav>
   );
 }
 
+/** Small spec-sheet strip under the hero — real numbers in mono, the kind of
+ *  detail a template landing page never bothers with. */
+const SPECS = [
+  ['5', 'visualizers'],
+  ['14', 'themes'],
+  ['0', 'cloud dependency'],
+  ['MIT', 'licensed'],
+];
 
 function Hero() {
   return (
-    <section id="top" className="relative pt-32 pb-20 lg:pt-44 lg:pb-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-        <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
+    <section id="top" className="relative pt-36 pb-20 lg:pt-44 lg:pb-28 overflow-hidden">
+      <div className="hero-wash" aria-hidden="true" />
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 relative z-10">
+        <div className="grid lg:grid-cols-[1.05fr_1fr] gap-14 items-center">
+          <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
+            <motion.div
+              variants={fadeIn}
+              className="inline-flex items-center gap-2 px-3 py-1 border border-white/10 bg-white/[0.03] text-xs font-mono text-white/50 mb-7"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-signal-teal" />
+              v{VERSION} &middot; WINDOWS
+            </motion.div>
+
+            <motion.h1
+              variants={fadeIn}
+              className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6 leading-[1.08]"
+            >
+              Never miss a moment
+              <br />
+              of <span className="relative inline-block px-1">
+                audio
+                <svg
+                  className="absolute left-0 -bottom-1 w-full"
+                  height="10"
+                  viewBox="0 0 160 10"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path d="M1 7 C 30 2, 60 9, 90 4 S 140 2, 159 6" stroke="#5ef2d6" strokeWidth="3" fill="none" strokeLinecap="round" />
+                </svg>
+              </span>
+              .
+            </motion.h1>
+
+            <motion.p variants={fadeIn} className="text-lg text-white/55 max-w-xl mb-10 leading-relaxed">
+              A system audio recorder for Windows that's always quietly capturing into memory. Press{' '}
+              <strong className="text-white font-semibold">Save</strong> and the last few minutes — however long you
+              buffered — land on disk.
+            </motion.p>
+
+            <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-start gap-4 mb-10">
+              <a
+                href={SETUP}
+                className="px-6 py-3.5 rounded-md bg-signal-teal text-ink-950 font-semibold text-sm hover:brightness-110 active:brightness-95 transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                <Download size={18} /> Download for Windows
+              </a>
+              <a
+                href="#gallery"
+                className="px-6 py-3.5 rounded-md border border-white/15 hover:border-white/30 hover:bg-white/[0.04] transition-colors flex items-center gap-2 w-full sm:w-auto justify-center text-sm font-medium"
+              >
+                View the gallery
+              </a>
+            </motion.div>
+
+            <motion.div variants={fadeIn} className="flex flex-wrap gap-x-8 gap-y-3 font-mono text-xs">
+              {SPECS.map(([n, label]) => (
+                <div key={label}>
+                  <span className="text-white font-semibold">{n}</span>{' '}
+                  <span className="text-white/40 uppercase tracking-wide">{label}</span>
+                </div>
+              ))}
+            </motion.div>
+          </motion.div>
+
           <motion.div
-            variants={fadeIn}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 text-xs font-semibold text-neon-cyan mb-6"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="relative"
           >
-            <span className="w-2 h-2 rounded-full bg-neon-cyan" />
-            v{VERSION} · Windows · work in progress
+            <div className="absolute -inset-6 bg-gradient-to-br from-signal-teal/10 to-signal-violet/10 rounded-2xl blur-2xl" aria-hidden="true" />
+            <AppFrame live className="relative shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]">
+              <img
+                src="shots-user/classic-grid-recording.png"
+                alt="PsydeClip recording live — oscilloscope, spectrum, spectrogram, history and MIDI all reading the same signal"
+                width={1108}
+                height={624}
+                className="w-full block"
+              />
+            </AppFrame>
           </motion.div>
-
-          <motion.h1
-            variants={fadeIn}
-            className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1]"
-          >
-            Never miss a moment of{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-cyan to-neon-magenta">
-              audio.
-            </span>
-          </motion.h1>
-
-          <motion.p variants={fadeIn} className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-10">
-            A system audio recorder for Windows. It is always quietly recording into memory — press{' '}
-            <strong className="text-white">Save</strong> to write the last 5 minutes, or however long you buffered, to
-            disk.
-          </motion.p>
-
-          <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a
-              href={SETUP}
-              className="px-8 py-4 rounded-full bg-gradient-to-br from-neon-magenta to-neon-purple text-white font-bold shadow-[0_4px_20px_rgba(255,0,255,0.3)] hover:shadow-[0_6px_30px_rgba(255,0,255,0.5)] hover:-translate-y-0.5 transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
-            >
-              <Download size={20} /> Download for Windows
-            </a>
-            <a
-              href="#visualizers"
-              className="px-8 py-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:-translate-y-0.5 transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
-            >
-              See the views
-            </a>
-          </motion.div>
-
-          <motion.p variants={fadeIn} className="mt-5 text-xs text-gray-500 max-w-xl mx-auto">
-            v{VERSION} · 83 MB installer, ~330 MB installed · Windows 10 or later. The installer is unsigned, so
-            SmartScreen will warn on first run.
-          </motion.p>
-        </motion.div>
+        </div>
       </div>
+      <p className="relative z-10 max-w-6xl mx-auto px-5 sm:px-8 mt-10 text-xs text-white/35">
+        v{VERSION} &middot; 83 MB installer, ~330 MB installed &middot; Windows 10 or later. The installer is
+        unsigned, so SmartScreen will warn on first run.
+      </p>
     </section>
   );
 }
 
-/**
- * The visualizer demo. The stage is its own component — it owns a canvas and a
- * rAF loop — while the section wrapper lives here with the others so it picks
- * up the same heading rhythm and reveal animation.
- */
-function Visualizers() {
-  return (
-    <section id="visualizers" className="py-16 relative border-t border-white/5 bg-white/[0.01]">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeIn}
-          className="text-center mb-8"
-        >
-          <h2 className="text-xl md:text-2xl font-bold mb-2">Five views</h2>
-          <p className="text-sm text-gray-400 max-w-xl mx-auto">
-            Highlight a stretch of History, the spectrogram or the MIDI notes, and drag it straight onto your
-            desktop as a WAV or a .mid.
-          </p>
-        </motion.div>
+const FEATURES = [
+  {
+    icon: History,
+    title: 'Rolling buffer',
+    body: 'Capture is always on in memory. Something good just happened? Save grabs the last N minutes — nothing to rewind, nothing missed.',
+  },
+  {
+    icon: Radio,
+    title: 'Five live views',
+    body: 'Oscilloscope, spectrum, spectrogram, history and a MIDI piano roll, all reading the same signal in real time.',
+  },
+  {
+    icon: Volume2,
+    title: 'True loopback',
+    body: 'WASAPI per-device capture, not just desktopCapturer — pick the exact output device you want to record.',
+  },
+  {
+    icon: Music,
+    title: 'Audio → MIDI',
+    body: 'Select a range and transcribe it with Basic Pitch. The notes render on the piano-roll lane before you even export.',
+  },
+  {
+    icon: Scissors,
+    title: 'Drag to export',
+    body: 'Highlight a stretch of History, the spectrogram or the MIDI notes and drag it straight onto your desktop as a WAV or .mid.',
+  },
+  {
+    icon: Palette,
+    title: '14 themes',
+    body: 'From a plain classic terminal green to full synthwave. Every visualizer re-themes with it, panel to panel.',
+  },
+];
 
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
-          <VisualizerStage />
-        </motion.div>
+function Features() {
+  return (
+    <section id="features" className="relative py-24 border-t border-white/5">
+      <div className="graticule" aria-hidden="true" />
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 relative z-10">
+        <Kicker>What it does</Kicker>
+        <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-16 tracking-tight">
+          Built for the moment you almost missed.
+        </h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-white/5 border border-white/5">
+          {FEATURES.map(({ icon: Icon, title, body }) => (
+            <motion.div
+              key={title}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-60px' }}
+              variants={fadeIn}
+              className="bg-ink-950 p-7 hover:bg-ink-900 transition-colors"
+            >
+              <Icon size={20} className="text-signal-teal mb-4" strokeWidth={1.75} />
+              <h3 className="font-semibold mb-2">{title}</h3>
+              <p className="text-sm text-white/50 leading-relaxed">{body}</p>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -163,39 +266,60 @@ function Visualizers() {
 
 /** Real captures of the app, not mockups. */
 const SHOTS = [
-  { src: 'shots-user/bloodred-grid.png', alt: 'PsydeClip in the Blood Red theme with the grid view', w: 1074, h: 553 },
-  { src: 'shots-user/kawaii-grid.png', alt: 'PsydeClip in the Kawaii theme with the grid view', w: 836, h: 410 },
-  { src: 'shots-user/modern-midi.png', alt: 'PsydeClip MIDI view in the Modern theme', w: 1074, h: 575 },
-  { src: 'shots-user/red-midi.png', alt: 'PsydeClip MIDI view in the Blood Red theme', w: 1074, h: 575 },
+  { src: 'shots-user/aurora-grid-active.png', alt: 'PsydeClip in the Aurora theme, recording across all five views', w: 1248, h: 870, title: 'aurora.theme' },
+  { src: 'shots-user/future-docked-strip.png', alt: 'PsydeClip docked as a thin strip across the top of a monitor, Future theme', w: 1921, h: 166, title: 'future.theme — docked', wide: true },
+  { src: 'shots-user/bloodred-grid.png', alt: 'PsydeClip in the Blood Red theme with the grid view', w: 1074, h: 553, title: 'blood-red.theme' },
+  { src: 'shots-user/kawaii-grid.png', alt: 'PsydeClip in the Kawaii theme with the grid view', w: 836, h: 410, title: 'kawaii.theme' },
+  { src: 'shots-user/modern-midi.png', alt: 'PsydeClip MIDI view in the Modern theme', w: 1074, h: 575, title: 'modern.theme — midi' },
+  { src: 'shots-user/red-midi.png', alt: 'PsydeClip MIDI view in the Blood Red theme', w: 1074, h: 575, title: 'blood-red.theme — midi' },
 ];
 
 function Screenshots() {
   return (
-    <section id="screenshots" className="py-20 border-t border-white/5">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
-          <img
-            src="shots-user/hero-modern.png"
-            alt="The PsydeClip main window"
-            width={1254}
-            height={681}
-            loading="lazy"
-            className="w-full rounded-2xl border border-white/10 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]"
-          />
-          <div className="grid sm:grid-cols-2 gap-4 mt-4">
-            {SHOTS.map((s) => (
-              <img
-                key={s.src}
-                src={s.src}
-                alt={s.alt}
-                width={s.w}
-                height={s.h}
-                loading="lazy"
-                className="w-full rounded-xl border border-white/10"
-              />
-            ))}
-          </div>
+    <section id="gallery" className="py-24 border-t border-white/5">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8">
+        <Kicker>In practice</Kicker>
+        <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-4 tracking-tight">
+          Same app, fourteen moods.
+        </h2>
+        <p className="text-sm text-white/50 max-w-xl mx-auto text-center mb-14">
+          Every shot below is a real capture, not a mockup — including this one, recording live.
+        </p>
+
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-60px' }}
+          variants={fadeIn}
+          className="mb-5"
+        >
+          <AppFrame title="live.gif" live>
+            <img
+              src="shots-user/live-demo.gif"
+              alt="PsydeClip running live, resizing and docking without losing any of its visualizers"
+              width={1144}
+              height={599}
+              className="w-full block"
+            />
+          </AppFrame>
         </motion.div>
+
+        <div className="grid sm:grid-cols-2 gap-5">
+          {SHOTS.map((s) => (
+            <motion.div
+              key={s.src}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-60px' }}
+              variants={fadeIn}
+              className={s.wide ? 'sm:col-span-2' : undefined}
+            >
+              <AppFrame title={s.title}>
+                <img src={s.src} alt={s.alt} width={s.w} height={s.h} loading="lazy" className="w-full block" />
+              </AppFrame>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -204,14 +328,14 @@ function Screenshots() {
 function TechStack() {
   const stack = ['Electron 30', 'React 18', 'TypeScript 5', 'Vite 5', 'NAudio WASAPI', 'WebM / Opus', 'Basic Pitch'];
   return (
-    <section className="py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h3 className="text-sm uppercase tracking-[0.2em] text-gray-500 mb-8">Built with</h3>
-        <div className="flex flex-wrap justify-center gap-3 max-w-3xl mx-auto">
+    <section className="py-20 border-t border-white/5">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 text-center">
+        <h3 className="font-mono text-xs uppercase tracking-[0.25em] text-white/40 mb-8">Built with</h3>
+        <div className="flex flex-wrap justify-center gap-2.5 max-w-3xl mx-auto">
           {stack.map((tech) => (
             <span
               key={tech}
-              className="px-5 py-2 rounded-full border border-white/10 bg-white/[0.03] font-mono text-[13px] text-gray-300"
+              className="px-4 py-1.5 rounded-md border border-white/10 bg-white/[0.02] font-mono text-[13px] text-white/60"
             >
               {tech}
             </span>
@@ -226,7 +350,7 @@ function TechStack() {
 function Video() {
   return (
     <section id="video" className="py-24 border-t border-white/5">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-5 sm:px-8">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -234,30 +358,24 @@ function Video() {
           variants={fadeIn}
           className="text-center mb-12"
         >
-          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
-            See it{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-neon-cyan to-neon-magenta">
-              in action.
-            </span>
-          </h2>
+          <Kicker>Walkthrough</Kicker>
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">See it in action.</h2>
         </motion.div>
 
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeIn}
-          className="relative w-full aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black shadow-[0_0_40px_rgba(0,255,255,0.08)]"
-        >
-          <iframe
-            className="absolute inset-0 w-full h-full"
-            src={`https://www.youtube-nocookie.com/embed/${VIDEO_ID}`}
-            title="PsydeClip demo video"
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
+          <AppFrame title="demo.mp4" className="shadow-[0_0_50px_-15px_rgba(94,242,214,0.15)]">
+            <div className="relative w-full aspect-video bg-black">
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src={`https://www.youtube-nocookie.com/embed/${VIDEO_ID}`}
+                title="PsydeClip demo video"
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </AppFrame>
         </motion.div>
       </div>
     </section>
@@ -266,24 +384,39 @@ function Video() {
 
 function Footer() {
   return (
-    <footer className="py-12 border-t border-white/10 text-center text-gray-500 text-sm">
-      <div className="max-w-7xl mx-auto px-4">
-        <p className="mb-2">Built in Windsor, Ontario · Windows 10 or later.</p>
-        <p className="mb-4 text-xs max-w-2xl mx-auto">
-          ~330 MB installed. The rolling buffer lives in RAM, so disk only fills as fast as you save — about 0.7 MB a
-          minute at the default 96 kbps Opus, ~11 MB a minute for WAV.
-        </p>
-        <p>MIT License · Copyright © 2026 Chimthuwu</p>
-        <div className="flex justify-center gap-6 mt-6">
-          <a href={REPO} className="text-neon-cyan hover:underline">
-            GitHub
-          </a>
-          <a href={`${REPO}/issues`} className="text-neon-cyan hover:underline">
-            Issues
-          </a>
-          <a href={RELEASE} className="text-neon-cyan hover:underline">
-            Releases
-          </a>
+    <footer className="py-16 border-t border-white/10 text-white/50 text-sm">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8">
+        <div className="grid sm:grid-cols-[1.4fr_1fr_1fr] gap-10 mb-12">
+          <div>
+            <a href="#top" className="flex items-center gap-2.5 mb-4">
+              <span className="w-2 h-2 rounded-full bg-signal-teal" />
+              <span className="font-mono font-semibold text-white lowercase">psydeclip</span>
+            </a>
+            <p className="max-w-sm leading-relaxed">
+              Built in Windsor, Ontario. ~330 MB installed; the rolling buffer lives in RAM, so disk only fills as
+              fast as you save — about 0.7 MB a minute at the default 96 kbps Opus, ~11 MB a minute for WAV.
+            </p>
+          </div>
+          <div>
+            <h4 className="font-mono text-xs uppercase tracking-[0.2em] text-white/30 mb-4">Product</h4>
+            <ul className="space-y-2.5">
+              <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+              <li><a href="#gallery" className="hover:text-white transition-colors">Gallery</a></li>
+              <li><a href={SETUP} className="hover:text-white transition-colors">Download</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-mono text-xs uppercase tracking-[0.2em] text-white/30 mb-4">Resources</h4>
+            <ul className="space-y-2.5">
+              <li><a href={REPO} className="hover:text-white transition-colors">GitHub</a></li>
+              <li><a href={`${REPO}/issues`} className="hover:text-white transition-colors">Issues</a></li>
+              <li><a href={RELEASE} className="hover:text-white transition-colors">Releases</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/35">
+          <p>MIT License &middot; Copyright &copy; 2026 Chimthuwu</p>
+          <p>Windows 10 or later</p>
         </div>
       </div>
     </footer>
@@ -292,13 +425,11 @@ function Footer() {
 
 export default function App() {
   return (
-    <div className="relative min-h-screen bg-[#05050A] text-white font-sans overflow-x-hidden">
-      <div className="glow-orb glow-1" aria-hidden="true" />
-      <div className="glow-orb glow-2" aria-hidden="true" />
+    <div className="relative min-h-screen bg-ink-950 text-white font-sans overflow-x-hidden">
       <Nav />
       <Hero />
+      <Features />
       <Video />
-      <Visualizers />
       <Screenshots />
       <TechStack />
       <Footer />

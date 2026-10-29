@@ -9,56 +9,64 @@
 }
 
 body {
-  background-color: #05050a;
+  background-color: #07070b;
   color: #ffffff;
   overflow-x: hidden;
-  /* Two fixed washes behind everything, so the page is never flat black. */
-  background-image:
-    radial-gradient(circle at 15% 50%, rgba(255, 0, 255, 0.08), transparent 40%),
-    radial-gradient(circle at 85% 30%, rgba(0, 243, 255, 0.08), transparent 40%);
-  background-attachment: fixed;
 }
 
 ::selection {
-  background-color: #ff00ff;
-  color: #ffffff;
+  background-color: #5ef2d6;
+  color: #07070b;
 }
 
-/* Ambient drifting orbs. Behind the content, never interactive. */
-.glow-orb {
+/* A fine oscilloscope graticule instead of blurry gradient blobs — it ties
+   the chrome to the product (every visualizer draws on a grid like this)
+   and reads as considered rather than a stock "SaaS gradient mesh" bg. */
+.graticule {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
+  inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.35;
-  animation: float 10s infinite ease-in-out alternate;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 85%);
 }
 
-.glow-1 {
-  top: 6%;
-  left: 12%;
-  width: min(400px, 70vw);
-  height: min(400px, 70vw);
-  background: #ff00ff;
+/* One restrained wash behind the hero — a signal, not a mood board. */
+.hero-wash {
+  position: absolute;
+  top: -10%;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 0;
+  pointer-events: none;
+  width: min(900px, 140vw);
+  height: 500px;
+  background: radial-gradient(ellipse at center, rgba(94, 242, 214, 0.12), transparent 70%);
+  filter: blur(40px);
 }
 
-.glow-2 {
-  top: 34%;
-  right: 6%;
-  width: min(500px, 80vw);
-  height: min(500px, 80vw);
-  background: #00f3ff;
-  animation-delay: -5s;
-}
-
-@keyframes float {
+/* A hairline trace that sweeps across the top nav border, like a signal
+   passing through — subtle, not decorative noise. */
+@keyframes sweep {
   0% {
-    transform: translateY(0) scale(1);
+    transform: translateX(-30%);
   }
   100% {
-    transform: translateY(-30px) scale(1.1);
+    transform: translateX(130%);
   }
+}
+.nav-trace {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 18%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #5ef2d6, transparent);
+  animation: sweep 7s linear infinite;
+  opacity: 0.7;
 }
 
 /* The mockup's oscilloscope trace: draws itself in, then breathes. */
