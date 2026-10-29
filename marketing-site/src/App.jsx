@@ -137,7 +137,14 @@ function Hero() {
                   preserveAspectRatio="none"
                   aria-hidden="true"
                 >
-                  <path d="M1 7 C 30 2, 60 9, 90 4 S 140 2, 159 6" stroke="#5ef2d6" strokeWidth="3" fill="none" strokeLinecap="round" />
+                  <path
+                    className="signal-underline"
+                    d="M1 7 C 30 2, 60 9, 90 4 S 140 2, 159 6"
+                    stroke="#5ef2d6"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </span>
               .
@@ -423,16 +430,27 @@ function Footer() {
   );
 }
 
+/** The page's background: the real app, blurred and dimmed, drifting slowly.
+ *  See `.ambient-bg` in index.css for why (and the gotcha: the inner layer
+ *  has to be opaque, not transparent, or it does nothing — same trap as the
+ *  app's own title-bar buttons hit earlier this session). */
+function AmbientBackground() {
+  return <div className="ambient-bg" aria-hidden="true" />;
+}
+
 export default function App() {
   return (
-    <div className="relative min-h-screen bg-ink-950 text-white font-sans overflow-x-hidden">
-      <Nav />
-      <Hero />
-      <Features />
-      <Video />
-      <Screenshots />
-      <TechStack />
-      <Footer />
+    <div className="relative min-h-screen text-white font-sans overflow-x-hidden">
+      <AmbientBackground />
+      <div className="relative z-10">
+        <Nav />
+        <Hero />
+        <Video />
+        <Features />
+        <Screenshots />
+        <TechStack />
+        <Footer />
+      </div>
     </div>
   );
 }

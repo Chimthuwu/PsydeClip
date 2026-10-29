@@ -19,9 +19,65 @@ body {
   color: #07070b;
 }
 
-/* A fine oscilloscope graticule instead of blurry gradient blobs — it ties
-   the chrome to the product (every visualizer draws on a grid like this)
-   and reads as considered rather than a stock "SaaS gradient mesh" bg. */
+/* The page's own background: the app's real UI, not a flat colour or a
+   gradient mesh — owner: "make the background like the UI of the app
+   itself", "feels static... wanted the background to be a bit more alive."
+   Fixed behind everything (sections stay transparent, there is no per-
+   section bg-ink any more), heavily blurred and dimmed so it reads as
+   ambient texture rather than a competing image, and it's the real
+   live-demo GIF so the page keeps moving even at rest. `background-image`
+   animates a GIF exactly like an <img> would — no extra element needed.
+   `ambientDrift` adds a slow pan+scale on top of the GIF's own motion so the
+   effect doesn't disappear if the GIF ever gets swapped for a still. */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: #07070b;
+}
+.ambient-bg::before {
+  content: '';
+  position: absolute;
+  inset: -5%;
+  background-image: url('/shots-user/live-demo.gif');
+  background-size: cover;
+  background-position: 30% 35%;
+  filter: blur(14px) saturate(1.4) brightness(1.05);
+  opacity: 0.9;
+  animation: ambientDrift 50s ease-in-out infinite alternate;
+}
+/* A flat, uniform scrim — NOT a gradient to solid black by 40% of the
+   viewport, which was the first attempt here: `position: fixed` means this
+   layer is always exactly one viewport tall, so a gradient tuned to "fade to
+   black by partway down" went fully opaque for the bottom 60% of every
+   single screen, on every section, all the time. The blurred GIF needs to
+   stay visibly present at any scroll position, not just in a sliver near
+   the top. */
+.ambient-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 7, 11, 0.72);
+}
+@keyframes ambientDrift {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.12) translate(-2%, 2%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambient-bg::before {
+    animation: none;
+  }
+}
+
+/* A fine oscilloscope graticule layered over the ambient image in a couple
+   of sections for extra texture — every visualizer in the app draws on a
+   grid like this. */
 .graticule {
   position: absolute;
   inset: 0;
@@ -46,6 +102,31 @@ body {
   height: 500px;
   background: radial-gradient(ellipse at center, rgba(94, 242, 214, 0.12), transparent 70%);
   filter: blur(40px);
+}
+
+/* The headline's underline trace redraws itself on a loop, like a signal
+   that never quite settles — a small, literal bit of "alive". */
+@keyframes retrace {
+  0% {
+    stroke-dashoffset: 200;
+  }
+  45%, 55% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -200;
+  }
+}
+.signal-underline {
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  animation: retrace 5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .signal-underline {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
 }
 
 /* A hairline trace that sweeps across the top nav border, like a signal
