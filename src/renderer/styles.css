@@ -1420,13 +1420,29 @@ option {
   white-space: nowrap;
 }
 /* Icon-only below this width — there isn't room for five full labels plus
-   the device picker that now lives in the same footer row. */
+   the device picker that now lives in the same footer row. Solid fill for
+   `.on` reads fine here (owner: "fine to have them filled in like this"). */
 @media (max-width: 900px) {
   .viz-chip-label {
     display: none;
   }
   .viz-buttons .chip {
     padding: 7px 9px;
+  }
+}
+/* With labels showing (900px+) a whole row of solid-filled pills reads as too
+   busy — owner: "outline style like before... only when expanded and text is
+   also showing." `.on` stays an outline here too, just a brighter one, so the
+   active view still reads clearly without the fill. Hover still fills
+   everywhere, including here, as instant interactive feedback. */
+@media (min-width: 901px) {
+  .viz-buttons .chip.on {
+    background:
+      linear-gradient(var(--bg-app), var(--bg-app)) padding-box,
+      linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft)) border-box;
+    color: var(--accent-bright);
+    border-width: 2px;
+    box-shadow: 0 0 9px color-mix(in srgb, var(--accent-bright) 70%, transparent);
   }
 }
 
