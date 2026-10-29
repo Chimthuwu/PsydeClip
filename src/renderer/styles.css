@@ -1063,10 +1063,12 @@ button.is-tight.labels-icon {
   white-space: nowrap;
 }
 /* The MIDI pane also carries the always-visible ⇩ .mid export button at
-   top-left (`.viz-pane-export`) — give its tag extra clearance so "⇩ .mid"
-   and "MIDI" don't collide into "⇩.midMIDI" in a narrow pane. */
+   top-left (`.viz-pane-export`) — owner (2026-10-30): that button already
+   says what the pane is, so the "MIDI" name tag is redundant there (and was
+   colliding with it in a narrow pane: "⇩.midMIDI"). Drop it entirely rather
+   than just shrinking it. */
 .viz-pane:has(.viz-pane-export) .viz-pane-tag {
-  max-width: calc(100% - 140px);
+  display: none;
 }
 /* Pane name tags stay out of the way until the cursor is over the window. */
 .app:hover .viz-pane-tag,
@@ -2549,11 +2551,27 @@ small {
   background: linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft));
   box-shadow: 0 0 12px color-mix(in srgb, var(--accent-bright) 70%, transparent);
 }
+/* Minimise / maximise / close (owner, 2026-10-30: "top right corner buttons
+   could be slightly more neon?? Lets make minimize, maximise and X always
+   filled") — unlike the rest of the title bar, these stay solid-filled at
+   rest instead of outline-only, with a stronger glow. */
+.tb-btn.tb-win {
+  background: linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft));
+  color: var(--bg-app, #05070f);
+  box-shadow: 0 0 10px var(--accent-bright), 0 0 20px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.tb-btn.tb-win:hover {
+  filter: brightness(1.2) saturate(1.15);
+  box-shadow: 0 0 14px var(--accent-bright), 0 0 28px color-mix(in srgb, var(--accent) 75%, transparent);
+}
+/* Close keeps its red hover, same cascade position as before (after the
+   generic .tb-win:hover rule, so it wins the tie-break on equal specificity). */
 .tb-btn.tb-close:hover {
   background: var(--danger);
   border-color: var(--danger);
   color: #fff;
-  box-shadow: 0 0 12px color-mix(in srgb, var(--danger) 70%, transparent);
+  filter: none;
+  box-shadow: 0 0 12px var(--danger), 0 0 22px color-mix(in srgb, var(--danger) 70%, transparent);
 }
 .app.theme-kawaii .tb-btn:hover {
   background: linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft));
