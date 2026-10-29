@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Download, Radio, Music, History, Volume2, Scissors, Palette } from 'lucide-react';
+import LiveWaveform from './components/LiveWaveform.jsx';
 
 const REPO = 'https://github.com/Chimthuwu/PsydeClip';
 const RELEASE = REPO + '/releases/latest';
@@ -430,18 +431,10 @@ function Footer() {
   );
 }
 
-/** The page's background: the real app, blurred and dimmed, drifting slowly.
- *  See `.ambient-bg` in index.css for why (and the gotcha: the inner layer
- *  has to be opaque, not transparent, or it does nothing — same trap as the
- *  app's own title-bar buttons hit earlier this session). */
-function AmbientBackground() {
-  return <div className="ambient-bg" aria-hidden="true" />;
-}
-
 export default function App() {
   return (
     <div className="relative min-h-screen text-white font-sans overflow-x-hidden">
-      <AmbientBackground />
+      <LiveWaveform />
       <div className="relative z-10">
         <Nav />
         <Hero />
