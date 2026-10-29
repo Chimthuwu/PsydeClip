@@ -69,7 +69,7 @@ export const VIZ_GAIN_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
 export const BUFFER_PRESETS_SEC = [60, 120, 300, 600, 900, 1800, 3600] as const;
 
 /** Which quick menu the title-bar buttons ask main to pop up. */
-export type TitleMenuKind = 'format' | 'gain' | 'buffer';
+export type TitleMenuKind = 'format' | 'gain' | 'buffer' | 'theme';
 
 export type RecordMode = 'rolling' | 'traditional';
 /**
@@ -144,6 +144,14 @@ export interface LoopbackDevice {
 export interface AppSettings {
   /** Global hotkey, e.g. "Alt+R". */
   hotkey: string;
+  /**
+   * Global hotkey that just raises and focuses the app — the main window, or
+   * the pop-out when that's the one currently on screen. Handy when
+   * `alwaysOnTop` is off (or the window got buried/moved) and you want it
+   * back without hunting for it. Defaults to the numpad `+` key, which
+   * nothing else tends to claim.
+   */
+  focusHotkey: string;
   /** Absolute path to a folder where recordings are written. */
   saveFolder: string;
   /** Which capture backend to use (desktopCapturer vs WASAPI loopback). */
@@ -215,7 +223,13 @@ export interface AppSettings {
   labelMode: LabelMode;
   /** Show the rolling-buffer waveform strip in the HUD. */
   showBuffer: boolean;
-  /** Show the source / output-device picker in the footer. */
+  /**
+   * Show the source / output-device picker in the footer, bottom-right.
+   *
+   * On by default (2026-10-30, owner's call: "should display and be able to
+   * set audio device from this UI too, bottom right area") — picking the
+   * capture source shouldn't require Settings or the quick menu.
+   */
   showSourcePicker: boolean;
   /** Show the oscilloscope / spectrum / spectrogram chip row. */
   showVizChips: boolean;
@@ -228,8 +242,10 @@ export interface AppSettings {
    * desktop work area shrinks and other applications lay out *below* the strip
    * instead of being covered by it — the same mechanism the taskbar uses.
    *
-   * Off by default: it changes the desktop layout for every application, which
-   * is not something to opt a user into silently.
+   * On by default (2026-10-30): the whole point of docking is a strip that
+   * behaves like a second taskbar rather than one more window covering the
+   * desktop. Still a plain Settings toggle for anyone who'd rather it not
+   * touch other apps' layout.
    */
   dockReservesSpace: boolean;
   /** Re-open the pop-out visualizer window on launch. */
@@ -268,6 +284,7 @@ export const AUTO_POPOUT_HEIGHT = 190;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   hotkey: 'Alt+R',
+  focusHotkey: 'numadd',
   saveFolder: '',
   captureBackend: 'desktop',
   sourceId: null,
@@ -282,7 +299,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   bufferSeconds: 5 * 60,
   bitrateKbps: 96,
   recordingFormat: 'webm',
-    alwaysOnTop: false,
+    // On by default (2026-10-30, owner's call): a recorder you have to go
+    // hunting for in alt-tab defeats the point. Both this and
+    // dockReservesSpace below are still plain Settings toggles, just no
+    // longer front-and-centre as title-bar buttons.
+    alwaysOnTop: true,
     /**
      * Write a MIDI transcription beside each saved recording.
      *
@@ -302,14 +323,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   titleBarMode: 'custom',
   labelMode: 'auto',
   showBuffer: true,
-  // Off by default: the device lives in the right-click quick menu and in
-  // Settings, and on a short window the footer strip was costing the
-  // visualizer more height than the picker was worth.
-  showSourcePicker: false,
+  // On by default (2026-10-30): see the field's doc comment above.
+  showSourcePicker: true,
   showVizChips: true,
   showHint: true,
   magneticSnap: true,
-  dockReservesSpace: false,
+  dockReservesSpace: true,
   popoutOpen: false,
   popoutAlwaysOnTop: true,
   popoutOpacity: 1,

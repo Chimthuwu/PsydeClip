@@ -1189,8 +1189,8 @@ export default function App() {
       )}
 
       <footer className="sidebar">
-        {settings.showSourcePicker ? sourcePicker : <span />}
         {vizChips || <span />}
+        {settings.showSourcePicker ? sourcePicker : <span />}
       </footer>
 
       {settingsOpen && (

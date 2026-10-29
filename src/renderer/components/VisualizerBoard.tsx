@@ -352,7 +352,15 @@ export function VisualizerBoard({ analyser, mode, theme, className, idleText, hi
 
     const fit = () => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // A docked/pop-out strip can span a whole monitor's width while staying
+      // short — every per-frame fill (gradients, the spectrogram's offscreen
+      // scroll-blit, the waveform path) costs backing-store-pixel-count, so a
+      // 1900px-wide canvas at the usual 2x DPR cap was pushing ~4x the paint
+      // work of a normal-sized window for a strip nobody is looking at up
+      // close. Past ~900 CSS px, drop to 1x — still sharp enough for a glance
+      // at a docked strip, and a straightforward fix for "the docked view
+      // feels laggier than the main view."
+      const dpr = rect.width > 900 ? 1 : Math.min(2, window.devicePixelRatio || 1);
       const w = Math.max(1, Math.floor(rect.width * dpr));
       const h = Math.max(1, Math.floor(rect.height * dpr));
       // Assigning canvas.width/height wipes the bitmap even when the value is

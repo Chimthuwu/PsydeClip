@@ -279,6 +279,22 @@ export function SettingsPanel({
         </section>
 
         <section>
+          <label htmlFor="focusHotkey">Bring-to-front hotkey</label>
+          <input
+            id="focusHotkey"
+            type="text"
+            value={draft.focusHotkey}
+            onChange={(e) => set('focusHotkey', e.target.value.trim())}
+            placeholder="numadd"
+          />
+          <small>
+            Raises and focuses the window (or the pop-out, if that's the one
+            showing) — handy if "Always on top" is off or it's drifted
+            somewhere. Defaults to the numpad <kbd>+</kbd> key.
+          </small>
+        </section>
+
+        <section>
           <label>Save folder</label>
           <div className="folder-row">
             <code title={draft.saveFolder || 'unset'}>

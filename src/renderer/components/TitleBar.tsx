@@ -40,6 +40,15 @@ export function TitleBar({
   return (
     <div className={`titlebar ${children ? 'has-inline' : ''}`}>
       <span className={`tb-dot ${capturing ? 'on' : ''}`} aria-hidden="true" />
+      <button
+        type="button"
+        className="tb-btn tb-theme"
+        title="Change theme"
+        aria-haspopup="menu"
+        onClick={() => window.api.showTitleMenu('theme')}
+      >
+        ◈
+      </button>
       <span className="tb-name">PsydeClip</span>
 
       {children ? <div className="tb-inline">{children}</div> : <div className="tb-spacer" />}
@@ -50,14 +59,9 @@ export function TitleBar({
       <TitleKnobs settings={settings} />
 
       <div className="tb-actions">
-        <button
-          type="button"
-          className={`tb-btn ${settings.alwaysOnTop ? 'is-on' : ''}`}
-          title={settings.alwaysOnTop ? 'Always on top: on' : 'Always on top: off'}
-          onClick={() => void onUpdate({ alwaysOnTop: !settings.alwaysOnTop })}
-        >
-          ▲
-        </button>
+        {/* "Always on top" is on by default and lives in Settings now, not
+            as a front-facing toggle — see todo.md 2026-10-30: fewer buttons
+            in the top bar, simpler default behaviour. */}
         <button
           type="button"
           className="tb-btn"

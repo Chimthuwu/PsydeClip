@@ -722,6 +722,13 @@ export function registerIpc(ctx: IpcContext) {
           checked: s.vizGain === g,
           click: () => apply({ vizGain: g }),
         }));
+      } else if (args.kind === 'theme') {
+        template = THEMES.map((t) => ({
+          label: t.label,
+          type: 'radio' as const,
+          checked: s.theme === t.value,
+          click: () => apply({ theme: t.value }),
+        }));
       } else {
         template = BUFFER_PRESETS_SEC.map((sec) => ({
           label: `${Math.round(sec / 60)} min`,

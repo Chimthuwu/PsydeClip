@@ -48,6 +48,8 @@ let suppressInitialShow = false;
  *  hide-on-close handler doesn't intercept and the app doesn't quit. */
 let recreating = false;
 const hotkeyMgr = new HotkeyManager();
+/** Separate manager for the "bring the app to the front" hotkey (default numpad +). */
+const focusHotkeyMgr = new HotkeyManager();
 
 function createWindow(bounds?: Electron.Rectangle) {
   const settings = readSettings();
@@ -204,6 +206,7 @@ function recreateWindow() {
  */
 function handleSettingsChanged(s: AppSettings) {
   applyHotkey(s.hotkey);
+  applyFocusHotkey(s.focusHotkey);
   applyPopoutWindowSwap(s);
   // Apply always-on-top; the tray module has direct refs to the current
   // window/settings so it can rebuild itself when notified.
@@ -329,6 +332,26 @@ function applyHotkey(hotkey: string) {
   hotkeyMgr.register(hotkey, () => {
     broadcast({ type: 'hotkey-pressed' });
   });
+}
+
+/**
+ * Raise and focus whichever window is currently "the app" — the pop-out if
+ * it's up (it's the one on screen while `hideMainWhenPopped` hides main),
+ * otherwise the main window. Exists for the case `alwaysOnTop` is off, or the
+ * window drifted/got buried: one keypress brings it back without alt-tabbing
+ * to find it.
+ */
+function focusApp() {
+  const w = getPopout() ?? mainWindow;
+  if (!w || w.isDestroyed()) return;
+  if (w.isMinimized()) w.restore();
+  if (!w.isVisible()) w.show();
+  w.moveTop();
+  w.focus();
+}
+
+function applyFocusHotkey(hotkey: string) {
+  focusHotkeyMgr.register(hotkey, focusApp);
 }
 
 /**
@@ -462,6 +485,7 @@ function init() {
 
     const initial = readSettings();
     applyHotkey(initial.hotkey);
+    applyFocusHotkey(initial.focusHotkey);
     lastPopoutOpen = initial.popoutOpen;
     // Relaunching straight into pop-out mode: skip the main window's first
     // show entirely rather than showing then hiding it.
@@ -495,6 +519,7 @@ function init() {
     // Allow our explicit Quit menu item to actually tear down the window.
     (app as unknown as { isQuitting?: boolean }).isQuitting = true;
     hotkeyMgr.unregister();
+    focusHotkeyMgr.unregister();
     destroyTray();
     if (getPopout()) destroyPopout();
     destroyClipWindow();
@@ -502,6 +527,7 @@ function init() {
 
   app.on('window-all-closed', () => {
     hotkeyMgr.unregister();
+    focusHotkeyMgr.unregister();
     // Don't quit when the window is just hidden via the tray (close handler
     // hides; tray menu's Quit calls app.quit()).
   });
