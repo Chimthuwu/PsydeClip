@@ -1053,6 +1053,20 @@ button.is-tight.labels-icon {
   border-radius: 4px;
   opacity: 0;
   transition: opacity 140ms ease;
+  /* A narrow pane (5-wide grid) used to let this clip against the pane's own
+     `overflow: hidden` — since the tag only has `right` set, the overflow ate
+     letters off the START of the label with no indication ("OSCILLOSCOPE"
+     read as "SCILLOSCOPE"). Truncate with an ellipsis instead. */
+  max-width: calc(100% - 68px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The MIDI pane also carries the always-visible ⇩ .mid export button at
+   top-left (`.viz-pane-export`) — give its tag extra clearance so "⇩ .mid"
+   and "MIDI" don't collide into "⇩.midMIDI" in a narrow pane. */
+.viz-pane:has(.viz-pane-export) .viz-pane-tag {
+  max-width: calc(100% - 140px);
 }
 /* Pane name tags stay out of the way until the cursor is over the window. */
 .app:hover .viz-pane-tag,
