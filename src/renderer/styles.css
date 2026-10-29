@@ -2441,12 +2441,18 @@ small {
    chrome regardless of which theme is active. */
 .tb-btn {
   -webkit-app-region: no-drag;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--accent) 28%, transparent),
-    color-mix(in srgb, var(--accent-soft) 22%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--accent-bright) 55%, transparent);
+  /* Gradient on the OUTLINE only, not a fill: an OPAQUE centre (padding-box
+     layer, matching the theme's own background so it blends into the title
+     bar) occludes a gradient ring underneath (border-box layer) — the classic
+     two-layer trick for a gradient border that still respects border-radius
+     (a plain `border-image` gradient does not round its corners). The centre
+     layer must be opaque, not literally `transparent` — `transparent` doesn't
+     occlude anything, it just lets the layer underneath show straight through
+     the middle too, which is what first produced a fully-filled button here. */
+  background:
+    linear-gradient(var(--bg-app), var(--bg-app)) padding-box,
+    linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft)) border-box;
+  border: 1.5px solid transparent;
   color: var(--accent-bright);
   font-size: 14px;
   line-height: 1;
@@ -2457,7 +2463,7 @@ small {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent);
   transition: background 120ms ease, box-shadow 120ms ease, transform 80ms ease;
 }
 .tb-btn:hover {
@@ -2506,8 +2512,12 @@ small {
   gap: 3px;
   height: 24px;
   padding: 0 8px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-bright) 45%, transparent);
+  /* Same opaque-centre / gradient-ring trick as .tb-btn — the gradient reads
+     on the outline, not as a fill, until hover. */
+  background:
+    linear-gradient(var(--bg-app), var(--bg-app)) padding-box,
+    linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft)) border-box;
+  border: 1.5px solid transparent;
   border-radius: 5px;
   color: var(--accent-bright);
   font-family: var(--font-mono, ui-monospace, Consolas, monospace);
@@ -2515,6 +2525,7 @@ small {
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 40%, transparent);
   transition: border-color 120ms ease, color 120ms ease, background 120ms ease, box-shadow 120ms ease;
 }
 .tb-ctl:hover {
