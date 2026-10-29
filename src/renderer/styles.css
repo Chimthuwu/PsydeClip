@@ -2557,7 +2557,14 @@ small {
    rest instead of outline-only, with a stronger glow. */
 .tb-btn.tb-win {
   background: linear-gradient(135deg, var(--accent), var(--accent-bright), var(--accent-soft));
-  color: var(--bg-app, #05070f);
+  /* Fixed dark glyph, not the theme-variable `--bg-app`: every theme's accent
+     trio is bright/light (that's what makes it read as neon), so a fixed dark
+     icon has reliable contrast everywhere. `--bg-app` went near-white on
+     kawaii/monochrome, which is what made the glyph nearly disappear into the
+     fill ("not quite sure what it is"). */
+  color: #05070f;
+  font-weight: 700;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
   box-shadow: 0 0 10px var(--accent-bright), 0 0 20px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 .tb-btn.tb-win:hover {
