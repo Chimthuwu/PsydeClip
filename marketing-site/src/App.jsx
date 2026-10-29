@@ -100,7 +100,7 @@ function Hero() {
           </motion.h1>
 
           <motion.p variants={fadeIn} className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-10">
-            A rolling-sampler system audio recorder for Windows. It is always quietly recording into memory — press{' '}
+            A system audio recorder for Windows. It is always quietly recording into memory — press{' '}
             <strong className="text-white">Save</strong> to write the last 5 minutes, or however long you buffered, to
             disk.
           </motion.p>
